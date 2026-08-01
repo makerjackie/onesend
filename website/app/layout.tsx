@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   metadataBase: new URL("https://onesend.01mvp.com"),
   title: {
-    default: "OneSend · 一传 — 文件，用光传过去",
+    default: "OneSend · 扫传 — 文件，用光传过去",
     template: "%s · OneSend",
   },
   description:
@@ -23,7 +23,7 @@ export const metadata: Metadata = {
   applicationName: "OneSend",
   keywords: [
     "OneSend",
-    "一传",
+    "扫传",
     "二维码文件传输",
     "离线传输",
     "Flutter",
@@ -39,8 +39,8 @@ export const metadata: Metadata = {
     type: "website",
     locale: "zh_CN",
     url: "/",
-    siteName: "OneSend · 一传",
-    title: "OneSend · 一传 — 文件，用光传过去",
+    siteName: "OneSend · 扫传",
+    title: "OneSend · 扫传 — 文件，用光传过去",
     description:
       "无需网络、无需配对，只用屏幕和摄像头离线传输文件。",
     images: [
@@ -48,13 +48,13 @@ export const metadata: Metadata = {
         url: "/og.png",
         width: 1730,
         height: 909,
-        alt: "OneSend · 一传 — 文件，用光传过去。",
+        alt: "OneSend · 扫传 — 文件，用光传过去。",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "OneSend · 一传 — 文件，用光传过去",
+    title: "OneSend · 扫传 — 文件，用光传过去",
     description:
       "无需网络、无需配对，只用屏幕和摄像头离线传输文件。",
     images: ["/og.png"],

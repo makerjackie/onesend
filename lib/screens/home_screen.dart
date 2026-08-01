@@ -88,7 +88,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        'OneSend · 一传\n无需网络、无需配对，只要一块屏幕和一枚摄像头。',
+                        'OneSend · 扫传\n无需网络、无需配对，只要一块屏幕和一枚摄像头。',
                         style: Theme.of(
                           context,
                         ).textTheme.bodyLarge?.copyWith(color: oneSendMuted),

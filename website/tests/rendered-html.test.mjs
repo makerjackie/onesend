@@ -31,7 +31,7 @@ test("server-renders the OneSend product page", async () => {
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
 
   const html = await response.text();
-  assert.match(html, /OneSend · 一传/);
+  assert.match(html, /OneSend · 扫传/);
   assert.match(html, /文件，/);
   assert.match(html, /用光传过去/);
   assert.match(html, /可靠模式/);

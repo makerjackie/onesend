@@ -23,7 +23,7 @@ class OneSendApp extends StatelessWidget {
     );
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'OneSend · 一传',
+      title: 'OneSend · 扫传',
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: scheme,
