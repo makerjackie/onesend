@@ -25,6 +25,11 @@ Upload the generated IPA from `build/ios/ipa/` with Transporter or App Store Con
 
 ## TestFlight external beta
 
+Public beta link: <https://testflight.apple.com/join/n2t1KrCp>
+
+The public link can be created while Beta App Review is pending. Testers can
+join after Apple approves at least one build in the external group.
+
 1. Wait for the build to finish processing in App Store Connect.
 2. Create an external tester group, for example `Early Access`.
 3. Add the build to that group.

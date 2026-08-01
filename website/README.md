@@ -19,8 +19,9 @@ npm test
 npm run lint
 ```
 
-The page links to the stable filenames in the latest GitHub Release. The public
-TestFlight URL is added only after Apple approves the external beta group.
+The page links to the stable filenames in the latest GitHub Release and to the
+public TestFlight group. Apple enables joining through that link after the
+submitted external beta build passes Beta App Review.
 
 ## Hosting
 

@@ -363,14 +363,18 @@ export default function Home() {
                 <em>{platform.action} ↗</em>
               </a>
             ))}
-            <div className="platform-testflight" id="testflight">
+            <a
+              className="platform-testflight"
+              href="https://testflight.apple.com/join/n2t1KrCp"
+              id="testflight"
+            >
               <span className="platform-mark">i</span>
               <div>
                 <strong>iPhone / iPad</strong>
-                <small>TestFlight 公测</small>
+                <small>TestFlight 公测 · 已提交 Apple 审核</small>
               </div>
-              <em>审核准备中</em>
-            </div>
+              <em>Beta 审核中 ↗</em>
+            </a>
           </div>
         </div>
       </section>

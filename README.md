@@ -13,6 +13,7 @@ OneSend 是一个极简、离线优先的跨设备文件传输工具。发送端
 
 [下载最新版](https://github.com/makerjackie/onesend/releases/latest) ·
 [产品网站](https://onesend.01mvp.com) ·
+[iOS TestFlight 公测](https://testflight.apple.com/join/n2t1KrCp) ·
 [隐私说明](PRIVACY.md)
 
 ## 功能
