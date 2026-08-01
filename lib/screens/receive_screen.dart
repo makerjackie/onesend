@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:isolate';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../app.dart';
 import '../core/envelope.dart';
@@ -37,14 +39,22 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
   String? _error;
   bool _paused = false;
   bool _completed = false;
+  bool _processing = false;
   bool _saving = false;
 
   bool get _usesMobileScanner =>
       Platform.isAndroid || Platform.isIOS || Platform.isMacOS;
 
   @override
+  void initState() {
+    super.initState();
+    unawaited(WakelockPlus.enable());
+  }
+
+  @override
   void dispose() {
     unawaited(_mobileController.dispose());
+    unawaited(WakelockPlus.disable());
     super.dispose();
   }
 
@@ -68,25 +78,32 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
   }
 
   void _consume(Uint8List bytes) {
-    if (_completed || _paused) return;
+    if (_completed || _paused || _processing) return;
     final event = _receiver.consume(bytes);
     if (event == null || !mounted) return;
     setState(() {
       _snapshot = event.snapshot;
-      _error = null;
+      _error = event.error;
     });
-    final file = event.file;
-    if (file != null && event.verified && !_completed) {
-      _completed = true;
-      _receivedFile = file;
-      unawaited(_finishTransfer(file));
+    if (event.error != null) {
+      setState(() => _processing = true);
+      unawaited(_recoverFromFailure(event.error!));
+      return;
+    }
+    final payload = event.payload;
+    if (payload != null && event.verified && !_completed) {
+      setState(() {
+        _processing = true;
+        _saving = true;
+      });
+      unawaited(_finishTransfer(payload));
     }
   }
 
-  Future<void> _finishTransfer(TransferFile file) async {
-    setState(() => _saving = true);
-    if (_usesMobileScanner) unawaited(_mobileController.stop());
+  Future<void> _finishTransfer(Uint8List payload) async {
     try {
+      if (_usesMobileScanner) await _mobileController.stop();
+      final file = await Isolate.run(() => decodeTransferFile(payload));
       final stored = await saveReceivedFile(file);
       await widget.store.add(
         TransferRecord(
@@ -100,26 +117,52 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
           verified: true,
         ),
       );
+      await WakelockPlus.disable();
       if (mounted) {
         setState(() {
+          _receivedFile = file;
           _storedFile = stored;
+          _completed = true;
+          _processing = false;
           _saving = false;
         });
       }
     } catch (error) {
-      if (mounted) {
-        setState(() {
-          _saving = false;
-          _error = error.toString();
-        });
+      await _recoverFromFailure(_friendlyReceiveError(error));
+    }
+  }
+
+  Future<void> _recoverFromFailure(String message) async {
+    if (_usesMobileScanner) {
+      try {
+        await _mobileController.stop();
+      } catch (_) {
+        // The scanner may already be stopped after a completed decode.
+      }
+    }
+    _receiver.reset();
+    if (!mounted) return;
+    setState(() {
+      _snapshot = null;
+      _processing = false;
+      _saving = false;
+      _error = message;
+    });
+    await WakelockPlus.enable();
+    if (_usesMobileScanner) {
+      try {
+        await _mobileController.start();
+      } catch (error) {
+        if (mounted) setState(() => _error = _friendlyReceiveError(error));
       }
     }
   }
 
   Future<void> _togglePause() async {
-    if (_completed) return;
+    if (_completed || _processing) return;
     if (_paused) {
       setState(() => _paused = false);
+      await WakelockPlus.enable();
       if (_usesMobileScanner) {
         try {
           await _mobileController.start();
@@ -129,12 +172,19 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
       }
     } else {
       if (_usesMobileScanner) await _mobileController.stop();
+      await WakelockPlus.disable();
       if (mounted) setState(() => _paused = true);
     }
   }
 
   Future<void> _reset() async {
-    if (_usesMobileScanner) unawaited(_mobileController.stop());
+    if (_usesMobileScanner) {
+      try {
+        await _mobileController.stop();
+      } catch (_) {
+        // A stopped controller is already in the state needed for reset.
+      }
+    }
     _receiver.reset();
     setState(() {
       _snapshot = null;
@@ -142,15 +192,30 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
       _storedFile = null;
       _error = null;
       _completed = false;
+      _processing = false;
       _saving = false;
       _paused = false;
     });
+    await WakelockPlus.enable();
     if (_usesMobileScanner) {
       try {
         await _mobileController.start();
       } catch (error) {
         if (mounted) setState(() => _error = error.toString());
       }
+    }
+  }
+
+  String _friendlyReceiveError(Object error) => error
+      .toString()
+      .replaceFirst('FormatException: ', '')
+      .replaceFirst('Bad state: ', '');
+
+  Future<void> _openReceived(StoredTransfer file) async {
+    try {
+      await openStoredFile(file);
+    } catch (error) {
+      if (mounted) setState(() => _error = _friendlyReceiveError(error));
     }
   }
 
@@ -163,7 +228,7 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
           if (_usesMobileScanner)
             IconButton(
               tooltip: '手电筒',
-              onPressed: _completed
+              onPressed: _completed || _processing
                   ? null
                   : () => unawaited(_mobileController.toggleTorch()),
               icon: const Icon(Icons.flashlight_on_outlined),
@@ -177,11 +242,13 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
   Widget _buildScanner() {
     final snapshot = _snapshot;
     final progress = snapshot?.progress;
-    final status = _paused
+    final status = _processing
+        ? '正在校验并保存文件…'
+        : _paused
         ? '已暂停，点击继续即可保留当前进度'
         : snapshot == null
         ? '正在寻找发送端…'
-        : '已锁定光传会话 · 正在收集二维码';
+        : '已锁定${snapshot.mode?.label ?? '兼容'}模式 · 正在收集二维码';
     return LayoutBuilder(
       builder: (context, constraints) {
         final cameraHeight = constraints.maxWidth >= 760
@@ -208,13 +275,13 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
                               painter: _ScannerOverlayPainter(paused: _paused),
                             ),
                           ),
-                          if (_paused)
+                          if (_paused || _processing)
                             Container(
                               color: oneSendInk.withValues(alpha: 0.55),
                               alignment: Alignment.center,
-                              child: const Text(
-                                '已暂停',
-                                style: TextStyle(
+                              child: Text(
+                                _processing ? '校验中…' : '已暂停',
+                                style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 20,
                                   fontWeight: FontWeight.w700,
@@ -260,7 +327,7 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
                               ),
                               if (snapshot != null)
                                 Text(
-                                  formatBytes(snapshot.totalLength),
+                                  '${snapshot.mode?.label ?? '兼容'} · ${formatBytes(snapshot.totalLength)}',
                                   style: Theme.of(context).textTheme.bodySmall,
                                 ),
                             ],
@@ -278,7 +345,7 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
                     children: [
                       Expanded(
                         child: OutlinedButton.icon(
-                          onPressed: _togglePause,
+                          onPressed: _processing ? null : _togglePause,
                           icon: Icon(
                             _paused
                                 ? Icons.play_arrow_rounded
@@ -290,7 +357,7 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: FilledButton.icon(
-                          onPressed: _reset,
+                          onPressed: _processing ? null : _reset,
                           icon: const Icon(Icons.refresh_rounded),
                           label: const Text('重新开始'),
                         ),
@@ -314,7 +381,10 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
         onDetect: _onMobileCapture,
       );
     }
-    return DesktopCameraReceiver(enabled: !_paused, onFrame: _consume);
+    return DesktopCameraReceiver(
+      enabled: !_paused && !_processing,
+      onFrame: _consume,
+    );
   }
 
   Widget _buildCompleted() {
@@ -367,20 +437,31 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
                         child: OutlinedButton.icon(
                           onPressed: stored == null
                               ? null
-                              : () => unawaited(shareStoredFile(stored)),
-                          icon: const Icon(Icons.ios_share_rounded),
-                          label: const Text('分享文件'),
+                              : () => unawaited(_openReceived(stored)),
+                          icon: const Icon(Icons.open_in_new_rounded),
+                          label: const Text('打开文件'),
                         ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: FilledButton.icon(
-                          onPressed: _reset,
-                          icon: const Icon(Icons.qr_code_scanner_rounded),
-                          label: const Text('继续接收'),
+                        child: OutlinedButton.icon(
+                          onPressed: stored == null
+                              ? null
+                              : () => unawaited(shareStoredFile(stored)),
+                          icon: const Icon(Icons.ios_share_rounded),
+                          label: const Text('分享'),
                         ),
                       ),
                     ],
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: _reset,
+                      icon: const Icon(Icons.qr_code_scanner_rounded),
+                      label: const Text('继续接收'),
+                    ),
                   ),
                 ],
               ),

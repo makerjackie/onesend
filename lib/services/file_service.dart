@@ -2,13 +2,14 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:open_filex/open_filex.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../core/envelope.dart';
 
-const int maxTransferBytes = 64 * 1024 * 1024;
+const int maxTransferBytes = maxTransferFileBytes;
 
 class PickedTransfer {
   const PickedTransfer({
@@ -41,22 +42,25 @@ class StoredTransfer {
 Future<PickedTransfer?> pickTransferFile() async {
   final result = await FilePicker.platform.pickFiles(
     allowMultiple: false,
-    withData: true,
+    withData: false,
     type: FileType.any,
   );
   if (result == null || result.files.isEmpty) return null;
 
   final picked = result.files.single;
+  if (picked.size > maxTransferBytes) {
+    throw StateError('文件不能超过 64 MB。');
+  }
   Uint8List? bytes = picked.bytes;
   final path = picked.path;
   if (bytes == null && path != null) {
     bytes = await File(path).readAsBytes();
   }
   if (bytes == null) {
-    throw StateError('OneSend could not read this file.');
+    throw StateError('OneSend 无法读取这个文件。');
   }
   if (bytes.length > maxTransferBytes) {
-    throw StateError('For this first release, files must be 64 MB or smaller.');
+    throw StateError('文件不能超过 64 MB。');
   }
 
   return PickedTransfer(
@@ -95,6 +99,15 @@ Future<void> shareStoredFile(StoredTransfer file) async {
   await SharePlus.instance.share(
     ShareParams(files: <XFile>[XFile(file.path)], text: 'Sent with OneSend'),
   );
+}
+
+Future<void> openStoredFile(StoredTransfer file) => openStoredPath(file.path);
+
+Future<void> openStoredPath(String path) async {
+  final result = await OpenFilex.open(path);
+  if (result.type != ResultType.done) {
+    throw StateError(result.message.isEmpty ? '系统无法打开这个文件。' : result.message);
+  }
 }
 
 Future<String> _uniquePath(String directory, String fileName) async {

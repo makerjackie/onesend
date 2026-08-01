@@ -4,17 +4,25 @@ import 'package:flutter/material.dart';
 import 'package:qr/qr.dart';
 
 class OpticalQr extends StatelessWidget {
-  const OpticalQr({required this.bytes, this.size = 320, super.key});
+  const OpticalQr({
+    required this.bytes,
+    this.size = 320,
+    this.robust = true,
+    super.key,
+  });
 
   final Uint8List bytes;
   final double size;
+  final bool robust;
 
   @override
   Widget build(BuildContext context) {
     final payload = QrPayload.fromTypedData(bytes);
     final code = QrCode(
       payload: payload,
-      errorCorrectLevel: QrErrorCorrectLevel.low,
+      errorCorrectLevel: robust
+          ? QrErrorCorrectLevel.medium
+          : QrErrorCorrectLevel.low,
     );
     final image = QrImage(code);
     return RepaintBoundary(
