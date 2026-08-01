@@ -28,6 +28,8 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>NSCameraUsageDescription</key>
 	<string>光传需要使用摄像头扫描持续变化的二维码来接收文件。</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>OneSend 的二维码识别组件仅在你主动选择图片时读取该图片，用于识别二维码；不会浏览或上传其他照片。</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>LSSupportsOpeningDocumentsInPlace</key>
