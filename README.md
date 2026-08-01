@@ -1,5 +1,9 @@
 # OneSend · 一传
 
+<p align="center">
+  <img src="assets/brand/onesend-icon-1024.png" width="112" alt="OneSend optical data icon">
+</p>
+
 OneSend 是一个极简、离线优先的跨设备文件传输工具。发送端把文件编码成
 持续变化的二维码，接收端只用摄像头连续扫描并在本地还原文件。
 
@@ -80,8 +84,8 @@ flutter run -d macos
 推送版本 tag 会触发 Android、macOS、Windows、Linux 构建并创建 GitHub Release：
 
 ```bash
-git tag v1.1.0
-git push origin v1.1.0
+git tag vX.Y.Z
+git push origin vX.Y.Z
 ```
 
 iOS 签名、TestFlight 和 Beta App Review 流程见
