@@ -49,7 +49,7 @@ jobs:
         run: |
           test -n "$KEYSTORE_BASE64"
           printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$ONESEND_ANDROID_KEYSTORE_PATH"
-      - run: flutter build apk --release --build-name=1.1.0 --build-number=${{ github.run_number }}
+      - run: flutter build apk --release --build-name=1.1.1 --build-number=${{ github.run_number }}
       - name: Verify Android release signature and permissions
         run: |
           BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
@@ -80,9 +80,9 @@ jobs:
       - run: flutter pub get
       - name: Verify native QR encode/decode bridge
         run: |
-          flutter build macos --release --target=tool/qr_codec_self_test.dart --build-name=1.1.0 --build-number=${{ github.run_number }}
+          flutter build macos --release --target=tool/qr_codec_self_test.dart --build-name=1.1.1 --build-number=${{ github.run_number }}
           build/macos/Build/Products/Release/OneSend.app/Contents/MacOS/OneSend
-      - run: flutter build macos --release --build-name=1.1.0 --build-number=${{ github.run_number }}
+      - run: flutter build macos --release --build-name=1.1.1 --build-number=${{ github.run_number }}
       - name: Package artifact
         run: ditto -c -k --sequesterRsrc --keepParent build/macos/Build/Products/Release/OneSend.app onesend-macos.zip
       - uses: actions/upload-artifact@v7
@@ -101,7 +101,7 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
-      - run: flutter build windows --release --build-name=1.1.0 --build-number=${{ github.run_number }}
+      - run: flutter build windows --release --build-name=1.1.1 --build-number=${{ github.run_number }}
       - name: Package artifact
         shell: pwsh
         run: Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath onesend-windows.zip
@@ -125,7 +125,7 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
-      - run: flutter build linux --release --build-name=1.1.0 --build-number=${{ github.run_number }}
+      - run: flutter build linux --release --build-name=1.1.1 --build-number=${{ github.run_number }}
       - name: Package artifact
         run: tar -czf onesend-linux.tar.gz -C build/linux/x64/release bundle
       - uses: actions/upload-artifact@v7
