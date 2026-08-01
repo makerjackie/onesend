@@ -9,6 +9,13 @@
 # packages, and plugins designed to encourage good coding practices.
 include: package:flutter_lints/flutter.yaml
 
+# The product website is a separate TypeScript project. Excluding it keeps the
+# Dart analyzer from walking its dependency tree when the site lives beside the
+# Flutter sources in the release repository.
+analyzer:
+  exclude:
+    - website/**
+
 linter:
   # The lint rules applied to this project can be customized in the
   # section below to disable rules from the `package:flutter_lints/flutter.yaml`

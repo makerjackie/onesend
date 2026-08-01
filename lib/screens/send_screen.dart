@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:isolate';
 import 'dart:math' as math;
 import 'dart:typed_data';
 
@@ -23,13 +24,14 @@ class SendScreen extends StatefulWidget {
 }
 
 class _SendScreenState extends State<SendScreen> {
-  PickedTransfer? _file;
+  _SendingFile? _file;
   OpticalSender? _sender;
   Uint8List? _frame;
   int _framesSent = 0;
   DateTime? _startedAt;
   String? _error;
   bool _picking = false;
+  TransferMode _mode = TransferMode.reliable;
 
   @override
   void dispose() {
@@ -49,23 +51,31 @@ class _SendScreenState extends State<SendScreen> {
       if (file == null || !mounted) return;
       _sender?.dispose();
       _sender = null;
-      final payload = encodeTransferFile(
-        TransferFile(
-          name: file.name,
-          mimeType: file.mimeType,
-          bytes: file.bytes,
+      final payload = await Isolate.run(
+        () => encodeTransferFile(
+          TransferFile(
+            name: file.name,
+            mimeType: file.mimeType,
+            bytes: file.bytes,
+          ),
         ),
       );
-      if (payload.length > maxTransferBytes) {
-        throw StateError('文件元数据过长，无法开始传输。');
+      if (!mounted) return;
+      if (payload.length > maxOpticalPayloadBytes) {
+        throw StateError('文件编码后超过光传协议上限。');
       }
+      final selected = _SendingFile(
+        name: file.name,
+        mimeType: file.mimeType,
+        bytes: file.bytes.length,
+      );
       setState(() {
-        _file = file;
+        _file = selected;
         _frame = null;
         _framesSent = 0;
         _startedAt = DateTime.now();
       });
-      _startSender(payload, file);
+      _startSender(payload, selected);
     } catch (error) {
       if (mounted) setState(() => _error = _friendlyError(error));
     } finally {
@@ -73,11 +83,12 @@ class _SendScreenState extends State<SendScreen> {
     }
   }
 
-  void _startSender(Uint8List payload, PickedTransfer file) {
+  void _startSender(Uint8List payload, _SendingFile file) {
     final sender = OpticalSender(
       payload: payload,
       fileName: file.name,
       mimeType: file.mimeType,
+      mode: _mode,
       onFrame: (frame, _) {
         if (!mounted) return;
         setState(() {
@@ -119,9 +130,9 @@ class _SendScreenState extends State<SendScreen> {
           id: DateTime.now().microsecondsSinceEpoch.toString(),
           direction: TransferDirection.sent,
           fileName: file.name,
-          bytes: file.bytes.length,
+          bytes: file.bytes,
           createdAt: DateTime.now(),
-          status: 'sent',
+          status: 'broadcast-ended',
         ),
       );
     }
@@ -175,11 +186,48 @@ class _SendScreenState extends State<SendScreen> {
                     '文件会被编码成一串不断变化的二维码。\n最大支持 64 MB，建议从小文件开始体验。',
                     textAlign: TextAlign.center,
                   ),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    child: SegmentedButton<TransferMode>(
+                      segments: const <ButtonSegment<TransferMode>>[
+                        ButtonSegment<TransferMode>(
+                          value: TransferMode.reliable,
+                          label: Text('可靠'),
+                          icon: Icon(Icons.verified_user_outlined),
+                        ),
+                        ButtonSegment<TransferMode>(
+                          value: TransferMode.fast,
+                          label: Text('快速'),
+                          icon: Icon(Icons.bolt_rounded),
+                        ),
+                      ],
+                      selected: <TransferMode>{_mode},
+                      showSelectedIcon: false,
+                      onSelectionChanged: _picking
+                          ? null
+                          : (selection) {
+                              setState(() => _mode = selection.single);
+                            },
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 180),
+                    child: Text(
+                      _mode == TransferMode.reliable
+                          ? '8 帧/秒 · 中等二维码纠错 · 手持扫描优先'
+                          : '15 帧/秒 · 低二维码纠错 · 固定设备、明亮屏幕',
+                      key: ValueKey<TransferMode>(_mode),
+                      style: Theme.of(context).textTheme.bodySmall,
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
                   if (_error != null) ...[
                     const SizedBox(height: 16),
                     _ErrorText(message: _error!),
                   ],
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 22),
                   FilledButton.icon(
                     onPressed: _picking ? null : _pickFile,
                     icon: _picking
@@ -202,11 +250,8 @@ class _SendScreenState extends State<SendScreen> {
   Widget _buildActiveTransfer() {
     final file = _file!;
     final sender = _sender;
-    final blockCount = sender?.blockCount ?? 1;
-    final progress = math.min(
-      0.99,
-      _framesSent / math.max(1, blockCount * expectedFrameOverhead),
-    );
+    final progress = sender?.sourcePassProgress ?? 0;
+    final pass = sender?.sourcePassNumber ?? 1;
     final elapsed = _startedAt == null
         ? '—'
         : _formatDuration(DateTime.now().difference(_startedAt!));
@@ -234,9 +279,34 @@ class _SendScreenState extends State<SendScreen> {
                                 ? const Center(
                                     child: CircularProgressIndicator(),
                                   )
-                                : OpticalQr(bytes: _frame!, size: qrSize),
+                                : OpticalQr(
+                                    bytes: _frame!,
+                                    size: qrSize,
+                                    robust: _mode == TransferMode.reliable,
+                                  ),
                           ),
                           const SizedBox(height: 18),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 11,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: _mode == TransferMode.reliable
+                                  ? oneSendLime
+                                  : const Color(0xffdce9ff),
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Text(
+                              '${_mode.label}模式 · ${_mode.framesPerSecond} fps',
+                              style: const TextStyle(
+                                color: oneSendInk,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
                           Text(
                             sender?.isPaused == true ? '已暂停播放' : '正在持续播放二维码',
                             style: Theme.of(context).textTheme.titleMedium,
@@ -258,7 +328,7 @@ class _SendScreenState extends State<SendScreen> {
                         children: [
                           FileTile(
                             name: file.name,
-                            bytes: file.bytes.length,
+                            bytes: file.bytes,
                             icon: Icons.north_east_rounded,
                           ),
                           const SizedBox(height: 22),
@@ -274,7 +344,7 @@ class _SendScreenState extends State<SendScreen> {
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Text(
-                                '已发 $_framesSent 帧',
+                                '第 $pass 轮 · 已发 $_framesSent 帧',
                                 style: Theme.of(context).textTheme.bodySmall,
                               ),
                               Text(
@@ -360,4 +430,16 @@ class _ErrorText extends StatelessWidget {
       ),
     );
   }
+}
+
+class _SendingFile {
+  const _SendingFile({
+    required this.name,
+    required this.mimeType,
+    required this.bytes,
+  });
+
+  final String name;
+  final String mimeType;
+  final int bytes;
 }

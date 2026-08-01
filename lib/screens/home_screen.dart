@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../app.dart';
+import '../services/file_service.dart';
 import '../services/transfer_store.dart';
 import '../widgets/brand_mark.dart';
 import '../widgets/file_tile.dart';
@@ -301,15 +302,35 @@ class _HistoryRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final received = record.direction == TransferDirection.received;
     final when = _relativeTime(record.createdAt);
+    final canOpen = received && record.path != null;
+    final directionLabel = received
+        ? '收到并校验'
+        : record.status == 'broadcast-ended'
+        ? '发送已结束'
+        : '发出';
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 12),
       child: FileTile(
         name: record.fileName,
         bytes: record.bytes,
         icon: received ? Icons.south_west_rounded : Icons.north_east_rounded,
-        subtitle: '${received ? '收到' : '发出'} · $when',
+        subtitle: '$directionLabel · $when',
+        onTap: canOpen ? () => _openFile(context, record.path!) : null,
       ),
     );
+  }
+
+  Future<void> _openFile(BuildContext context, String path) async {
+    try {
+      await openStoredPath(path);
+    } catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error.toString().replaceFirst('Bad state: ', '')),
+        ),
+      );
+    }
   }
 
   String _relativeTime(DateTime date) {

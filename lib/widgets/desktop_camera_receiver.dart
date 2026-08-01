@@ -3,8 +3,9 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:camera/camera.dart';
+import 'package:camera_desktop/camera_desktop.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_zxing/flutter_zxing.dart';
+import 'package:flutter_zxing/flutter_zxing.dart' as zxing;
 
 class DesktopCameraReceiver extends StatefulWidget {
   const DesktopCameraReceiver({
@@ -22,8 +23,8 @@ class DesktopCameraReceiver extends StatefulWidget {
 
 class _DesktopCameraReceiverState extends State<DesktopCameraReceiver> {
   CameraController? _controller;
-  Timer? _timer;
-  bool _capturing = false;
+  bool _processingFrame = false;
+  bool _streaming = false;
   String? _error;
 
   @override
@@ -37,10 +38,9 @@ class _DesktopCameraReceiverState extends State<DesktopCameraReceiver> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.enabled == widget.enabled) return;
     if (widget.enabled) {
-      _startTimer();
+      unawaited(_startStream());
     } else {
-      _timer?.cancel();
-      _timer = null;
+      unawaited(_stopStream());
     }
   }
 
@@ -60,46 +60,78 @@ class _DesktopCameraReceiverState extends State<DesktopCameraReceiver> {
         camera,
         ResolutionPreset.high,
         enableAudio: false,
+        fps: 30,
       );
       await controller.initialize();
+      if (!Platform.isWindows) {
+        // Mirrored pixels look natural in a webcam preview, but mirrored QR
+        // modules are not reliably decodable.
+        await CameraDesktopPlugin().setMirror(controller.cameraId, false);
+      }
+      await zxing.zx.startCameraProcessing();
       if (!mounted) {
         await controller.dispose();
+        zxing.zx.stopCameraProcessing();
         return;
       }
       setState(() => _controller = controller);
-      if (widget.enabled) _startTimer();
+      if (widget.enabled) await _startStream();
     } catch (error) {
       if (mounted) setState(() => _error = error.toString());
     }
   }
 
-  void _startTimer() {
-    _timer?.cancel();
-    _timer = Timer.periodic(const Duration(milliseconds: 220), (_) {
-      unawaited(_captureAndDecode());
-    });
-  }
-
-  Future<void> _captureAndDecode() async {
+  Future<void> _startStream() async {
     final controller = _controller;
     if (!mounted ||
+        !widget.enabled ||
+        _streaming ||
         controller == null ||
-        _capturing ||
         !controller.value.isInitialized) {
       return;
     }
-    _capturing = true;
-    String? imagePath;
     try {
-      final image = await controller.takePicture();
-      imagePath = image.path;
-      final result = await zx.readBarcodeImagePathString(
-        image.path,
-        DecodeParams(
-          format: Format.qrCode,
-          tryHarder: true,
+      await controller.startImageStream(_onCameraImage);
+      _streaming = true;
+    } catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    }
+  }
+
+  Future<void> _stopStream() async {
+    final controller = _controller;
+    if (controller == null || !_streaming) return;
+    _streaming = false;
+    try {
+      if (controller.value.isStreamingImages) {
+        await controller.stopImageStream();
+      }
+    } catch (_) {
+      // The native camera may already have stopped while the window closes.
+    }
+    if (mounted && widget.enabled) await _startStream();
+  }
+
+  void _onCameraImage(CameraImage image) {
+    if (!mounted || !widget.enabled || _processingFrame) return;
+    _processingFrame = true;
+    unawaited(_decodeFrame(image));
+  }
+
+  Future<void> _decodeFrame(CameraImage image) async {
+    try {
+      final result = await zxing.zx.processCameraImage(
+        image,
+        zxing.DecodeParams(
+          imageFormat: image.format.group == ImageFormatGroup.bgra8888
+              ? zxing.ImageFormat.bgrx
+              : zxing.ImageFormat.lum,
+          format: zxing.Format.qrCode,
+          width: image.width,
+          height: image.height,
+          tryHarder: false,
+          tryRotate: true,
           tryDownscale: true,
-          maxSize: 1280,
         ),
       );
       if (result.isValid && result.rawBytes != null) {
@@ -108,21 +140,18 @@ class _DesktopCameraReceiverState extends State<DesktopCameraReceiver> {
     } catch (_) {
       // A missed desktop frame is expected; the fountain code absorbs it.
     } finally {
-      _capturing = false;
-      if (imagePath != null) {
-        try {
-          await File(imagePath).delete();
-        } catch (_) {
-          // Camera backends may manage their temporary files themselves.
-        }
-      }
+      _processingFrame = false;
     }
   }
 
   @override
   void dispose() {
-    _timer?.cancel();
-    unawaited(_controller?.dispose());
+    final controller = _controller;
+    unawaited(() async {
+      await _stopStream();
+      await controller?.dispose();
+      zxing.zx.stopCameraProcessing();
+    }());
     super.dispose();
   }
 

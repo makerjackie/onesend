@@ -11,9 +11,10 @@ permissions:
 
 env:
   FLUTTER_VERSION: '3.44.5'
+  ONESEND_ANDROID_CERT_SHA256: '2a6af660bfbe4c858da95969bb6087401dcbd514082e597307b62b2e3e52ce42'
 
 jobs:
-  android:
+  quality:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -23,7 +24,42 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
-      - run: flutter build apk --release --build-name=1.0.0 --build-number=${{ github.run_number }}
+      - run: flutter analyze
+      - run: flutter test
+
+  android:
+    needs: quality
+    runs-on: ubuntu-latest
+    env:
+      ONESEND_ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/onesend-release.jks
+      ONESEND_ANDROID_STORE_PASSWORD: ${{ secrets.ONESEND_ANDROID_STORE_PASSWORD }}
+      ONESEND_ANDROID_KEY_ALIAS: ${{ secrets.ONESEND_ANDROID_KEY_ALIAS }}
+      ONESEND_ANDROID_KEY_PASSWORD: ${{ secrets.ONESEND_ANDROID_KEY_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - name: Restore Android release signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ONESEND_ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          test -n "$KEYSTORE_BASE64"
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$ONESEND_ANDROID_KEYSTORE_PATH"
+      - run: flutter build apk --release --build-name=1.1.0 --build-number=${{ github.run_number }}
+      - name: Verify Android release signature and permissions
+        run: |
+          BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
+          APK=build/app/outputs/flutter-apk/app-release.apk
+          "$BUILD_TOOLS/apksigner" verify --verbose --print-certs "$APK" | tee /tmp/onesend-apksigner.txt
+          grep -Fqi "$ONESEND_ANDROID_CERT_SHA256" /tmp/onesend-apksigner.txt
+          "$BUILD_TOOLS/aapt2" dump permissions "$APK" | tee /tmp/onesend-permissions.txt
+          test "$(grep -c "uses-permission:" /tmp/onesend-permissions.txt)" -eq 2
+          grep -Fq "android.permission.CAMERA" /tmp/onesend-permissions.txt
+          grep -Fq "com.makerjackie.onesend.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" /tmp/onesend-permissions.txt
       - name: Prepare artifact
         run: cp build/app/outputs/flutter-apk/app-release.apk onesend-android.apk
       - uses: actions/upload-artifact@v4
@@ -32,6 +68,7 @@ jobs:
           path: onesend-android.apk
 
   macos:
+    needs: quality
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -41,7 +78,11 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
-      - run: flutter build macos --release --build-name=1.0.0 --build-number=${{ github.run_number }}
+      - name: Verify native QR encode/decode bridge
+        run: |
+          flutter build macos --release --target=tool/qr_codec_self_test.dart --build-name=1.1.0 --build-number=${{ github.run_number }}
+          build/macos/Build/Products/Release/OneSend.app/Contents/MacOS/OneSend
+      - run: flutter build macos --release --build-name=1.1.0 --build-number=${{ github.run_number }}
       - name: Package artifact
         run: ditto -c -k --sequesterRsrc --keepParent build/macos/Build/Products/Release/OneSend.app onesend-macos.zip
       - uses: actions/upload-artifact@v4
@@ -50,6 +91,7 @@ jobs:
           path: onesend-macos.zip
 
   windows:
+    needs: quality
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -59,7 +101,7 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
-      - run: flutter build windows --release --build-name=1.0.0 --build-number=${{ github.run_number }}
+      - run: flutter build windows --release --build-name=1.1.0 --build-number=${{ github.run_number }}
       - name: Package artifact
         shell: pwsh
         run: Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath onesend-windows.zip
@@ -69,6 +111,7 @@ jobs:
           path: onesend-windows.zip
 
   linux:
+    needs: quality
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -82,7 +125,7 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
-      - run: flutter build linux --release --build-name=1.0.0 --build-number=${{ github.run_number }}
+      - run: flutter build linux --release --build-name=1.1.0 --build-number=${{ github.run_number }}
       - name: Package artifact
         run: tar -czf onesend-linux.tar.gz -C build/linux/x64/release bundle
       - uses: actions/upload-artifact@v4
@@ -102,4 +145,13 @@ jobs:
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" artifacts/* --title "OneSend $GITHUB_REF_NAME" --generate-notes
+        run: |
+          cd artifacts
+          sha256sum * > SHA256SUMS.txt
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --clobber ./*
+          else
+            # Keep the release private until the locally Developer ID-signed and
+            # notarized macOS package replaces the CI validation artifact.
+            gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" ./* --title "OneSend $GITHUB_REF_NAME" --generate-notes --draft
+          fi

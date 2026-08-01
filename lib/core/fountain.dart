@@ -1,3 +1,4 @@
+import 'dart:collection';
 import 'dart:math' as math;
 import 'dart:typed_data';
 
@@ -6,6 +7,21 @@ import 'protocol.dart';
 const double _ln2 = 0.6931471805599453;
 const double _solitonC = 0.1;
 const double _solitonDelta = 0.5;
+const int sourceFramesPerGroup = 4;
+const int framesPerGroup = sourceFramesPerGroup + 1;
+const int _maximumRepairDegree = 64;
+const int _seenSequenceWindow = 4096;
+const int _maximumPendingFrameLimit = 8192;
+
+bool isRepairSequence(int sequence) =>
+    sequence % framesPerGroup == sourceFramesPerGroup;
+
+int sourceFramesThrough(int sequence) {
+  final completedGroups = sequence ~/ framesPerGroup;
+  final groupPosition = sequence % framesPerGroup;
+  return completedGroups * sourceFramesPerGroup +
+      math.min(groupPosition + 1, sourceFramesPerGroup);
+}
 
 /// A deterministic natural logarithm used to keep the sender and receiver's
 /// robust-soliton distributions bit-identical on different runtimes.
@@ -61,8 +77,8 @@ Float64List _solitonCdf(int blockCount) {
     cdf[degree - 1] = total;
   }
 
-  for (var i = 0; i < blockCount; i++) {
-    cdf[i] = cdf[i] / total;
+  for (var index = 0; index < blockCount; index++) {
+    cdf[index] = cdf[index] / total;
   }
   cdf[blockCount - 1] = 1;
   return cdf;
@@ -72,8 +88,31 @@ List<int> frameBlockIndices(
   int blockCount,
   Float64List cdf,
   int sessionId,
-  int sequence,
-) {
+  int sequence, {
+  int protocolVersion = currentProtocolVersion,
+}) {
+  if (protocolVersion >= currentProtocolVersion &&
+      !isRepairSequence(sequence)) {
+    final group = sequence ~/ framesPerGroup;
+    final sourceSlot = sequence % framesPerGroup;
+    return <int>[(group * sourceFramesPerGroup + sourceSlot) % blockCount];
+  }
+  return _fountainIndices(
+    blockCount,
+    cdf,
+    sessionId,
+    sequence,
+    capDegree: protocolVersion >= currentProtocolVersion,
+  );
+}
+
+List<int> _fountainIndices(
+  int blockCount,
+  Float64List cdf,
+  int sessionId,
+  int sequence, {
+  required bool capDegree,
+}) {
   final random = splitmix32(frameSeed(sessionId, sequence));
   final sample = random() / 0x100000000;
   var low = 0;
@@ -86,20 +125,23 @@ List<int> frameBlockIndices(
       low = middle + 1;
     }
   }
-  final degree = math.min(blockCount, low + 1);
+  final sampledDegree = math.min(blockCount, low + 1);
+  final degree = capDegree
+      ? math.min(sampledDegree, _maximumRepairDegree)
+      : sampledDegree;
 
   if (degree > (blockCount >> 3)) {
     final scratch = Uint32List(blockCount);
-    for (var i = 0; i < blockCount; i++) {
-      scratch[i] = i;
+    for (var index = 0; index < blockCount; index++) {
+      scratch[index] = index;
     }
     final result = <int>[];
-    for (var i = 0; i < degree; i++) {
-      final swapIndex = i + (random() % (blockCount - i));
-      final temp = scratch[i];
-      scratch[i] = scratch[swapIndex];
-      scratch[swapIndex] = temp;
-      result.add(scratch[i]);
+    for (var index = 0; index < degree; index++) {
+      final swapIndex = index + (random() % (blockCount - index));
+      final temporary = scratch[index];
+      scratch[index] = scratch[swapIndex];
+      scratch[swapIndex] = temporary;
+      result.add(scratch[index]);
     }
     return result;
   }
@@ -112,8 +154,8 @@ List<int> frameBlockIndices(
 }
 
 void _xorInto(Uint32List target, Uint32List source) {
-  for (var i = 0; i < target.length; i++) {
-    target[i] = target[i] ^ source[i];
+  for (var index = 0; index < target.length; index++) {
+    target[index] = target[index] ^ source[index];
   }
 }
 
@@ -122,52 +164,51 @@ class LTEncoder {
     required Uint8List payload,
     required this.blockLength,
     required this.sessionId,
+    this.protocolVersion = currentProtocolVersion,
   }) : blockCount = blockLength > 0
            ? math.max(1, (payload.length / blockLength).ceil())
            : 1,
-       _words = (blockLength / 4).ceil() {
+       _payload = payload {
     if (payload.isEmpty) {
       throw ArgumentError.value(payload.length, 'payload', 'cannot be empty');
     }
     if (blockLength <= 0 || blockLength > 0xffff) {
       throw ArgumentError.value(blockLength, 'blockLength');
     }
-    _blocks = Uint32List(blockCount * _words);
-    final bytes = Uint8List.view(_blocks.buffer);
-    for (var block = 0; block < blockCount; block++) {
-      final start = block * blockLength;
-      final end = math.min(start + blockLength, payload.length);
-      bytes.setRange(
-        block * _words * 4,
-        block * _words * 4 + end - start,
-        payload,
-        start,
-      );
-    }
     _cdf = _solitonCdf(blockCount);
   }
 
   final int blockLength;
   final int sessionId;
+  final int protocolVersion;
   final int blockCount;
-  final int _words;
-  late final Uint32List _blocks;
+  final Uint8List _payload;
   late final Float64List _cdf;
 
   Uint8List encode(int sequence) {
-    final output = Uint32List(_words);
-    for (final block in frameBlockIndices(
+    final indices = frameBlockIndices(
       blockCount,
       _cdf,
       sessionId,
       sequence,
-    )) {
-      final offset = block * _words;
-      for (var word = 0; word < _words; word++) {
-        output[word] = output[word] ^ _blocks[offset + word];
+      protocolVersion: protocolVersion,
+    );
+    final output = Uint8List(blockLength);
+    if (indices.length == 1) {
+      final start = indices.single * blockLength;
+      final end = math.min(start + blockLength, _payload.length);
+      if (start < end) output.setRange(0, end - start, _payload, start);
+      return output;
+    }
+
+    for (final blockIndex in indices) {
+      final start = blockIndex * blockLength;
+      final available = math.min(blockLength, _payload.length - start);
+      for (var byte = 0; byte < available; byte++) {
+        output[byte] ^= _payload[start + byte];
       }
     }
-    return Uint8List.view(output.buffer, output.offsetInBytes, blockLength);
+    return output;
   }
 }
 
@@ -184,31 +225,48 @@ class LTDecoder {
     required this.blockLength,
     required this.sessionId,
     required this.totalLength,
+    this.protocolVersion = currentProtocolVersion,
   }) : _words = (blockLength / 4).ceil(),
        _cdf = _solitonCdf(blockCount),
-       _solved = List<Uint32List?>.filled(blockCount, null);
+       _solved = List<Uint32List?>.filled(blockCount, null),
+       _maximumPendingFrames = math.min(
+         blockCount * 2,
+         _maximumPendingFrameLimit,
+       );
 
   final int blockCount;
   final int blockLength;
   final int sessionId;
   final int totalLength;
+  final int protocolVersion;
   final int _words;
   final Float64List _cdf;
   final List<Uint32List?> _solved;
+  final int _maximumPendingFrames;
   final Map<int, Set<_PendingFrame>> _waitingByBlock = {};
   final Set<int> _seen = {};
+  final Queue<int> _seenOrder = Queue<int>();
 
   int solvedCount = 0;
   int framesNew = 0;
   int framesDuplicate = 0;
+  int framesDiscarded = 0;
+  int _pendingFrames = 0;
 
   bool get isComplete => solvedCount >= blockCount;
 
   void addFrame(int sequence, Uint8List block) {
-    if (block.length < blockLength) return;
+    if (block.length != blockLength) {
+      framesDiscarded++;
+      return;
+    }
     if (!_seen.add(sequence)) {
       framesDuplicate++;
       return;
+    }
+    _seenOrder.addLast(sequence);
+    if (_seenOrder.length > _seenSequenceWindow) {
+      _seen.remove(_seenOrder.removeFirst());
     }
     framesNew++;
     if (isComplete) return;
@@ -218,6 +276,7 @@ class LTDecoder {
       _cdf,
       sessionId,
       sequence,
+      protocolVersion: protocolVersion,
     ).toSet();
     final words = Uint32List(_words);
     Uint8List.view(words.buffer).setRange(0, blockLength, block);
@@ -235,10 +294,15 @@ class LTDecoder {
       _resolve(indices.first, words);
       return;
     }
+    if (_pendingFrames >= _maximumPendingFrames) {
+      framesDiscarded++;
+      return;
+    }
 
     final pending = _PendingFrame(indices, words);
+    _pendingFrames++;
     for (final blockIndex in indices) {
-      (_waitingByBlock[blockIndex] ??= {}).add(pending);
+      (_waitingByBlock[blockIndex] ??= <_PendingFrame>{}).add(pending);
     }
   }
 
@@ -258,6 +322,7 @@ class LTDecoder {
         if (pending.indices.length == 1) {
           final remaining = pending.indices.first;
           _waitingByBlock[remaining]?.remove(pending);
+          _pendingFrames--;
           if (_solved[remaining] == null) {
             queue.add((remaining, pending.words));
           }
