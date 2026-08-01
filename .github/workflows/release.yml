@@ -1,0 +1,105 @@
+name: Release desktop and Android builds
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  FLUTTER_VERSION: '3.44.5'
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter build apk --release --build-name=1.0.0 --build-number=${{ github.run_number }}
+      - name: Prepare artifact
+        run: cp build/app/outputs/flutter-apk/app-release.apk onesend-android.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: onesend-android
+          path: onesend-android.apk
+
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter build macos --release --build-name=1.0.0 --build-number=${{ github.run_number }}
+      - name: Package artifact
+        run: ditto -c -k --sequesterRsrc --keepParent build/macos/Build/Products/Release/OneSend.app onesend-macos.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: onesend-macos
+          path: onesend-macos.zip
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter build windows --release --build-name=1.0.0 --build-number=${{ github.run_number }}
+      - name: Package artifact
+        shell: pwsh
+        run: Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath onesend-windows.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: onesend-windows
+          path: onesend-windows.zip
+
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Linux camera dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev gstreamer1.0-plugins-good
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter build linux --release --build-name=1.0.0 --build-number=${{ github.run_number }}
+      - name: Package artifact
+        run: tar -czf onesend-linux.tar.gz -C build/linux/x64/release bundle
+      - uses: actions/upload-artifact@v4
+        with:
+          name: onesend-linux
+          path: onesend-linux.tar.gz
+
+  github-release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [android, macos, windows, linux]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" artifacts/* --title "OneSend $GITHUB_REF_NAME" --generate-notes
