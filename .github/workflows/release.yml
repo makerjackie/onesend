@@ -17,7 +17,7 @@ jobs:
   quality:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
@@ -36,7 +36,7 @@ jobs:
       ONESEND_ANDROID_KEY_ALIAS: ${{ secrets.ONESEND_ANDROID_KEY_ALIAS }}
       ONESEND_ANDROID_KEY_PASSWORD: ${{ secrets.ONESEND_ANDROID_KEY_PASSWORD }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
@@ -62,7 +62,7 @@ jobs:
           grep -Fq "com.makerjackie.onesend.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" /tmp/onesend-permissions.txt
       - name: Prepare artifact
         run: cp build/app/outputs/flutter-apk/app-release.apk onesend-android.apk
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: onesend-android
           path: onesend-android.apk
@@ -71,7 +71,7 @@ jobs:
     needs: quality
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
@@ -85,7 +85,7 @@ jobs:
       - run: flutter build macos --release --build-name=1.1.0 --build-number=${{ github.run_number }}
       - name: Package artifact
         run: ditto -c -k --sequesterRsrc --keepParent build/macos/Build/Products/Release/OneSend.app onesend-macos.zip
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: onesend-macos
           path: onesend-macos.zip
@@ -94,7 +94,7 @@ jobs:
     needs: quality
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
@@ -105,7 +105,7 @@ jobs:
       - name: Package artifact
         shell: pwsh
         run: Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath onesend-windows.zip
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: onesend-windows
           path: onesend-windows.zip
@@ -114,7 +114,7 @@ jobs:
     needs: quality
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Install Linux camera dependencies
         run: |
           sudo apt-get update
@@ -128,7 +128,7 @@ jobs:
       - run: flutter build linux --release --build-name=1.1.0 --build-number=${{ github.run_number }}
       - name: Package artifact
         run: tar -czf onesend-linux.tar.gz -C build/linux/x64/release bundle
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: onesend-linux
           path: onesend-linux.tar.gz
@@ -138,7 +138,7 @@ jobs:
     needs: [android, macos, windows, linux]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: artifacts
           merge-multiple: true
