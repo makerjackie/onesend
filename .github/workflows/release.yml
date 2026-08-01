@@ -31,7 +31,7 @@ jobs:
     needs: quality
     runs-on: ubuntu-latest
     env:
-      ONESEND_ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/onesend-release.jks
+      ONESEND_ANDROID_KEYSTORE_PATH: /tmp/onesend-release.jks
       ONESEND_ANDROID_STORE_PASSWORD: ${{ secrets.ONESEND_ANDROID_STORE_PASSWORD }}
       ONESEND_ANDROID_KEY_ALIAS: ${{ secrets.ONESEND_ANDROID_KEY_ALIAS }}
       ONESEND_ANDROID_KEY_PASSWORD: ${{ secrets.ONESEND_ANDROID_KEY_PASSWORD }}
