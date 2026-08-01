@@ -416,7 +416,7 @@ export default function Home() {
 
       <footer className="site-footer page-shell">
         <Brand />
-        <p>OneSend · 一传 — 文件，用光传过去。</p>
+        <p>OneSend · 扫传 — 文件，用光传过去。</p>
         <div>
           <a href="/privacy">隐私</a>
           <a href="https://github.com/makerjackie/onesend/blob/main/LICENSE">

@@ -1,7 +1,7 @@
 # OneSend product site
 
 Source for [onesend.01mvp.com](https://onesend.01mvp.com), the public product
-page and privacy notice for OneSend · 一传.
+page and privacy notice for OneSend · 扫传.
 
 ## Development
 

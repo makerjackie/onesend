@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.1.2 - 2026-08-02
+
+- Updated the Chinese product name to “扫传” across the app, website, release
+  metadata, and TestFlight materials.
+
 ## 1.1.1 - 2026-08-01
 
 - Replaced the Flutter placeholder icon with the original OneSend optical-data mark on iOS, Android, macOS, Windows, and the product website.

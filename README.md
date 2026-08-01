@@ -1,4 +1,4 @@
-# OneSend · 一传
+# OneSend · 扫传
 
 <p align="center">
   <img src="assets/brand/onesend-icon-1024.png" width="112" alt="OneSend optical data icon">
