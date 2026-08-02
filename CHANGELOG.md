@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.2.0 - 2026-08-02
+
+- Increased Fast mode from 1320 B at 15 fps to a fixed V30-L profile carrying
+  1700 B at 24 fps, for about 32 KB/s theoretical useful throughput.
+- Synchronized optical playback to display vsync and replaced per-frame QR mask
+  searches with deterministic standards-compliant masks.
+- Added a rateless LT schedule for Fast mode, cutting recovery overhead under
+  frame loss while retaining bounded-memory scheduling for large files.
+- Preserved receive compatibility with the OneSend 1.1 Fast profile.
+- Processed every QR detected in a mobile camera exposure and added pacing,
+  capacity, compatibility, and 30% frame-loss regression tests.
+
 ## 1.1.2 - 2026-08-02
 
 - Updated the Chinese product name to “扫传” across the app, website, release

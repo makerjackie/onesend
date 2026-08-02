@@ -26,6 +26,7 @@ void main() {
     await tester.tap(find.text('快速'));
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('15 帧/秒'), findsOneWidget);
+    expect(find.textContaining('24 帧/秒'), findsOneWidget);
+    expect(find.textContaining('32 KB/s'), findsOneWidget);
   });
 }

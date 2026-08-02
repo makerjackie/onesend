@@ -4,10 +4,12 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../app.dart';
 import '../core/envelope.dart';
+import '../core/frame_pacer.dart';
 import '../core/optical_transfer.dart';
 import '../services/file_service.dart';
 import '../services/transfer_store.dart';
@@ -23,9 +25,12 @@ class SendScreen extends StatefulWidget {
   State<SendScreen> createState() => _SendScreenState();
 }
 
-class _SendScreenState extends State<SendScreen> {
+class _SendScreenState extends State<SendScreen>
+    with SingleTickerProviderStateMixin {
   _SendingFile? _file;
   OpticalSender? _sender;
+  late final Ticker _playbackTicker;
+  FramePacer? _framePacer;
   Uint8List? _frame;
   int _framesSent = 0;
   DateTime? _startedAt;
@@ -34,7 +39,14 @@ class _SendScreenState extends State<SendScreen> {
   TransferMode _mode = TransferMode.reliable;
 
   @override
+  void initState() {
+    super.initState();
+    _playbackTicker = createTicker(_onPlaybackTick);
+  }
+
+  @override
   void dispose() {
+    _playbackTicker.dispose();
     _sender?.dispose();
     unawaited(WakelockPlus.disable());
     super.dispose();
@@ -49,6 +61,7 @@ class _SendScreenState extends State<SendScreen> {
     try {
       final file = await pickTransferFile();
       if (file == null || !mounted) return;
+      _playbackTicker.stop();
       _sender?.dispose();
       _sender = null;
       final payload = await Isolate.run(
@@ -89,6 +102,7 @@ class _SendScreenState extends State<SendScreen> {
       fileName: file.name,
       mimeType: file.mimeType,
       mode: _mode,
+      useInternalClock: false,
       onFrame: (frame, _) {
         if (!mounted) return;
         setState(() {
@@ -98,21 +112,34 @@ class _SendScreenState extends State<SendScreen> {
       },
       onError: (error) {
         if (!mounted) return;
+        _playbackTicker.stop();
         setState(() => _error = _friendlyError(error));
       },
     );
     _sender = sender;
+    _framePacer = FramePacer(sender.frameInterval);
     sender.start();
+    _playbackTicker.start();
     unawaited(WakelockPlus.enable());
+  }
+
+  void _onPlaybackTick(Duration elapsed) {
+    final sender = _sender;
+    final pacer = _framePacer;
+    if (sender == null || pacer == null || sender.isPaused) return;
+    if (pacer.shouldEmit(elapsed)) sender.emitNext();
   }
 
   Future<void> _togglePause() async {
     final sender = _sender;
     if (sender == null) return;
     if (sender.isPaused) {
+      _framePacer?.reset();
       sender.resume();
+      _playbackTicker.start();
       await WakelockPlus.enable();
     } else {
+      _playbackTicker.stop();
       sender.pause();
       await WakelockPlus.disable();
     }
@@ -122,6 +149,7 @@ class _SendScreenState extends State<SendScreen> {
   Future<void> _endTransfer() async {
     final file = _file;
     final sender = _sender;
+    _playbackTicker.stop();
     sender?.stop();
     await WakelockPlus.disable();
     if (file != null && _framesSent > 0) {
@@ -217,7 +245,7 @@ class _SendScreenState extends State<SendScreen> {
                     child: Text(
                       _mode == TransferMode.reliable
                           ? '8 帧/秒 · 中等二维码纠错 · 手持扫描优先'
-                          : '15 帧/秒 · 低二维码纠错 · 固定设备、明亮屏幕',
+                          : '24 帧/秒 · 理论约 32 KB/s · 固定设备、明亮屏幕',
                       key: ValueKey<TransferMode>(_mode),
                       style: Theme.of(context).textTheme.bodySmall,
                       textAlign: TextAlign.center,
@@ -250,8 +278,8 @@ class _SendScreenState extends State<SendScreen> {
   Widget _buildActiveTransfer() {
     final file = _file!;
     final sender = _sender;
-    final progress = sender?.sourcePassProgress ?? 0;
-    final pass = sender?.sourcePassNumber ?? 1;
+    final progress = sender?.passProgress ?? 0;
+    final pass = sender?.passNumber ?? 1;
     final elapsed = _startedAt == null
         ? '—'
         : _formatDuration(DateTime.now().difference(_startedAt!));

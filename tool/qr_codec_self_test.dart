@@ -5,6 +5,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_zxing/flutter_zxing.dart' as zxing;
 import 'package:onesend/core/optical_transfer.dart';
 import 'package:onesend/core/protocol.dart';
+import 'package:onesend/widgets/optical_qr.dart';
 import 'package:qr/qr.dart';
 
 Future<void> main() async {
@@ -29,33 +30,29 @@ Future<void> main() async {
         ),
         block,
       );
-      final qr = QrImage(
-        QrCode(
+      final qr = buildOpticalQrImage(
+        frame,
+        robust: mode == TransferMode.reliable,
+      );
+      if (mode == TransferMode.fast && qr.moduleCount != 137) {
+        throw StateError(
+          'Fast mode must render an exact V30 symbol, got ${qr.moduleCount} modules',
+        );
+      }
+      _decodeAndVerify(qr, frame, '${mode.name} production render');
+
+      if (mode == TransferMode.fast) {
+        final code = QrCode(
           payload: QrPayload.fromTypedData(frame),
-          errorCorrectLevel: mode == TransferMode.reliable
-              ? QrErrorCorrectLevel.medium
-              : QrErrorCorrectLevel.low,
-        ),
-      );
-      final raster = _rasterize(qr);
-      final result = zxing.zx.readBarcode(
-        raster.pixels,
-        zxing.DecodeParams(
-          imageFormat: zxing.ImageFormat.lum,
-          format: zxing.Format.qrCode,
-          width: raster.side,
-          height: raster.side,
-          tryHarder: true,
-          tryRotate: false,
-          tryDownscale: true,
-        ),
-      );
-      final decoded = result.rawBytes;
-      if (!result.isValid ||
-          decoded == null ||
-          !_bytesEqual(decoded, frame) ||
-          parseFrame(decoded) == null) {
-        throw StateError('${mode.name} QR codec self-test failed');
+          errorCorrectLevel: QrErrorCorrectLevel.low,
+        );
+        for (var mask = 0; mask < 8; mask++) {
+          _decodeAndVerify(
+            QrImage.withMaskPattern(code, mask),
+            frame,
+            'fast mask $mask',
+          );
+        }
       }
     }
     stdout.writeln('OneSend native QR codec self-test passed.');
@@ -65,6 +62,29 @@ Future<void> main() async {
       ..writeln(error)
       ..writeln(stackTrace);
     exit(1);
+  }
+}
+
+void _decodeAndVerify(QrImage qr, Uint8List frame, String label) {
+  final raster = _rasterize(qr);
+  final result = zxing.zx.readBarcode(
+    raster.pixels,
+    zxing.DecodeParams(
+      imageFormat: zxing.ImageFormat.lum,
+      format: zxing.Format.qrCode,
+      width: raster.side,
+      height: raster.side,
+      tryHarder: true,
+      tryRotate: false,
+      tryDownscale: true,
+    ),
+  );
+  final decoded = result.rawBytes;
+  if (!result.isValid ||
+      decoded == null ||
+      !_bytesEqual(decoded, frame) ||
+      parseFrame(decoded) == null) {
+    throw StateError('$label QR codec self-test failed');
   }
 }
 

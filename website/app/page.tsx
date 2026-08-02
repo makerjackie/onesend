@@ -197,8 +197,8 @@ export default function Home() {
             <span>可靠 / 快速模式</span>
           </div>
           <div>
-            <strong>4+1</strong>
-            <span>原始块 + 修复块交织</span>
+            <strong>24 fps</strong>
+            <span>快速模式刷新同步</span>
           </div>
           <div>
             <strong>CRC32</strong>
@@ -232,7 +232,7 @@ export default function Home() {
             <span className="step-number">02</span>
             <div className="step-icon blue">▦</div>
             <h3>持续显示</h3>
-            <p>原始块和 LT 修复块交织成二维码流，漏掉几帧也不必重来。</p>
+            <p>可靠档交织原始块与修复块，快速档持续生成 LT fountain 帧，漏掉几帧也不必重来。</p>
           </article>
           <article>
             <span className="step-number">03</span>
@@ -271,6 +271,10 @@ export default function Home() {
                   <dt>QR 纠错</dt>
                   <dd>Medium</dd>
                 </div>
+                <div>
+                  <dt>理论有效</dt>
+                  <dd>约 4.6 KB/s</dd>
+                </div>
               </dl>
             </article>
             <article className="mode-card mode-fast">
@@ -283,15 +287,19 @@ export default function Home() {
               <dl>
                 <div>
                   <dt>帧率</dt>
-                  <dd>约 15 fps</dd>
+                  <dd>约 24 fps</dd>
                 </div>
                 <div>
                   <dt>每帧</dt>
-                  <dd>1320 B</dd>
+                  <dd>1700 B</dd>
                 </div>
                 <div>
                   <dt>QR 纠错</dt>
-                  <dd>Low</dd>
+                  <dd>V30 · Low</dd>
+                </div>
+                <div>
+                  <dt>理论有效</dt>
+                  <dd>约 32 KB/s</dd>
                 </div>
               </dl>
             </article>

@@ -90,9 +90,11 @@ List<int> frameBlockIndices(
   int sessionId,
   int sequence, {
   int protocolVersion = currentProtocolVersion,
+  bool? systematicFrames,
 }) {
-  if (protocolVersion >= currentProtocolVersion &&
-      !isRepairSequence(sequence)) {
+  final usesSystematicFrames =
+      systematicFrames ?? protocolVersion >= currentProtocolVersion;
+  if (usesSystematicFrames && !isRepairSequence(sequence)) {
     final group = sequence ~/ framesPerGroup;
     final sourceSlot = sequence % framesPerGroup;
     return <int>[(group * sourceFramesPerGroup + sourceSlot) % blockCount];
@@ -164,10 +166,14 @@ class LTEncoder {
     required Uint8List payload,
     required this.blockLength,
     required this.sessionId,
-    this.protocolVersion = currentProtocolVersion,
+    int protocolVersion = currentProtocolVersion,
+    bool? systematicFrames,
   }) : blockCount = blockLength > 0
            ? math.max(1, (payload.length / blockLength).ceil())
            : 1,
+       protocolVersion = protocolVersion,
+       usesSystematicFrames =
+           systematicFrames ?? protocolVersion >= currentProtocolVersion,
        _payload = payload {
     if (payload.isEmpty) {
       throw ArgumentError.value(payload.length, 'payload', 'cannot be empty');
@@ -181,6 +187,7 @@ class LTEncoder {
   final int blockLength;
   final int sessionId;
   final int protocolVersion;
+  final bool usesSystematicFrames;
   final int blockCount;
   final Uint8List _payload;
   late final Float64List _cdf;
@@ -192,6 +199,7 @@ class LTEncoder {
       sessionId,
       sequence,
       protocolVersion: protocolVersion,
+      systematicFrames: usesSystematicFrames,
     );
     final output = Uint8List(blockLength);
     if (indices.length == 1) {
@@ -225,8 +233,12 @@ class LTDecoder {
     required this.blockLength,
     required this.sessionId,
     required this.totalLength,
-    this.protocolVersion = currentProtocolVersion,
+    int protocolVersion = currentProtocolVersion,
+    bool? systematicFrames,
   }) : _words = (blockLength / 4).ceil(),
+       protocolVersion = protocolVersion,
+       usesSystematicFrames =
+           systematicFrames ?? protocolVersion >= currentProtocolVersion,
        _cdf = _solitonCdf(blockCount),
        _solved = List<Uint32List?>.filled(blockCount, null),
        _maximumPendingFrames = math.min(
@@ -239,6 +251,7 @@ class LTDecoder {
   final int sessionId;
   final int totalLength;
   final int protocolVersion;
+  final bool usesSystematicFrames;
   final int _words;
   final Float64List _cdf;
   final List<Uint32List?> _solved;
@@ -277,6 +290,7 @@ class LTDecoder {
       sessionId,
       sequence,
       protocolVersion: protocolVersion,
+      systematicFrames: usesSystematicFrames,
     ).toSet();
     final words = Uint32List(_words);
     Uint8List.view(words.buffer).setRange(0, blockLength, block);
