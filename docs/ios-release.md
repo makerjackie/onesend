@@ -16,8 +16,8 @@ OneSend uses the bundle identifier `com.makerjackie.onesend`.
 flutter pub get
 flutter build ipa \
   --release \
-  --build-name 1.1.2 \
-  --build-number 6 \
+  --build-name 1.2.0 \
+  --build-number 7 \
   --export-method app-store
 ```
 

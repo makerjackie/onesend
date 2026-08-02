@@ -5,8 +5,10 @@ import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:onesend/core/envelope.dart';
 import 'package:onesend/core/fountain.dart';
+import 'package:onesend/core/frame_pacer.dart';
 import 'package:onesend/core/optical_transfer.dart';
 import 'package:onesend/core/protocol.dart';
+import 'package:onesend/widgets/optical_qr.dart';
 import 'package:qr/qr.dart';
 
 void main() {
@@ -303,6 +305,97 @@ void main() {
 
       expect(receiver.snapshot!.sessionId, 1);
     });
+
+    test('accepts the OneSend 1.1 fast profile', () {
+      final payload = Uint8List.fromList(<int>[7, 8, 9]);
+      final block = Uint8List(1320)..setRange(0, payload.length, payload);
+      final receiver = OpticalReceiver();
+      final event = receiver.consume(
+        packFrame(
+          FrameHeader(
+            profileId: 1,
+            sessionId: 77,
+            sequence: 0,
+            blockCount: 1,
+            blockLength: 1320,
+            totalLength: payload.length,
+            payloadChecksum: crc32(payload),
+          ),
+          block,
+        ),
+      );
+
+      expect(event?.verified, isTrue);
+      expect(event?.payload, orderedEquals(payload));
+      expect(event?.snapshot.mode, TransferMode.fast);
+    });
+  });
+
+  group('display pacing', () {
+    test('fast mode sustains 24 fps on a 60 Hz display timeline', () {
+      final pacer = FramePacer(TransferMode.fast.frameInterval);
+      var emitted = 1; // The sender displays the first frame immediately.
+      for (var displayFrame = 1; displayFrame <= 600; displayFrame++) {
+        final elapsed = Duration(
+          microseconds: displayFrame * Duration.microsecondsPerSecond ~/ 60,
+        );
+        if (pacer.shouldEmit(elapsed)) emitted++;
+      }
+
+      expect(emitted, 240);
+    });
+
+    test('missed display deadlines never create a catch-up burst', () {
+      final pacer = FramePacer(TransferMode.fast.frameInterval);
+
+      expect(pacer.shouldEmit(const Duration(seconds: 2)), isTrue);
+      expect(
+        pacer.shouldEmit(const Duration(seconds: 2, microseconds: 1)),
+        isFalse,
+      );
+    });
+  });
+
+  test('large fast transfers fall back to bounded-memory scheduling', () {
+    expect(
+      TransferMode.fast.usesRatelessFountainFor(maxRatelessFountainBlocks),
+      isTrue,
+    );
+    expect(
+      TransferMode.fast.usesRatelessFountainFor(maxRatelessFountainBlocks + 1),
+      isFalse,
+    );
+    expect(TransferMode.reliable.usesRatelessFountainFor(1), isFalse);
+  });
+
+  test('rateless receiver progress follows accepted frames', () {
+    const halfway = ReceiverSnapshot(
+      protocolVersion: currentProtocolVersion,
+      profileId: 2,
+      sessionId: 1,
+      blockCount: 512,
+      blockLength: 1700,
+      totalLength: 512 * 1700,
+      framesNew: 320,
+      framesDuplicate: 0,
+      framesDiscarded: 0,
+      solvedBlocks: 0,
+    );
+    const complete = ReceiverSnapshot(
+      protocolVersion: currentProtocolVersion,
+      profileId: 2,
+      sessionId: 1,
+      blockCount: 512,
+      blockLength: 1700,
+      totalLength: 512 * 1700,
+      framesNew: 610,
+      framesDuplicate: 0,
+      framesDiscarded: 0,
+      solvedBlocks: 512,
+    );
+
+    expect(halfway.progress, 0.5);
+    expect(complete.progress, 1);
   });
 
   test('both transfer modes fit their intended QR error correction level', () {
@@ -328,7 +421,30 @@ void main() {
       );
 
       expect(QrImage(code).moduleCount, lessThanOrEqualTo(177));
+      if (mode == TransferMode.fast) expect(code.typeNumber, 30);
     }
+  });
+
+  test('the optimized fast frame produces a complete V30-L symbol', () {
+    final block = _patternBytes(TransferMode.fast.blockLength, multiplier: 29);
+    final frame = packFrame(
+      FrameHeader(
+        profileId: TransferMode.fast.id,
+        sessionId: 0x10203040,
+        sequence: 19,
+        blockCount: 3,
+        blockLength: block.length,
+        totalLength: block.length * 3,
+        payloadChecksum: crc32(block),
+      ),
+      block,
+    );
+    final image = buildOpticalQrImage(frame, robust: false);
+
+    expect(image.typeNumber, 30);
+    expect(image.moduleCount, 137);
+    expect(image.errorCorrectLevel, QrErrorCorrectLevel.low);
+    expect(image.qrModules.expand((row) => row), everyElement(isNotNull));
   });
 }
 

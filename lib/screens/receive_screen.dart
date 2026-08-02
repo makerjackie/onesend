@@ -59,13 +59,15 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
   }
 
   void _onMobileCapture(BarcodeCapture capture) {
+    if (_completed || _paused || _processing) return;
+    ReceiverEvent? latest;
     for (final barcode in capture.barcodes) {
       final bytes = _barcodeBytes(barcode);
-      if (bytes != null) {
-        _consume(bytes);
-        return;
-      }
+      if (bytes == null) continue;
+      latest = _receiver.consume(bytes) ?? latest;
+      if (latest?.error != null || latest?.payload != null) break;
     }
+    _handleReceiverEvent(latest);
   }
 
   Uint8List? _barcodeBytes(Barcode barcode) {
@@ -79,7 +81,10 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
 
   void _consume(Uint8List bytes) {
     if (_completed || _paused || _processing) return;
-    final event = _receiver.consume(bytes);
+    _handleReceiverEvent(_receiver.consume(bytes));
+  }
+
+  void _handleReceiverEvent(ReceiverEvent? event) {
     if (event == null || !mounted) return;
     setState(() {
       _snapshot = event.snapshot;
@@ -322,6 +327,8 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
                               Text(
                                 snapshot == null
                                     ? '等待第一帧'
+                                    : snapshot.usesRatelessFountain
+                                    ? '${snapshot.framesNew} 帧 · Fountain 恢复中'
                                     : '${snapshot.framesNew} 帧 · ${snapshot.solvedBlocks}/${snapshot.blockCount} 块',
                                 style: Theme.of(context).textTheme.bodySmall,
                               ),

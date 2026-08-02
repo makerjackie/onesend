@@ -36,6 +36,9 @@ test("server-renders the OneSend product page", async () => {
   assert.match(html, /用光传过去/);
   assert.match(html, /可靠模式/);
   assert.match(html, /快速模式/);
+  assert.match(html, /24 fps/);
+  assert.match(html, /1700 B/);
+  assert.match(html, /32 KB\/s/);
   assert.match(html, /onesend-android\.apk/);
   assert.match(html, /\/privacy/);
   assert.doesNotMatch(html, /codex-preview|loading skeleton|Starter Project/i);

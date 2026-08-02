@@ -17,6 +17,41 @@ void main() {
       }
     }
   });
+
+  test('fast rateless stream keeps bounded overhead at 30% frame loss', () {
+    const blockCount = 512;
+    final payload = Uint8List.fromList(
+      List<int>.generate(
+        blockCount * TransferMode.fast.blockLength - 19,
+        (index) => (index * 31 + 7) & 0xff,
+      ),
+    );
+    final encoder = LTEncoder(
+      payload: payload,
+      blockLength: TransferMode.fast.blockLength,
+      sessionId: 0x12345678,
+      systematicFrames: false,
+    );
+    final decoder = LTDecoder(
+      blockCount: encoder.blockCount,
+      blockLength: encoder.blockLength,
+      sessionId: encoder.sessionId,
+      totalLength: payload.length,
+      systematicFrames: false,
+    );
+    final random = math.Random(1230);
+    var displayed = 0;
+    for (var sequence = 0; sequence < blockCount * 2; sequence++) {
+      displayed++;
+      if (random.nextDouble() < 0.30) continue;
+      decoder.addFrame(sequence, encoder.encode(sequence));
+      if (decoder.isComplete) break;
+    }
+
+    expect(decoder.isComplete, isTrue);
+    expect(displayed, lessThanOrEqualTo((blockCount * 1.8).ceil()));
+    expect(decoder.assemble(), orderedEquals(payload));
+  });
 }
 
 void _runChannelSimulation(
@@ -40,6 +75,7 @@ void _runChannelSimulation(
     payload: payload,
     blockLength: mode.blockLength,
     sessionId: sessionId,
+    systematicFrames: !mode.usesRatelessFountainFor(requestedBlockCount),
   );
   final receiver = OpticalReceiver();
   final checksum = crc32(payload);

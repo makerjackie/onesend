@@ -9,6 +9,7 @@ const int maxOpticalPayloadBytes = 72 * 1024 * 1024;
 const int maxOpticalBlocks = 110000;
 const int minOpticalBlockLength = 64;
 const int maxOpticalBlockLength = 2048;
+const int maxRatelessFountainBlocks = 8192;
 
 enum TransferMode {
   reliable(
@@ -18,10 +19,10 @@ enum TransferMode {
     frameInterval: Duration(milliseconds: 125),
   ),
   fast(
-    id: 1,
+    id: 2,
     label: '快速',
-    blockLength: 1320,
-    frameInterval: Duration(milliseconds: 67),
+    blockLength: 1700,
+    frameInterval: Duration(microseconds: 41667),
   );
 
   const TransferMode({
@@ -37,13 +38,30 @@ enum TransferMode {
   final Duration frameInterval;
 
   int get framesPerSecond =>
-      (Duration.millisecondsPerSecond / frameInterval.inMilliseconds).round();
+      (Duration.microsecondsPerSecond / frameInterval.inMicroseconds).round();
+
+  double get usefulBytesPerSecond =>
+      blockLength * framesPerSecond * sourceFramesPerGroup / framesPerGroup;
+
+  bool usesRatelessFountainFor(int blockCount) =>
+      this == fast && blockCount <= maxRatelessFountainBlocks;
 
   static TransferMode? fromId(int id) {
-    for (final mode in values) {
-      if (mode.id == id) return mode;
-    }
-    return null;
+    return switch (id) {
+      0 => reliable,
+      1 || 2 => fast,
+      _ => null,
+    };
+  }
+
+  static TransferMode? fromProfile(int id, int blockLength) {
+    return switch ((id, blockLength)) {
+      (0, 720) => reliable,
+      // OneSend 1.1 fast streams remain readable after the 1.2 speed upgrade.
+      (1, 1320) => fast,
+      (2, 1700) => fast,
+      _ => null,
+    };
   }
 }
 
@@ -56,15 +74,22 @@ class OpticalSender {
     this.mode = TransferMode.reliable,
     int? blockLength,
     Duration? frameInterval,
+    this.useInternalClock = true,
     this.onError,
   }) : blockLength = blockLength ?? mode.blockLength,
        frameInterval = frameInterval ?? mode.frameInterval {
     sessionId = math.Random.secure().nextInt(0xffffffff) + 1;
     payloadChecksum = crc32(payload);
+    final expectedBlockCount = math.max(
+      1,
+      (payload.length + this.blockLength - 1) ~/ this.blockLength,
+    );
+    usesRatelessFountain = mode.usesRatelessFountainFor(expectedBlockCount);
     _encoder = LTEncoder(
       payload: payload,
       blockLength: this.blockLength,
       sessionId: sessionId,
+      systematicFrames: !usesRatelessFountain,
     );
   }
 
@@ -76,8 +101,10 @@ class OpticalSender {
   final TransferMode mode;
   final int blockLength;
   final Duration frameInterval;
+  final bool useInternalClock;
   late final int sessionId;
   late final int payloadChecksum;
+  late final bool usesRatelessFountain;
   late final LTEncoder _encoder;
 
   Timer? _timer;
@@ -91,9 +118,14 @@ class OpticalSender {
   int get blockCount => _encoder.blockCount;
   bool get isRunning => _running;
   bool get isPaused => _paused;
-  int get sourcePassNumber => sourceFramesEmitted ~/ blockCount + 1;
-  double get sourcePassProgress =>
-      (sourceFramesEmitted % blockCount) / blockCount;
+  int get passNumber =>
+      (usesRatelessFountain ? framesEmitted : sourceFramesEmitted) ~/
+          blockCount +
+      1;
+  double get passProgress =>
+      ((usesRatelessFountain ? framesEmitted : sourceFramesEmitted) %
+          blockCount) /
+      blockCount;
 
   void start() {
     if (_running) return;
@@ -111,8 +143,13 @@ class OpticalSender {
     if (!_running || !_paused) return;
     _paused = false;
     _emit();
-    _timer = Timer.periodic(frameInterval, (_) => _emit());
+    if (useInternalClock) {
+      _timer = Timer.periodic(frameInterval, (_) => _emit());
+    }
   }
+
+  /// Emits the next frame when playback is driven by display vsync.
+  void emitNext() => _emit();
 
   void stop() {
     _running = false;
@@ -125,7 +162,7 @@ class OpticalSender {
     if (!_running || _paused) return;
     try {
       final sequence = _sequence;
-      final repair = isRepairSequence(sequence);
+      final repair = usesRatelessFountain || isRepairSequence(sequence);
       final block = _encoder.encode(sequence);
       final frame = packFrame(
         FrameHeader(
@@ -179,9 +216,22 @@ class ReceiverSnapshot {
   final int framesDiscarded;
   final int solvedBlocks;
 
-  TransferMode? get mode => TransferMode.fromId(profileId);
-  double get progress =>
-      blockCount == 0 ? 0 : math.min(1, solvedBlocks / blockCount).toDouble();
+  TransferMode? get mode => TransferMode.fromProfile(profileId, blockLength);
+  bool get usesRatelessFountain =>
+      protocolVersion >= currentProtocolVersion &&
+      profileId == TransferMode.fast.id &&
+      TransferMode.fast.usesRatelessFountainFor(blockCount);
+
+  double get progress {
+    if (blockCount == 0) return 0;
+    if (!usesRatelessFountain) {
+      return math.min(1, solvedBlocks / blockCount).toDouble();
+    }
+    if (solvedBlocks >= blockCount) return 1;
+    // LT peeling resolves most blocks near the end. Accepted-frame progress is
+    // linear and avoids a progress bar that appears frozen before completion.
+    return math.min(0.95, framesNew / (blockCount * 1.25)).toDouble();
+  }
 }
 
 class ReceiverEvent {
@@ -235,8 +285,11 @@ class OpticalReceiver {
       return null;
     }
     if (header.protocolVersion == currentProtocolVersion) {
-      final mode = TransferMode.fromId(header.profileId);
-      if (mode == null || header.blockLength != mode.blockLength) return null;
+      final mode = TransferMode.fromProfile(
+        header.profileId,
+        header.blockLength,
+      );
+      if (mode == null) return null;
     }
 
     if (_decoder == null) {
@@ -247,6 +300,10 @@ class OpticalReceiver {
         sessionId: header.sessionId,
         totalLength: header.totalLength,
         protocolVersion: header.protocolVersion,
+        systematicFrames:
+            !(header.protocolVersion >= currentProtocolVersion &&
+                header.profileId == TransferMode.fast.id &&
+                TransferMode.fast.usesRatelessFountainFor(header.blockCount)),
       );
       _startedAt = DateTime.now();
       _delivered = false;
