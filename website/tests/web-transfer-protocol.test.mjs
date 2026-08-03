@@ -1,14 +1,16 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import QRCode from "qrcode";
-import {
+import ZXing from "@zxing/library";
+
+const {
   BinaryBitmap,
   DecodeHintType,
   HybridBinarizer,
   QRCodeReader,
   RGBLuminanceSource,
   ResultMetadataType,
-} from "@zxing/library";
+} = ZXing;
 
 import {
   OpticalReceiver,
