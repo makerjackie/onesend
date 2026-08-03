@@ -19,6 +19,10 @@ CIMBAR 文件使用 OneSend 版本化 CRC32 完整性信封。只有解码、长
 - [iOS TestFlight](https://testflight.apple.com/join/n2t1KrCp)
 - [网站 CIMBAR 实验](https://onesend.01mvp.com/cimbar)
 
+### 开源说明
+
+OneSend 自有代码继续使用 MIT 许可证。随应用分发、未经修改的 libcimbar v0.6.7c JS/WASM 文件继续适用 MPL-2.0；对应上游提交为 [`e5bebd04fb777cbf31d67a7f1e35e7fa3a4cea44`](https://github.com/sz3/libcimbar/tree/e5bebd04fb777cbf31d67a7f1e35e7fa3a4cea44)，完整源代码快照也随本 Release 以 `libcimbar-v0.6.7c-e5bebd0-source.tar.gz` 提供。
+
 ## English
 
 OneSend 1.5.0 keeps stable QR Fast as the default and adds two experiments that users can explicitly enable in Settings.
@@ -37,3 +41,7 @@ Downloads:
 - [GitHub Releases](https://github.com/makerjackie/onesend/releases/tag/v1.5.0)
 - [iOS TestFlight](https://testflight.apple.com/join/n2t1KrCp)
 - [Website CIMBAR experiment](https://onesend.01mvp.com/cimbar)
+
+### Open-source notice
+
+OneSend's own code remains MIT-licensed. The unmodified libcimbar v0.6.7c JS/WASM files distributed with the app remain under MPL-2.0. Their immutable upstream revision is [`e5bebd04fb777cbf31d67a7f1e35e7fa3a4cea44`](https://github.com/sz3/libcimbar/tree/e5bebd04fb777cbf31d67a7f1e35e7fa3a4cea44), and this Release also includes the full `libcimbar-v0.6.7c-e5bebd0-source.tar.gz` source snapshot.
