@@ -169,6 +169,65 @@ void main() {
       expect(parsed.block, orderedEquals(<int>[1, 2, 3, 4]));
     });
 
+    test('turbo profile uses the V40-L-safe frame geometry', () {
+      final block = _patternBytes(
+        TransferMode.turbo.blockLength,
+        multiplier: 41,
+      );
+      final frame = packFrame(
+        FrameHeader(
+          profileId: TransferMode.turbo.id,
+          sessionId: 0x10203040,
+          sequence: 7,
+          blockCount: 1,
+          blockLength: TransferMode.turbo.blockLength,
+          totalLength: block.length,
+          payloadChecksum: crc32(block),
+        ),
+        block,
+      );
+      final parsed = parseFrame(frame);
+
+      expect(TransferMode.fromId(3), TransferMode.turbo);
+      expect(
+        TransferMode.fromProfile(3, TransferMode.turbo.blockLength),
+        TransferMode.turbo,
+      );
+      expect(frame.length, maxOpticalFrameLength);
+      expect(frame.length, 2953);
+      expect(parsed?.header.profileId, TransferMode.turbo.id);
+      expect(parsed?.header.blockLength, 2921);
+      expect(parsed?.block, orderedEquals(block));
+    });
+
+    test(
+      'turbo sender emits the new profile without changing frame pacing',
+      () {
+        final emitted = <Uint8List>[];
+        final sender = OpticalSender(
+          payload: _patternBytes(
+            TransferMode.turbo.blockLength + 7,
+            multiplier: 47,
+          ),
+          fileName: 'turbo.bin',
+          mimeType: 'application/octet-stream',
+          mode: TransferMode.turbo,
+          useInternalClock: false,
+          onFrame: (frame, _) => emitted.add(frame),
+        );
+
+        sender.start();
+        sender.stop();
+
+        final parsed = parseFrame(emitted.single);
+        expect(TransferMode.turbo.framesPerSecond, 24);
+        expect(sender.frameInterval, TransferMode.turbo.frameInterval);
+        expect(parsed?.header.profileId, TransferMode.turbo.id);
+        expect(parsed?.header.blockLength, TransferMode.turbo.blockLength);
+        expect(emitted.single.length, 2953);
+      },
+    );
+
     test('v2 frame rejects one-bit camera corruption', () {
       final header = FrameHeader(
         sessionId: 42,
@@ -373,6 +432,32 @@ void main() {
       expect(event?.payload, orderedEquals(payload));
       expect(event?.snapshot.mode, TransferMode.fast);
     });
+
+    test('accepts turbo geometry and selects rateless fountain decoding', () {
+      final payload = Uint8List.fromList(<int>[7, 8, 9]);
+      final block = Uint8List(TransferMode.turbo.blockLength)
+        ..setRange(0, payload.length, payload);
+      final receiver = OpticalReceiver();
+      final event = receiver.consume(
+        packFrame(
+          FrameHeader(
+            profileId: TransferMode.turbo.id,
+            sessionId: 88,
+            sequence: 0,
+            blockCount: 1,
+            blockLength: TransferMode.turbo.blockLength,
+            totalLength: payload.length,
+            payloadChecksum: crc32(payload),
+          ),
+          block,
+        ),
+      );
+
+      expect(event?.verified, isTrue);
+      expect(event?.payload, orderedEquals(payload));
+      expect(event?.snapshot.mode, TransferMode.turbo);
+      expect(event?.snapshot.usesRatelessFountain, isTrue);
+    });
   });
 
   group('display pacing', () {
@@ -400,17 +485,40 @@ void main() {
     });
   });
 
-  test('large fast transfers fall back to bounded-memory scheduling', () {
-    expect(
-      TransferMode.fast.usesRatelessFountainFor(maxRatelessFountainBlocks),
-      isTrue,
-    );
-    expect(
-      TransferMode.fast.usesRatelessFountainFor(maxRatelessFountainBlocks + 1),
-      isFalse,
-    );
-    expect(TransferMode.reliable.usesRatelessFountainFor(1), isFalse);
+  test('raw and useful transport rates remain explicitly conservative', () {
+    expect(TransferMode.reliable.rawBytesPerSecond, 5760);
+    expect(TransferMode.fast.rawBytesPerSecond, 40800);
+    expect(TransferMode.turbo.rawBytesPerSecond, 70104);
+    expect(TransferMode.turbo.usefulBytesPerSecond, closeTo(56083.2, 0.001));
+    expect(TransferMode.turbo.theoreticalCodeStreamBytesPerSecond, 70872);
   });
+
+  test(
+    'large fast and turbo transfers fall back to bounded-memory scheduling',
+    () {
+      expect(
+        TransferMode.fast.usesRatelessFountainFor(maxRatelessFountainBlocks),
+        isTrue,
+      );
+      expect(
+        TransferMode.fast.usesRatelessFountainFor(
+          maxRatelessFountainBlocks + 1,
+        ),
+        isFalse,
+      );
+      expect(
+        TransferMode.turbo.usesRatelessFountainFor(maxRatelessFountainBlocks),
+        isTrue,
+      );
+      expect(
+        TransferMode.turbo.usesRatelessFountainFor(
+          maxRatelessFountainBlocks + 1,
+        ),
+        isFalse,
+      );
+      expect(TransferMode.reliable.usesRatelessFountainFor(1), isFalse);
+    },
+  );
 
   test('rateless receiver progress follows accepted frames', () {
     const halfway = ReceiverSnapshot(
@@ -442,7 +550,7 @@ void main() {
     expect(complete.progress, 1);
   });
 
-  test('both transfer modes fit their intended QR error correction level', () {
+  test('all transfer modes fit their intended QR error correction level', () {
     for (final mode in TransferMode.values) {
       final block = Uint8List(mode.blockLength);
       final frame = packFrame(
@@ -466,6 +574,7 @@ void main() {
 
       expect(QrImage(code).moduleCount, lessThanOrEqualTo(177));
       if (mode == TransferMode.fast) expect(code.typeNumber, 30);
+      if (mode == TransferMode.turbo) expect(code.typeNumber, 40);
     }
   });
 
@@ -487,6 +596,29 @@ void main() {
 
     expect(image.typeNumber, 30);
     expect(image.moduleCount, 137);
+    expect(image.errorCorrectLevel, QrErrorCorrectLevel.low);
+    expect(image.qrModules.expand((row) => row), everyElement(isNotNull));
+  });
+
+  test('the optimized turbo frame produces a complete V40-L symbol', () {
+    final block = _patternBytes(TransferMode.turbo.blockLength, multiplier: 53);
+    final frame = packFrame(
+      FrameHeader(
+        profileId: TransferMode.turbo.id,
+        sessionId: 0x20304050,
+        sequence: 29,
+        blockCount: 3,
+        blockLength: block.length,
+        totalLength: block.length * 3,
+        payloadChecksum: crc32(block),
+      ),
+      block,
+    );
+    final image = buildOpticalQrImage(frame, robust: false);
+
+    expect(frame.length, 2953);
+    expect(image.typeNumber, 40);
+    expect(image.moduleCount, 177);
     expect(image.errorCorrectLevel, QrErrorCorrectLevel.low);
     expect(image.qrModules.expand((row) => row), everyElement(isNotNull));
   });

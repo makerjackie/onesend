@@ -52,3 +52,33 @@ releases. Their complete bundled notices are preserved in:
 Dependency licenses remain with their respective copyright holders. Flutter
 and Dart dependency manifests in this repository identify the exact versions
 used by each release.
+
+## libcimbar v0.6.7c (cimbar color high-speed experiment)
+
+The `/cimbar` website and Flutter mobile experiment include the unmodified
+Emscripten release assets from the `sz3/libcimbar` v0.6.7c GitHub release.
+That release tag resolves to commit
+`e5bebd04fb777cbf31d67a7f1e35e7fa3a4cea44`:
+
+- Project: [`sz3/libcimbar`](https://github.com/sz3/libcimbar)
+- Release: [`v0.6.7c`](https://github.com/sz3/libcimbar/releases/tag/v0.6.7c)
+- Tagged source commit: [`e5bebd04fb777cbf31d67a7f1e35e7fa3a4cea44`](https://github.com/sz3/libcimbar/tree/e5bebd04fb777cbf31d67a7f1e35e7fa3a4cea44)
+- License: Mozilla Public License 2.0 (MPL-2.0)
+- Full license text: [`licenses/libcimbar-MPL-2.0.txt`](licenses/libcimbar-MPL-2.0.txt)
+- Corresponding source offer: the exact upstream source tree is available at
+  the commit link above; the mobile release assets are kept under
+  `assets/cimbar/upstream/` and the website copy under `website/public/cimbar/`.
+
+The copied `cimbar_js.2026-07-13T0523.js`,
+`cimbar_js.2026-07-13T0523.wasm`, `send.2026-07-13T0523.js`, and
+`send-worker.2026-07-13T0523.js` files, along with the receiver worker and
+zstd/receiver scripts in `assets/cimbar/upstream/`, are distributed without
+source changes.
+The OneSend bootstrap and receiver wrapper are separate OneSend files; they
+only call the upstream public worker/WASM interface. The upstream release
+service workers are intentionally not copied or registered, so they cannot
+control or purge caches belonging to the OneSend site.
+
+OneSend's website, wrapper code, and existing QR transfer remain under the
+OneSend MIT License. The libcimbar MPL-2.0 notice and source obligations apply
+only to the libcimbar covered assets and are not relicensed as OneSend MIT.

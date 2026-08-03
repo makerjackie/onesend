@@ -1,0 +1,49 @@
+<!doctype html>
+<!-- OneSend wrapper: MIT. Upstream libcimbar artifacts are separate files. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+  <title>OneSend Cimbar Receive</title>
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #10130f; color: #f5f6f0; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
+    #container { position: fixed; inset: 0; background: #000; }
+    video { width: 100%; height: 100%; object-fit: cover; background: #000; }
+    .crosshairs { position: fixed; width: 12vw; height: 12vw; border: 4px solid #737970; pointer-events: none; }
+    #crosshair1 { top: 18%; right: 18%; border-left: 0; border-bottom: 0; }
+    #crosshair2 { bottom: 18%; left: 18%; border-right: 0; border-top: 0; }
+    .active_xhairs { border-color: #d9f866 !important; }
+    .scanning_xhairs { border-color: #fff36b !important; }
+    #progress_bars { position: fixed; left: 4%; right: 4%; bottom: 4%; }
+    .progress { height: 8px; margin-top: 5px; background: #d9f866; border-radius: 4px; }
+    #debug_menu { display: none; }
+    #nav-container, #nav-button, #nav-content { display: none; }
+  </style>
+</head>
+<body>
+  <div id="container">
+    <video id="video" autoplay playsinline muted></video>
+  </div>
+  <div id="crosshair1" class="crosshairs"></div>
+  <div id="crosshair2" class="crosshairs"></div>
+  <div id="nav-container"><button id="nav-button"></button><div id="nav-content"></div></div>
+  <div id="debug_menu">
+    <div id="errorbox"></div>
+    <div id="t0"></div><div id="t1"></div><div id="t2"></div><div id="t3"></div>
+    <div id="framesInFlight"></div><div id="tdec"></div>
+  </div>
+  <div id="progress_bars"><div class="progress"></div></div>
+
+    <script src="upstream/recv.2026-07-13T0523.js"></script>
+    <script src="upstream/zstd.2026-07-13T0523.js"></script>
+    <script src="onesend_cimbar_envelope.js"></script>
+    <script src="onesend_cimbar_bridge.js"></script>
+  <script>
+    var Module = window.Module = {};
+    OneSendCimbar.bootReceive();
+  </script>
+  <script src="upstream/cimbar_js.2026-07-13T0523.js"></script>
+</body>
+</html>

@@ -527,6 +527,7 @@ export function WebTransfer({ copy }: { copy: WebTransferCopy }) {
 
         <div className="web-transfer-notes">
           <p><strong>{copy.localNote}</strong> {copy.interopNote}</p>
+          <a className="text-link" href="/cimbar">试用彩色高速实验 <span aria-hidden="true">↗</span></a>
         </div>
       </div>
     </section>

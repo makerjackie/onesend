@@ -54,7 +54,11 @@ void main() {
       );
 
       expect(find.text('自动更新'), findsNothing);
-      await tester.tap(find.byKey(const ValueKey<String>('settings-language')));
+      final languageEntry = find.byKey(
+        const ValueKey<String>('settings-language'),
+      );
+      await tester.ensureVisible(languageEntry);
+      await tester.tap(languageEntry);
       expect(languageTapped, isTrue);
     },
   );

@@ -41,9 +41,10 @@ build/macos/Build/Products/Release/OneSend.app/Contents/MacOS/OneSend
 flutter build macos --release
 ```
 
-For a one-shot local check, `dart run tool/qr_codec_self_test.dart` delegates
-to the same build and executable. The app exits with code 0 on success and 1
-on a QR codec failure.
+After the self-test build is present, `dart run tool/qr_codec_self_test.dart`
+launches that same prebuilt app and forwards its exit status. The app exits
+with code 0 on success and 1 on a QR codec failure; the wrapper deliberately
+does not start a nested Flutter build.
 
 ## Release order
 

@@ -1,0 +1,48 @@
+<!doctype html>
+<!-- OneSend wrapper: MIT. Upstream libcimbar artifacts are separate files. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+  <title>OneSend Cimbar Send</title>
+  <style>
+    :root { color-scheme: light; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; background: #10130f; color: #f5f6f0; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
+    body { display: flex; justify-content: center; padding: 12px; }
+    main { width: min(100%, 760px); display: flex; flex-direction: column; gap: 12px; }
+    #canvas-shell { width: 100%; min-height: 48vh; display: grid; place-items: center; background: #000; border: 2px solid #d9f866; overflow: hidden; }
+    #canvas { display: block; width: 100%; height: auto; max-height: 68vh; background: #000; }
+    #file_input { display: none; }
+    #nav-container, #invisible_click { position: absolute; width: 1px; height: 1px; overflow: hidden; opacity: 0; pointer-events: none; }
+    #nav-content { display: none; }
+  </style>
+</head>
+<body>
+  <main>
+    <div id="canvas-shell">
+      <canvas id="canvas" width="1024" height="1024"></canvas>
+    </div>
+    <input id="file_input" type="file" onchange="OneSendCimbar.sendFile(this.files[0])">
+  </main>
+
+  <div id="nav-container">
+    <button id="nav-button" type="button"></button>
+    <div id="nav-content"><a id="nav-find-file-link" href="#">file</a></div>
+  </div>
+  <div id="invisible_click"></div>
+  <span id="current-file" hidden aria-hidden="true"></span>
+
+    <script src="upstream/send.2026-07-13T0523.js"></script>
+    <script src="upstream/main.2026-07-13T0523.js"></script>
+    <script src="onesend_cimbar_envelope.js"></script>
+    <script src="onesend_cimbar_bridge.js"></script>
+  <script>
+    var Module = window.Module = {
+      canvas: document.getElementById('canvas')
+    };
+    OneSendCimbar.bootSend();
+  </script>
+  <script src="upstream/cimbar_js.2026-07-13T0523.js"></script>
+</body>
+</html>

@@ -4,7 +4,7 @@ OneSend uses the bundle identifier `com.makerjackie.onesend`.
 
 ## Current version / 当前版本
 
-OneSend 1.4.0 (build 12) is the current release candidate. This checklist does not assert any
+OneSend 1.5.0 (build 13) is the current release candidate. This checklist does not assert any
 TestFlight processing, Beta App Review, or external tester availability status; check
 App Store Connect for the live status.
 
@@ -22,8 +22,8 @@ App Store Connect for the live status.
 flutter pub get
 flutter build ipa \
   --release \
-  --build-name 1.4.0 \
-  --build-number 12 \
+  --build-name 1.5.0 \
+  --build-number 13 \
   --export-method app-store
 ```
 
@@ -42,4 +42,4 @@ join after Apple approves at least one build in the external group.
 4. Fill in `What to Test` and the Beta App Review contact details.
 5. Submit the external beta build for review and wait for the status to become available to external testers.
 
-The review notes should explain that the app transfers a file by showing animated QR codes on one device and scanning them with the camera on another. No login or network connection is required.
+The review notes should explain that the app transfers a file by showing changing visual codes on one device and scanning them with the camera on another. Stable QR Fast remains the default; Turbo QR and CIMBAR color mode are experimental settings. No login or network connection is required for file transfer.

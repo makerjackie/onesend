@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../app.dart';
@@ -12,6 +13,7 @@ import '../widgets/file_tile.dart';
 import '../widgets/stored_file_actions.dart';
 import '../widgets/update_ui.dart';
 import 'about_screen.dart';
+import 'cimbar_transfer_screen.dart';
 import 'receive_screen.dart';
 import 'send_screen.dart';
 import 'settings_screen.dart';
@@ -118,6 +120,35 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  bool get _supportsCimbar =>
+      !kIsWeb &&
+      (defaultTargetPlatform == TargetPlatform.android ||
+          defaultTargetPlatform == TargetPlatform.iOS);
+
+  bool get _useCimbar =>
+      _supportsCimbar &&
+      _settings.transferAlgorithm == TransferAlgorithm.cimbar;
+
+  Widget _sendRoute() {
+    if (_useCimbar) {
+      return CimbarTransferScreen(
+        direction: CimbarDirection.send,
+        store: widget.store,
+      );
+    }
+    return SendScreen(store: widget.store, settings: _settings);
+  }
+
+  Widget _receiveRoute() {
+    if (_useCimbar) {
+      return CimbarTransferScreen(
+        direction: CimbarDirection.receive,
+        store: widget.store,
+      );
+    }
+    return ReceiveScreen(store: widget.store);
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -201,12 +232,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               title: l10n.sendFile,
                               description: l10n.sendCardDescription,
                               accent: oneSendLime,
-                              onTap: () => _open(
-                                SendScreen(
-                                  store: widget.store,
-                                  settings: _settings,
-                                ),
-                              ),
+                              onTap: () => _open(_sendRoute()),
                             ),
                           ),
                           SizedBox(
@@ -221,8 +247,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               title: l10n.receiveFile,
                               description: l10n.receiveCardDescription,
                               accent: const Color(0xffe2e5de),
-                              onTap: () =>
-                                  _open(ReceiveScreen(store: widget.store)),
+                              onTap: () => _open(_receiveRoute()),
                             ),
                           ),
                         ],
@@ -330,51 +355,63 @@ class _ActionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.all(Radius.circular(6)),
-        side: BorderSide(color: oneSendInk, width: 2),
-      ),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: const BorderRadius.all(Radius.circular(4)),
-        child: Padding(
-          padding: const EdgeInsets.all(22),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return Semantics(
+      button: true,
+      label: '$title. $description',
+      child: ExcludeSemantics(
+        child: Material(
+          color: Colors.white,
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.all(Radius.circular(6)),
+            side: BorderSide(color: oneSendInk, width: 2),
+          ),
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: const BorderRadius.all(Radius.circular(4)),
+            child: Padding(
+              padding: const EdgeInsets.all(22),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    width: 52,
-                    height: 52,
-                    decoration: BoxDecoration(
-                      color: accent,
-                      border: Border.all(color: oneSendInk, width: 2),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Icon(icon, color: oneSendInk, size: 25),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Container(
+                        width: 52,
+                        height: 52,
+                        decoration: BoxDecoration(
+                          color: accent,
+                          border: Border.all(color: oneSendInk, width: 2),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Icon(icon, color: oneSendInk, size: 25),
+                      ),
+                      const Icon(
+                        Icons.arrow_outward_rounded,
+                        color: oneSendMuted,
+                      ),
+                    ],
                   ),
-                  const Icon(Icons.arrow_outward_rounded, color: oneSendMuted),
+                  const SizedBox(height: 28),
+                  Text(
+                    eyebrow,
+                    style: const TextStyle(
+                      color: oneSendMuted,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.5,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(title, style: Theme.of(context).textTheme.titleLarge),
+                  const SizedBox(height: 5),
+                  Text(
+                    description,
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
                 ],
               ),
-              const SizedBox(height: 28),
-              Text(
-                eyebrow,
-                style: const TextStyle(
-                  color: oneSendMuted,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 1.5,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(title, style: Theme.of(context).textTheme.titleLarge),
-              const SizedBox(height: 5),
-              Text(description, style: Theme.of(context).textTheme.bodyMedium),
-            ],
+            ),
           ),
         ),
       ),

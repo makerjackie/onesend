@@ -59,8 +59,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool get _showUpdateSettings =>
       _desktop && widget.updates?.supportsUpdates == true;
 
-  Future<void> _selectMode(TransferMode mode) async {
-    if (_saving || widget.settings.transferMode == mode) return;
+  Future<void> _selectQrMode(TransferMode mode) async {
+    await _selectTransfer(algorithm: TransferAlgorithm.qr, mode: mode);
+  }
+
+  Future<void> _selectCimbar() async {
+    await _selectTransfer(algorithm: TransferAlgorithm.cimbar);
+  }
+
+  Future<void> _selectTransfer({
+    required TransferAlgorithm algorithm,
+    TransferMode? mode,
+  }) async {
+    final alreadySelected =
+        widget.settings.transferAlgorithm == algorithm &&
+        (algorithm == TransferAlgorithm.cimbar ||
+            widget.settings.transferMode == mode);
+    if (_saving || alreadySelected) return;
 
     final modeSaveError = AppLocalizations.of(context)?.modeSaveError;
     setState(() {
@@ -69,7 +84,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     });
     String? errorMessage;
     try {
-      await widget.settings.setDefaultMode(mode);
+      await widget.settings.setDefaultAlgorithm(algorithm);
+      if (mode != null && widget.settings.transferMode != mode) {
+        await widget.settings.setDefaultMode(mode);
+      }
     } catch (_) {
       errorMessage = modeSaveError;
     }
@@ -146,7 +164,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Scaffold(
       backgroundColor: _settingsPaper,
       appBar: AppBar(
-        title: const Text('设置'),
+        title: Text(AppLocalizations.of(context)?.settings ?? '设置'),
         backgroundColor: _settingsPaper,
         foregroundColor: _settingsInk,
         elevation: 0,
@@ -164,6 +182,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget _buildContent(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final mode = widget.settings.transferMode;
+    final algorithm = widget.settings.transferAlgorithm;
     return LayoutBuilder(
       builder: (context, constraints) {
         return SingleChildScrollView(
@@ -215,7 +234,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           const SizedBox(height: 14),
                           _ModeOption(
                             key: const ValueKey<String>('settings-fast'),
-                            mode: TransferMode.fast,
+                            semanticLabel: l10n.modeAccessibilityLabel(
+                              l10n.modeFast,
+                              formatTransferSpeed(
+                                TransferMode.fast.usefulBytesPerSecond,
+                              ),
+                            ),
                             title: l10n.modeFast,
                             description: l10n.fastModeDescription(
                               l10n.theoreticalSpeed(
@@ -224,14 +248,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 ),
                               ),
                             ),
-                            selected: mode == TransferMode.fast,
+                            selected:
+                                algorithm == TransferAlgorithm.qr &&
+                                mode == TransferMode.fast,
                             enabled: !_saving,
-                            onTap: () => _selectMode(TransferMode.fast),
+                            onTap: () => _selectQrMode(TransferMode.fast),
                           ),
                           const SizedBox(height: 10),
                           _ModeOption(
                             key: const ValueKey<String>('settings-reliable'),
-                            mode: TransferMode.reliable,
+                            semanticLabel: l10n.modeAccessibilityLabel(
+                              l10n.modeReliable,
+                              formatTransferSpeed(
+                                TransferMode.reliable.usefulBytesPerSecond,
+                              ),
+                            ),
                             title: l10n.modeReliable,
                             description: l10n.reliableModeDescription(
                               l10n.theoreticalSpeed(
@@ -240,9 +271,44 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 ),
                               ),
                             ),
-                            selected: mode == TransferMode.reliable,
+                            selected:
+                                algorithm == TransferAlgorithm.qr &&
+                                mode == TransferMode.reliable,
                             enabled: !_saving,
-                            onTap: () => _selectMode(TransferMode.reliable),
+                            onTap: () => _selectQrMode(TransferMode.reliable),
+                          ),
+                          const SizedBox(height: 10),
+                          _ModeOption(
+                            key: const ValueKey<String>('settings-turbo'),
+                            semanticLabel: l10n.modeAccessibilityLabel(
+                              l10n.modeTurboQr,
+                              formatTransferSpeed(
+                                TransferMode.turbo.usefulBytesPerSecond,
+                              ),
+                            ),
+                            title: l10n.modeTurboQr,
+                            description: l10n.turboModeDescription(
+                              l10n.theoreticalSpeed(
+                                formatTransferSpeed(
+                                  TransferMode.turbo.usefulBytesPerSecond,
+                                ),
+                              ),
+                            ),
+                            selected:
+                                algorithm == TransferAlgorithm.qr &&
+                                mode == TransferMode.turbo,
+                            enabled: !_saving,
+                            onTap: () => _selectQrMode(TransferMode.turbo),
+                          ),
+                          const SizedBox(height: 10),
+                          _ModeOption(
+                            key: const ValueKey<String>('settings-cimbar'),
+                            semanticLabel: l10n.modeCimbar,
+                            title: l10n.modeCimbar,
+                            description: l10n.cimbarModeDescription,
+                            selected: algorithm == TransferAlgorithm.cimbar,
+                            enabled: !_saving,
+                            onTap: _selectCimbar,
                           ),
                           if (_message != null) ...[
                             const SizedBox(height: 12),
@@ -354,7 +420,7 @@ class _SettingsPanel extends StatelessWidget {
 
 class _ModeOption extends StatelessWidget {
   const _ModeOption({
-    required this.mode,
+    required this.semanticLabel,
     required this.title,
     required this.description,
     required this.selected,
@@ -363,7 +429,7 @@ class _ModeOption extends StatelessWidget {
     super.key,
   });
 
-  final TransferMode mode;
+  final String semanticLabel;
   final String title;
   final String description;
   final bool selected;
@@ -376,10 +442,7 @@ class _ModeOption extends StatelessWidget {
       button: true,
       selected: selected,
       enabled: enabled,
-      label: AppLocalizations.of(context)!.modeAccessibilityLabel(
-        title,
-        formatTransferSpeed(mode.usefulBytesPerSecond),
-      ),
+      label: semanticLabel,
       child: Material(
         color: Colors.transparent,
         child: InkWell(

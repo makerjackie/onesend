@@ -24,6 +24,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get modeReliable => 'Reliable';
 
   @override
+  String get modeTurboQr => 'Turbo QR (experimental)';
+
+  @override
+  String get modeCimbar => 'CIMBAR color visual code (experimental)';
+
+  @override
+  String get compatibilityMode => 'Compatibility';
+
+  @override
   String get cancel => 'Cancel';
 
   @override
@@ -183,7 +192,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get algorithmDescription =>
-      'Fast is best for a steady setup; Reliable gives handheld scanning more headroom.';
+      'Choose a QR profile or the experimental CIMBAR color visual code. QR receive mode is described by each frame.';
 
   @override
   String theoreticalSpeed(Object speed) {
@@ -192,17 +201,26 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String fastModeDescription(Object speed) {
-    return '$speed; best for a steady setup and bright screen.';
+    return '$speed; stable and fast for a steady setup and bright screen.';
   }
 
   @override
   String reliableModeDescription(Object speed) {
-    return '$speed; more error-correction headroom, but slower.';
+    return '$speed; reliable compatibility with more error-correction headroom, but slower.';
   }
 
   @override
+  String turboModeDescription(Object speed) {
+    return '$speed; experimental high-capacity QR profile with less scanning headroom.';
+  }
+
+  @override
+  String get cimbarModeDescription =>
+      'About 106 KB/s upstream reference; experimental color visual code on Android and iOS.';
+
+  @override
   String get modeSaveError =>
-      'Could not save the default transfer mode. Try again.';
+      'Could not save the default transfer settings. Try again.';
 
   @override
   String get appSection => 'APP';
@@ -626,6 +644,179 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get downloadError =>
       'The update package could not be downloaded. Try again later.';
+
+  @override
+  String get cimbarSendTitle => 'CIMBAR high-speed send';
+
+  @override
+  String get cimbarReceiveTitle => 'CIMBAR high-speed receive';
+
+  @override
+  String get cimbarUnsupported =>
+      'The CIMBAR experimental transfer engine is available only on Android and iOS.';
+
+  @override
+  String get cimbarLoading => 'Loading the experimental engine…';
+
+  @override
+  String get cimbarPageReadySend =>
+      'Experimental engine loaded. Choose a file.';
+
+  @override
+  String get cimbarPageReadyReceive =>
+      'Experimental engine loaded. Tap start to request camera access.';
+
+  @override
+  String get cimbarEngineReady => 'Experimental engine ready · Mode B';
+
+  @override
+  String get cimbarPreparingFile => 'Preparing file…';
+
+  @override
+  String get cimbarPaused => 'Playback paused';
+
+  @override
+  String get cimbarPlaying => 'Playing';
+
+  @override
+  String get cimbarBroadcasting => 'File ready; broadcasting the visual code';
+
+  @override
+  String get cimbarDecoderReady => 'Decoder ready. Looking for CIMBAR.';
+
+  @override
+  String get cimbarDecoderReadyStart =>
+      'Decoder ready. Tap start to request camera access.';
+
+  @override
+  String get cimbarCameraStarted => 'Camera started. Looking for CIMBAR.';
+
+  @override
+  String get cimbarDecoding => 'Decoding with the upstream worker';
+
+  @override
+  String get cimbarFileHeaderReceived =>
+      'File header verified. Receiving chunks.';
+
+  @override
+  String get cimbarReceiving => 'Receiving verified bytes';
+
+  @override
+  String get cimbarRecoveredSaving => 'File fully recovered. Saving…';
+
+  @override
+  String get cimbarRecoveredNotSaved =>
+      'File fully recovered, but it has not been saved.';
+
+  @override
+  String get cimbarReceiveComplete => 'Receive complete';
+
+  @override
+  String get cimbarLoadFailed => 'Loading failed. Try again.';
+
+  @override
+  String get cimbarTransferFailed => 'CIMBAR transfer failed. Try again.';
+
+  @override
+  String get cimbarReloading => 'Reloading the experimental engine…';
+
+  @override
+  String get cimbarRequestingCamera => 'Requesting camera access…';
+
+  @override
+  String cimbarFileInfo(Object name, Object size) {
+    return 'File: $name · $size';
+  }
+
+  @override
+  String get cimbarSendRate => 'Upstream reference: 106 KB/s · Mode B';
+
+  @override
+  String cimbarReceiveRate(Object speed) {
+    return 'Upstream reference: 106 KB/s · Measured for this receive: $speed KB/s';
+  }
+
+  @override
+  String cimbarReceiveProgress(
+    Object expected,
+    Object received,
+    Object seconds,
+  ) {
+    return 'Recovered $received / $expected · $seconds s';
+  }
+
+  @override
+  String cimbarReceiveProgressNoTotal(Object received, Object seconds) {
+    return 'Recovered $received · $seconds s';
+  }
+
+  @override
+  String get cimbarStartReceive => 'Start receiving (request camera)';
+
+  @override
+  String cimbarFileTooLarge(Object maxSize) {
+    return 'Mobile CIMBAR files must be no larger than $maxSize.';
+  }
+
+  @override
+  String get cimbarPageLoadError =>
+      'The offline CIMBAR page could not be loaded. Try again.';
+
+  @override
+  String get cimbarBridgeError =>
+      'The CIMBAR transfer sent an invalid event. Try again.';
+
+  @override
+  String get cimbarEngineError =>
+      'The CIMBAR engine is unavailable. Try again.';
+
+  @override
+  String get cimbarCameraError =>
+      'Camera access or decoding failed. Check permission and try again.';
+
+  @override
+  String get cimbarSendError =>
+      'The CIMBAR sender could not prepare the file. Try again.';
+
+  @override
+  String get cimbarReceiveError =>
+      'The CIMBAR receiver could not decode the file. Try again.';
+
+  @override
+  String get cimbarVerificationError =>
+      'The received file could not be verified. Try again.';
+
+  @override
+  String get cimbarSaveError =>
+      'The recovered file could not be saved. Try Retry save.';
+
+  @override
+  String get cimbarHistoryError =>
+      'The file was saved, but its transfer history record could not be written.';
+
+  @override
+  String get cimbarAllFiles => 'All files';
+
+  @override
+  String get cimbarSelectedFileName => 'selected.bin';
+
+  @override
+  String get cimbarReceivedFileName => 'received.bin';
+
+  @override
+  String cimbarBytes(Object value) {
+    return '$value B';
+  }
+
+  @override
+  String cimbarKibibytes(Object value) {
+    return '$value KiB';
+  }
+
+  @override
+  String cimbarMebibytes(Object value) {
+    return '$value MiB';
+  }
 
   @override
   String durationHoursMinutes(Object hours, Object minutes) {

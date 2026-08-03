@@ -145,7 +145,11 @@ void main() {
       await tester.tap(find.text('设置'));
       await tester.pumpAndSettle();
       expect(find.text('自动更新'), findsOneWidget);
-      await tester.tap(find.byKey(const ValueKey<String>('settings-updates')));
+      final updateEntry = find.byKey(
+        const ValueKey<String>('settings-updates'),
+      );
+      await tester.ensureVisible(updateEntry);
+      await tester.tap(updateEntry);
       await tester.pumpAndSettle();
       expect(find.text('自动检查更新'), findsOneWidget);
       expect(find.byType(Switch), findsOneWidget);
@@ -196,8 +200,8 @@ void main() {
       expect(find.text('保存位置'), findsOneWidget);
       expect(find.textContaining(filePath), findsOneWidget);
       expect(find.text('打开'), findsOneWidget);
-      expect(find.text('分享/转发'), findsOneWidget);
-      expect(find.text('另存副本'), findsOneWidget);
+      expect(find.text('分享 / 转发'), findsOneWidget);
+      expect(find.text('保存副本'), findsOneWidget);
       expect(find.text('在文件夹中显示'), findsOneWidget);
     },
   );

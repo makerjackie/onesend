@@ -5,7 +5,7 @@ page and privacy notice for OneSend · 扫传.
 
 ## Development
 
-Requires Node.js 22.13 or newer.
+Requires Node.js 24 or newer.
 
 ```bash
 npm install
