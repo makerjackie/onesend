@@ -8,6 +8,7 @@ import 'package:onesend/core/fountain.dart';
 import 'package:onesend/core/frame_pacer.dart';
 import 'package:onesend/core/optical_transfer.dart';
 import 'package:onesend/core/protocol.dart';
+import 'package:onesend/core/transfer_codec.dart';
 import 'package:onesend/widgets/optical_qr.dart';
 import 'package:qr/qr.dart';
 
@@ -99,6 +100,49 @@ void main() {
       expect(decoded.name, 'empty.txt');
       expect(decoded.bytes, isEmpty);
     });
+  });
+
+  group('background transfer codec', () {
+    test(
+      'round trips compressed text with metadata across an isolate',
+      () async {
+        final originalBytes = Uint8List.fromList(List<int>.filled(12000, 0x41));
+
+        final encoded = await encodeTransferFileInBackground(
+          name: '报告 01.txt',
+          mimeType: 'text/plain',
+          bytes: originalBytes,
+        );
+        final decoded = await decodeTransferFileInBackground(encoded);
+
+        expect(decoded.name, '报告 01.txt');
+        expect(decoded.mimeType, 'text/plain');
+        expect(decoded.wasCompressed, isTrue);
+        expect(decoded.bytes, orderedEquals(originalBytes));
+      },
+    );
+
+    test(
+      'round trips arbitrary binary without compression across an isolate',
+      () async {
+        final originalBytes = Uint8List.fromList(
+          List<int>.generate(4096, (index) => (index * 73 + 19) & 0xff),
+        );
+
+        final encoded = await encodeTransferFileInBackground(
+          name: 'payload.bin',
+          mimeType: 'application/octet-stream',
+          bytes: originalBytes,
+          enableCompression: false,
+        );
+        final decoded = await decodeTransferFileInBackground(encoded);
+
+        expect(decoded.name, 'payload.bin');
+        expect(decoded.mimeType, 'application/octet-stream');
+        expect(decoded.wasCompressed, isFalse);
+        expect(decoded.bytes, orderedEquals(originalBytes));
+      },
+    );
   });
 
   group('wire protocol', () {

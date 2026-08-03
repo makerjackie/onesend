@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:isolate';
 import 'dart:math' as math;
 import 'dart:typed_data';
 
@@ -8,9 +7,9 @@ import 'package:flutter/scheduler.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../app.dart';
-import '../core/envelope.dart';
 import '../core/frame_pacer.dart';
 import '../core/optical_transfer.dart';
+import '../core/transfer_codec.dart';
 import '../services/file_service.dart';
 import '../services/transfer_store.dart';
 import '../widgets/file_tile.dart';
@@ -64,14 +63,10 @@ class _SendScreenState extends State<SendScreen>
       _playbackTicker.stop();
       _sender?.dispose();
       _sender = null;
-      final payload = await Isolate.run(
-        () => encodeTransferFile(
-          TransferFile(
-            name: file.name,
-            mimeType: file.mimeType,
-            bytes: file.bytes,
-          ),
-        ),
+      final payload = await encodeTransferFileInBackground(
+        name: file.name,
+        mimeType: file.mimeType,
+        bytes: file.bytes,
       );
       if (!mounted) return;
       if (payload.length > maxOpticalPayloadBytes) {

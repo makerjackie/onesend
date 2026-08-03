@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.2.1 - 2026-08-03
+
+- Fixed file selection failing with `Invalid argument: object is unsendable` on
+  macOS and other native platforms.
+- Moved send and receive file-envelope work behind explicit, sendable isolate
+  messages so UI state and plugin objects cannot cross the worker boundary.
+- Added isolate round-trip and real file-picker UI regression coverage for text,
+  arbitrary binary data, compression, and Unicode file metadata.
+
 ## 1.2.0 - 2026-08-02
 
 - Increased Fast mode from 1320 B at 15 fps to a fixed V30-L profile carrying
