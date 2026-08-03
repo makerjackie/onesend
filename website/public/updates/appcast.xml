@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><!-- sparkle-sign-warning:
+IMPORTANT: This file was signed by Sparkle. Any modifications to this file requires re-signing this file with generate_appcast or sign_update! The signed signature will be embedded at the end of this file.
+--><rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
+  <channel>
+    <title>OneSend stable updates</title>
+    <link>https://onesend.01mvp.com</link>
+    <description>Stable desktop releases for OneSend · 扫传</description>
+    <language>zh-cn</language>
+    <item>
+      <title>OneSend 1.3.0</title>
+      <link>https://github.com/makerjackie/onesend/releases/tag/v1.3.0</link>
+      <sparkle:version>9</sparkle:version>
+      <sparkle:shortVersionString>1.3.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>10.15</sparkle:minimumSystemVersion>
+      <description><![CDATA[<ul><li>新增桌面自动更新：macOS、Windows 与 Linux 均支持每日检查和手动检查。</li><li>修复选择任意文件时可能出现的 Invalid argument object is unsendable 错误。</li><li>更新包使用 Ed25519 签名和 SHA-256 校验；macOS 安装包通过 Apple 公证。</li></ul>]]></description>
+      <pubDate>Mon, 03 Aug 2026 06:43:16 +0000</pubDate>
+      <enclosure url="https://github.com/makerjackie/onesend/releases/download/v1.3.0/onesend-macos-universal.zip" sparkle:edSignature="bMtQJwGaebhFaegCVckRT9dh8q3uha5kyM8Rl9gHsIkjmOdkwR+bzVsMmxv0pUEeCRYxkLmOS+MpuEkGAme7Dg==" sparkle:os="macos" length="21192548" type="application/octet-stream"></enclosure>
+    </item>
+    <item>
+      <title>OneSend 1.3.0</title>
+      <link>https://github.com/makerjackie/onesend/releases/tag/v1.3.0</link>
+      <sparkle:version>9</sparkle:version>
+      <sparkle:shortVersionString>1.3.0</sparkle:shortVersionString>
+      <description><![CDATA[<ul><li>新增桌面自动更新：macOS、Windows 与 Linux 均支持每日检查和手动检查。</li><li>修复选择任意文件时可能出现的 Invalid argument object is unsendable 错误。</li><li>更新包使用 Ed25519 签名和 SHA-256 校验；macOS 安装包通过 Apple 公证。</li></ul>]]></description>
+      <pubDate>Mon, 03 Aug 2026 06:43:16 +0000</pubDate>
+      <enclosure url="https://github.com/makerjackie/onesend/releases/download/v1.3.0/onesend-windows-setup.exe" sparkle:edSignature="se6TS7MV1Hikb6/+48jE+A73C3rtnIR4T7442cNIaMaAhh7MqaN+qo9aKAhLw0+SODj856BUWrxeOAjx8fCDCw==" sparkle:installerArguments="/SILENT /SP- /NOICONS /NORESTART /ONESENDUPDATE=1" sparkle:os="windows-x64" length="12503231" type="application/octet-stream"></enclosure>
+    </item>
+  </channel>
+</rss><!-- sparkle-signatures:
+edSignature: qbI5O979TH46kT66recrneEqBXw5g2Xkl3TJmcOOuAYA11vDH4+wBIIcr2ZNKcWeIPTzpTOm5si8iqAw0YLOAA==
+length: 2689
+-->
