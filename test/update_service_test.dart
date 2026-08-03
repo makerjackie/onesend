@@ -17,6 +17,47 @@ void main() {
     SharedPreferences.setMockInitialValues(<String, Object>{});
   });
 
+  test('mobile platforms select the disabled updater', () {
+    for (final platform in <TargetPlatform>[
+      TargetPlatform.android,
+      TargetPlatform.iOS,
+    ]) {
+      final manager = createUpdateManager(
+        targetPlatform: platform,
+        isWeb: false,
+      );
+
+      expect(manager, same(DisabledUpdateManager.instance));
+      expect(manager, isA<DisabledUpdateManager>());
+    }
+  });
+
+  test('desktop platforms select the desktop updater', () {
+    final expected = <TargetPlatform, OneSendDesktopPlatform>{
+      TargetPlatform.macOS: OneSendDesktopPlatform.macos,
+      TargetPlatform.windows: OneSendDesktopPlatform.windows,
+      TargetPlatform.linux: OneSendDesktopPlatform.linux,
+    };
+
+    for (final entry in expected.entries) {
+      expect(desktopUpdatePlatformForTarget(entry.key), entry.value);
+      final manager = createUpdateManager(
+        targetPlatform: entry.key,
+        isWeb: false,
+      );
+      addTearDown(manager.dispose);
+
+      expect(manager, isA<DesktopUpdateManager>());
+    }
+  });
+
+  test('web never selects a network-capable updater', () {
+    expect(
+      createUpdateManager(targetPlatform: TargetPlatform.macOS, isWeb: true),
+      same(DisabledUpdateManager.instance),
+    );
+  });
+
   test(
     'native updater forwards checks and automatic-check preference',
     () async {

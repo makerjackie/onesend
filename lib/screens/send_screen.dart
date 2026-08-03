@@ -10,15 +10,18 @@ import '../app.dart';
 import '../core/frame_pacer.dart';
 import '../core/optical_transfer.dart';
 import '../core/transfer_codec.dart';
+import '../services/app_settings.dart';
 import '../services/file_service.dart';
+import '../services/sample_file_service.dart';
 import '../services/transfer_store.dart';
 import '../widgets/file_tile.dart';
 import '../widgets/optical_qr.dart';
 
 class SendScreen extends StatefulWidget {
-  const SendScreen({required this.store, super.key});
+  const SendScreen({required this.store, this.settings, super.key});
 
   final TransferStore store;
+  final AppSettings? settings;
 
   @override
   State<SendScreen> createState() => _SendScreenState();
@@ -34,12 +37,13 @@ class _SendScreenState extends State<SendScreen>
   int _framesSent = 0;
   DateTime? _startedAt;
   String? _error;
-  bool _picking = false;
-  TransferMode _mode = TransferMode.reliable;
+  bool _preparing = false;
+  late TransferMode _mode;
 
   @override
   void initState() {
     super.initState();
+    _mode = widget.settings?.defaultMode ?? AppSettings.defaultTransferMode;
     _playbackTicker = createTicker(_onPlaybackTick);
   }
 
@@ -47,52 +51,78 @@ class _SendScreenState extends State<SendScreen>
   void dispose() {
     _playbackTicker.dispose();
     _sender?.dispose();
-    unawaited(WakelockPlus.disable());
+    unawaited(_disableWakelock());
     super.dispose();
   }
 
   Future<void> _pickFile() async {
-    if (_picking) return;
+    if (_preparing) return;
+    await _preparePickedFile(pickTransferFile);
+  }
+
+  Future<void> _sendSampleVideo() async {
+    if (_preparing) return;
+    await _preparePickedFile(loadSampleVideo);
+  }
+
+  Future<void> _preparePickedFile(
+    Future<PickedTransfer?> Function() loader,
+  ) async {
     setState(() {
-      _picking = true;
+      _preparing = true;
       _error = null;
     });
     try {
-      final file = await pickTransferFile();
+      final file = await loader();
       if (file == null || !mounted) return;
-      _playbackTicker.stop();
-      _sender?.dispose();
-      _sender = null;
-      final payload = await encodeTransferFileInBackground(
-        name: file.name,
-        mimeType: file.mimeType,
-        bytes: file.bytes,
-      );
-      if (!mounted) return;
-      if (payload.length > maxOpticalPayloadBytes) {
-        throw StateError('文件编码后超过光传协议上限。');
-      }
-      final selected = _SendingFile(
-        name: file.name,
-        mimeType: file.mimeType,
-        bytes: file.bytes.length,
-      );
-      setState(() {
-        _file = selected;
-        _frame = null;
-        _framesSent = 0;
-        _startedAt = DateTime.now();
-      });
-      _startSender(payload, selected);
+      await _prepareAndStart(file);
     } catch (error) {
       if (mounted) setState(() => _error = _friendlyError(error));
     } finally {
-      if (mounted) setState(() => _picking = false);
+      if (mounted) setState(() => _preparing = false);
     }
   }
 
+  /// The picker and bundled sample both enter this single preparation path.
+  /// Only plain strings and [Uint8List] are passed to the top-level isolate
+  /// callback, so plugin objects and widget state cannot become unsendable.
+  Future<void> _prepareAndStart(PickedTransfer file) async {
+    final payload = await encodeTransferFileInBackground(
+      name: file.name,
+      mimeType: file.mimeType,
+      bytes: file.bytes,
+    );
+    if (!mounted) return;
+    if (payload.length > maxOpticalPayloadBytes) {
+      throw StateError('文件编码后超过光传协议上限。');
+    }
+
+    _stopPlayback();
+    final selected = _SendingFile(
+      name: file.name,
+      mimeType: file.mimeType,
+      bytes: file.bytes.length,
+    );
+    setState(() {
+      _file = selected;
+      _frame = null;
+      _framesSent = 0;
+      _startedAt = DateTime.now();
+    });
+    _startSender(payload, selected);
+  }
+
+  void _stopPlayback() {
+    _playbackTicker.stop();
+    _sender?.dispose();
+    _sender = null;
+    _framePacer = null;
+    unawaited(_disableWakelock());
+  }
+
   void _startSender(Uint8List payload, _SendingFile file) {
-    final sender = OpticalSender(
+    late final OpticalSender sender;
+    sender = OpticalSender(
       payload: payload,
       fileName: file.name,
       mimeType: file.mimeType,
@@ -102,7 +132,7 @@ class _SendScreenState extends State<SendScreen>
         if (!mounted) return;
         setState(() {
           _frame = frame;
-          _framesSent = _sender?.framesEmitted ?? (_framesSent + 1);
+          _framesSent = sender.framesEmitted;
         });
       },
       onError: (error) {
@@ -115,7 +145,7 @@ class _SendScreenState extends State<SendScreen>
     _framePacer = FramePacer(sender.frameInterval);
     sender.start();
     _playbackTicker.start();
-    unawaited(WakelockPlus.enable());
+    unawaited(_enableWakelock());
   }
 
   void _onPlaybackTick(Duration elapsed) {
@@ -128,36 +158,43 @@ class _SendScreenState extends State<SendScreen>
   Future<void> _togglePause() async {
     final sender = _sender;
     if (sender == null) return;
-    if (sender.isPaused) {
-      _framePacer?.reset();
-      sender.resume();
-      _playbackTicker.start();
-      await WakelockPlus.enable();
-    } else {
-      _playbackTicker.stop();
-      sender.pause();
-      await WakelockPlus.disable();
+    try {
+      if (sender.isPaused) {
+        _framePacer?.reset();
+        sender.resume();
+        _playbackTicker.start();
+        await _enableWakelock();
+      } else {
+        _playbackTicker.stop();
+        sender.pause();
+        await _disableWakelock();
+      }
+      if (mounted) setState(() {});
+    } catch (error) {
+      if (mounted) setState(() => _error = _friendlyError(error));
     }
-    if (mounted) setState(() {});
   }
 
   Future<void> _endTransfer() async {
     final file = _file;
-    final sender = _sender;
-    _playbackTicker.stop();
-    sender?.stop();
-    await WakelockPlus.disable();
-    if (file != null && _framesSent > 0) {
-      await widget.store.add(
-        TransferRecord(
-          id: DateTime.now().microsecondsSinceEpoch.toString(),
-          direction: TransferDirection.sent,
-          fileName: file.name,
-          bytes: file.bytes,
-          createdAt: DateTime.now(),
-          status: 'broadcast-ended',
-        ),
-      );
+    _stopPlayback();
+    try {
+      await _disableWakelock();
+      if (file != null && _framesSent > 0) {
+        await widget.store.add(
+          TransferRecord(
+            id: DateTime.now().microsecondsSinceEpoch.toString(),
+            direction: TransferDirection.sent,
+            fileName: file.name,
+            bytes: file.bytes,
+            createdAt: DateTime.now(),
+            status: 'broadcast-ended',
+          ),
+        );
+      }
+    } catch (error) {
+      if (mounted) setState(() => _error = _friendlyError(error));
+      return;
     }
     if (mounted) Navigator.of(context).pop();
   }
@@ -170,7 +207,7 @@ class _SendScreenState extends State<SendScreen>
         actions: [
           IconButton(
             tooltip: '选择其他文件',
-            onPressed: _picking ? null : _pickFile,
+            onPressed: _preparing ? null : _pickFile,
             icon: const Icon(Icons.attach_file_rounded),
           ),
         ],
@@ -182,84 +219,78 @@ class _SendScreenState extends State<SendScreen>
   }
 
   Widget _buildPicker() {
+    final theoretical = formatTransferSpeed(_mode.usefulBytesPerSecond);
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 520),
           child: Card(
             child: Padding(
-              padding: const EdgeInsets.all(30),
+              padding: const EdgeInsets.all(24),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Container(
-                    width: 80,
-                    height: 80,
+                    width: 72,
+                    height: 72,
                     decoration: BoxDecoration(
                       color: oneSendLime,
-                      borderRadius: BorderRadius.circular(26),
+                      border: Border.all(color: oneSendInk, width: 2),
+                      borderRadius: BorderRadius.circular(4),
                     ),
-                    child: const Icon(Icons.upload_file_rounded, size: 36),
+                    child: const Icon(Icons.upload_file_rounded, size: 34),
                   ),
-                  const SizedBox(height: 22),
+                  const SizedBox(height: 18),
                   Text('选一个文件', style: Theme.of(context).textTheme.titleLarge),
                   const SizedBox(height: 8),
                   const Text(
                     '文件会被编码成一串不断变化的二维码。\n最大支持 64 MB，建议从小文件开始体验。',
                     textAlign: TextAlign.center,
                   ),
-                  const SizedBox(height: 24),
-                  SizedBox(
+                  const SizedBox(height: 16),
+                  Container(
                     width: double.infinity,
-                    child: SegmentedButton<TransferMode>(
-                      segments: const <ButtonSegment<TransferMode>>[
-                        ButtonSegment<TransferMode>(
-                          value: TransferMode.reliable,
-                          label: Text('可靠'),
-                          icon: Icon(Icons.verified_user_outlined),
-                        ),
-                        ButtonSegment<TransferMode>(
-                          value: TransferMode.fast,
-                          label: Text('快速'),
-                          icon: Icon(Icons.bolt_rounded),
-                        ),
-                      ],
-                      selected: <TransferMode>{_mode},
-                      showSelectedIcon: false,
-                      onSelectionChanged: _picking
-                          ? null
-                          : (selection) {
-                              setState(() => _mode = selection.single);
-                            },
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xffeef0e9),
+                      border: Border.all(color: oneSendInk, width: 2),
+                      borderRadius: BorderRadius.circular(4),
                     ),
-                  ),
-                  const SizedBox(height: 10),
-                  AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 180),
                     child: Text(
-                      _mode == TransferMode.reliable
-                          ? '8 帧/秒 · 中等二维码纠错 · 手持扫描优先'
-                          : '24 帧/秒 · 理论约 32 KB/s · 固定设备、明亮屏幕',
-                      key: ValueKey<TransferMode>(_mode),
-                      style: Theme.of(context).textTheme.bodySmall,
+                      '新传输默认使用${_mode.label}模式 · 理论码流约 $theoretical',
                       textAlign: TextAlign.center,
+                      style: const TextStyle(fontWeight: FontWeight.w700),
                     ),
                   ),
                   if (_error != null) ...[
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 14),
                     _ErrorText(message: _error!),
                   ],
-                  const SizedBox(height: 22),
-                  FilledButton.icon(
-                    onPressed: _picking ? null : _pickFile,
-                    icon: _picking
-                        ? const SizedBox.square(
-                            dimension: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.folder_open_rounded),
-                    label: Text(_picking ? '读取中…' : '选择文件'),
+                  const SizedBox(height: 18),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      key: const ValueKey<String>('send-pick-file'),
+                      onPressed: _preparing ? null : _pickFile,
+                      icon: _preparing
+                          ? const SizedBox.square(
+                              dimension: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.folder_open_rounded),
+                      label: Text(_preparing ? '读取中…' : '选择文件'),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      key: const ValueKey<String>('send-sample-video'),
+                      onPressed: _preparing ? null : _sendSampleVideo,
+                      icon: const Icon(Icons.movie_outlined),
+                      label: const Text('一键发送内置测试视频'),
+                    ),
                   ),
                 ],
               ),
@@ -278,14 +309,15 @@ class _SendScreenState extends State<SendScreen>
     final elapsed = _startedAt == null
         ? '—'
         : _formatDuration(DateTime.now().difference(_startedAt!));
+    final currentRate = _currentBytesPerSecond();
     return LayoutBuilder(
       builder: (context, constraints) {
         final qrSize = math.min(
           500.0,
-          math.max(250.0, constraints.maxWidth - 48),
+          math.max(220.0, constraints.maxWidth - 40),
         );
         return SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(24, 8, 24, 30),
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 30),
           child: Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 720),
@@ -293,7 +325,7 @@ class _SendScreenState extends State<SendScreen>
                 children: [
                   Card(
                     child: Padding(
-                      padding: const EdgeInsets.all(22),
+                      padding: const EdgeInsets.all(18),
                       child: Column(
                         children: [
                           SizedBox.square(
@@ -308,20 +340,19 @@ class _SendScreenState extends State<SendScreen>
                                     robust: _mode == TransferMode.reliable,
                                   ),
                           ),
-                          const SizedBox(height: 18),
+                          const SizedBox(height: 14),
                           Container(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 11,
+                              horizontal: 10,
                               vertical: 6,
                             ),
                             decoration: BoxDecoration(
-                              color: _mode == TransferMode.reliable
-                                  ? oneSendLime
-                                  : const Color(0xffdce9ff),
-                              borderRadius: BorderRadius.circular(999),
+                              color: oneSendLime,
+                              border: Border.all(color: oneSendInk, width: 2),
+                              borderRadius: BorderRadius.circular(4),
                             ),
                             child: Text(
-                              '${_mode.label}模式 · ${_mode.framesPerSecond} fps',
+                              '${_mode.label}模式',
                               style: const TextStyle(
                                 color: oneSendInk,
                                 fontSize: 12,
@@ -329,7 +360,7 @@ class _SendScreenState extends State<SendScreen>
                               ),
                             ),
                           ),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 10),
                           Text(
                             sender?.isPaused == true ? '已暂停播放' : '正在持续播放二维码',
                             style: Theme.of(context).textTheme.titleMedium,
@@ -338,15 +369,16 @@ class _SendScreenState extends State<SendScreen>
                           Text(
                             '请把另一台设备的摄像头对准这块白色区域',
                             style: Theme.of(context).textTheme.bodyMedium,
+                            textAlign: TextAlign.center,
                           ),
                         ],
                       ),
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 14),
                   Card(
                     child: Padding(
-                      padding: const EdgeInsets.all(20),
+                      padding: const EdgeInsets.all(18),
                       child: Column(
                         children: [
                           FileTile(
@@ -354,17 +386,18 @@ class _SendScreenState extends State<SendScreen>
                             bytes: file.bytes,
                             icon: Icons.north_east_rounded,
                           ),
-                          const SizedBox(height: 22),
+                          const SizedBox(height: 18),
                           LinearProgressIndicator(
                             minHeight: 8,
-                            borderRadius: BorderRadius.circular(8),
                             value: progress,
-                            backgroundColor: const Color(0xffe8ebe4),
+                            backgroundColor: const Color(0xffe2e5de),
                             color: oneSendInk,
                           ),
                           const SizedBox(height: 10),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          Wrap(
+                            alignment: WrapAlignment.spaceBetween,
+                            runSpacing: 4,
+                            spacing: 18,
                             children: [
                               Text(
                                 '第 $pass 轮 · 已发 $_framesSent 帧',
@@ -376,40 +409,51 @@ class _SendScreenState extends State<SendScreen>
                               ),
                             ],
                           ),
+                          const SizedBox(height: 10),
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              '理论码流 ${formatTransferSpeed(_mode.usefulBytesPerSecond)} · 当前码流 ${formatTransferSpeed(currentRate)}',
+                              style: const TextStyle(
+                                color: oneSendMuted,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  if (_error != null) _ErrorText(message: _error!),
-                  const SizedBox(height: 10),
-                  Row(
+                  const SizedBox(height: 14),
+                  if (_error != null) ...[
+                    _ErrorText(message: _error!),
+                    const SizedBox(height: 10),
+                  ],
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: 10,
+                    runSpacing: 10,
                     children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: _togglePause,
-                          icon: Icon(
-                            sender?.isPaused == true
-                                ? Icons.play_arrow_rounded
-                                : Icons.pause_rounded,
-                          ),
-                          label: Text(sender?.isPaused == true ? '继续' : '暂停'),
+                      OutlinedButton.icon(
+                        onPressed: sender == null ? null : _togglePause,
+                        icon: Icon(
+                          sender?.isPaused == true
+                              ? Icons.play_arrow_rounded
+                              : Icons.pause_rounded,
                         ),
+                        label: Text(sender?.isPaused == true ? '继续' : '暂停'),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: FilledButton.icon(
-                          onPressed: _endTransfer,
-                          icon: const Icon(Icons.stop_rounded),
-                          label: const Text('结束传输'),
-                        ),
+                      FilledButton.icon(
+                        onPressed: _endTransfer,
+                        icon: const Icon(Icons.stop_rounded),
+                        label: const Text('结束传输'),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 8),
                   TextButton(
-                    onPressed: _picking ? null : _pickFile,
-                    child: const Text('换一个文件'),
+                    onPressed: _preparing ? null : _pickFile,
+                    child: const Text('发送另一个文件'),
                   ),
                 ],
               ),
@@ -420,9 +464,40 @@ class _SendScreenState extends State<SendScreen>
     );
   }
 
+  double _currentBytesPerSecond() {
+    final sender = _sender;
+    final startedAt = _startedAt;
+    if (sender == null || startedAt == null) return 0;
+    final elapsed = DateTime.now().difference(startedAt).inMicroseconds;
+    if (elapsed <= 0) return 0;
+    final seconds = elapsed / Duration.microsecondsPerSecond;
+    return sender.framesEmitted *
+        (_mode.usefulBytesPerSecond / _mode.framesPerSecond) /
+        seconds;
+  }
+
+  Future<void> _enableWakelock() async {
+    try {
+      await WakelockPlus.enable();
+    } catch (_) {
+      // Wakelock is a convenience and is unavailable in widget tests and
+      // some desktop environments.
+    }
+  }
+
+  Future<void> _disableWakelock() async {
+    try {
+      await WakelockPlus.disable();
+    } catch (_) {
+      // A failed cleanup must not interrupt the transfer flow.
+    }
+  }
+
   String _friendlyError(Object error) {
-    final message = error.toString().replaceFirst('Bad state: ', '');
-    return message;
+    return error
+        .toString()
+        .replaceFirst('FormatException: ', '')
+        .replaceFirst('Bad state: ', '');
   }
 
   String _formatDuration(Duration duration) {
@@ -445,7 +520,8 @@ class _ErrorText extends StatelessWidget {
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: const Color(0xffffe5e1),
-        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xffa32820), width: 2),
+        borderRadius: BorderRadius.circular(4),
       ),
       child: Text(
         message,

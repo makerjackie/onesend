@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 
 export const metadata: Metadata = {
@@ -11,7 +12,14 @@ export default function PrivacyPage() {
     <main className="privacy-page">
       <header className="site-header page-shell">
         <Link className="brand" href="/" aria-label="返回 OneSend 首页">
-          <span className="brand-mark">1</span>
+          <Image
+            className="brand-icon"
+            src="/icon.png"
+            alt=""
+            width={40}
+            height={40}
+            unoptimized
+          />
           <span>OneSend</span>
         </Link>
         <nav aria-label="隐私页面导航">
@@ -54,8 +62,8 @@ export default function PrivacyPage() {
           <h2>权限</h2>
           <ul>
             <li>摄像头：仅在接收文件时扫描持续变化的二维码。</li>
-            <li>文件选择与存储：用于读取你明确选择的文件，以及保存接收文件。</li>
-            <li>保持屏幕唤醒：传输进行中避免设备自动休眠；暂停或完成后关闭。</li>
+            <li>移动端接收只请求相机；文件选择与保存使用系统文件界面，不建立账号或网络通道。</li>
+            <li>桌面端自动更新是桌面功能例外，传输本身仍不需要联网。</li>
           </ul>
         </section>
 

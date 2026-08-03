@@ -2,6 +2,12 @@
 
 OneSend uses the bundle identifier `com.makerjackie.onesend`.
 
+## Current version / 当前版本
+
+OneSend 1.4.0 (build 12) is the current release candidate. This checklist does not assert any
+TestFlight processing, Beta App Review, or external tester availability status; check
+App Store Connect for the live status.
+
 ## One-time Apple setup
 
 1. Register the App ID in Apple Developer with the identifier above.
@@ -16,8 +22,8 @@ OneSend uses the bundle identifier `com.makerjackie.onesend`.
 flutter pub get
 flutter build ipa \
   --release \
-  --build-name 1.3.0 \
-  --build-number 9 \
+  --build-name 1.4.0 \
+  --build-number 12 \
   --export-method app-store
 ```
 

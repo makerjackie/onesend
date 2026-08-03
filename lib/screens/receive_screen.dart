@@ -14,6 +14,7 @@ import '../services/file_service.dart';
 import '../services/transfer_store.dart';
 import '../widgets/desktop_camera_receiver.dart';
 import '../widgets/file_tile.dart';
+import '../widgets/stored_file_actions.dart';
 
 class ReceiveScreen extends StatefulWidget {
   const ReceiveScreen({required this.store, super.key});
@@ -48,13 +49,13 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
   @override
   void initState() {
     super.initState();
-    unawaited(WakelockPlus.enable());
+    unawaited(_enableWakelock());
   }
 
   @override
   void dispose() {
-    unawaited(_mobileController.dispose());
-    unawaited(WakelockPlus.disable());
+    unawaited(_disposeMobileController());
+    unawaited(_disableWakelock());
     super.dispose();
   }
 
@@ -109,32 +110,82 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
     try {
       if (_usesMobileScanner) await _mobileController.stop();
       final file = await decodeTransferFileInBackground(payload);
-      final stored = await saveReceivedFile(file);
-      await widget.store.add(
-        TransferRecord(
-          id: DateTime.now().microsecondsSinceEpoch.toString(),
-          direction: TransferDirection.received,
-          fileName: stored.name,
-          bytes: stored.bytes,
-          createdAt: DateTime.now(),
-          status: 'received',
-          path: stored.path,
-          verified: true,
-        ),
-      );
-      await WakelockPlus.disable();
       if (mounted) {
         setState(() {
           _receivedFile = file;
-          _storedFile = stored;
           _completed = true;
           _processing = false;
-          _saving = false;
+          _saving = true;
+          _error = null;
         });
       }
+      await _saveDecodedFile();
     } catch (error) {
       await _recoverFromFailure(_friendlyReceiveError(error));
     }
+  }
+
+  /// Saves the decoded file independently from decoding so a storage failure
+  /// can be retried without asking the sender to replay the whole transfer.
+  Future<void> _saveDecodedFile() async {
+    final file = _receivedFile;
+    if (file == null || _saving && _storedFile != null) return;
+    if (mounted) {
+      setState(() {
+        _completed = true;
+        _processing = false;
+        _saving = true;
+        _error = null;
+      });
+    }
+    try {
+      final stored = await saveReceivedFile(file);
+      if (!mounted) return;
+      setState(() {
+        _storedFile = stored;
+        _saving = false;
+        _error = null;
+      });
+      try {
+        await widget.store.add(
+          TransferRecord(
+            id: DateTime.now().microsecondsSinceEpoch.toString(),
+            direction: TransferDirection.received,
+            fileName: stored.name,
+            bytes: stored.bytes,
+            createdAt: DateTime.now(),
+            status: 'received',
+            path: stored.path,
+            verified: true,
+          ),
+        );
+      } catch (error) {
+        if (mounted) {
+          setState(
+            () => _error = '文件已保存，但记录未写入：${_friendlyReceiveError(error)}',
+          );
+        }
+      }
+      try {
+        await _disableWakelock();
+      } catch (_) {
+        // Wakelock is best effort and must not hide a successfully saved file.
+      }
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _storedFile = null;
+        _completed = true;
+        _processing = false;
+        _saving = false;
+        _error = '保存失败：${_friendlyReceiveError(error)}';
+      });
+    }
+  }
+
+  Future<void> _retrySave() async {
+    if (_saving || _receivedFile == null) return;
+    await _saveDecodedFile();
   }
 
   Future<void> _recoverFromFailure(String message) async {
@@ -149,11 +200,16 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
     if (!mounted) return;
     setState(() {
       _snapshot = null;
+      _completed = false;
       _processing = false;
       _saving = false;
       _error = message;
     });
-    await WakelockPlus.enable();
+    try {
+      await _enableWakelock();
+    } catch (_) {
+      // Camera progress remains usable if wakelock is unavailable.
+    }
     if (_usesMobileScanner) {
       try {
         await _mobileController.start();
@@ -165,20 +221,20 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
 
   Future<void> _togglePause() async {
     if (_completed || _processing) return;
-    if (_paused) {
-      setState(() => _paused = false);
-      await WakelockPlus.enable();
-      if (_usesMobileScanner) {
-        try {
+    try {
+      if (_paused) {
+        setState(() => _paused = false);
+        await _enableWakelock();
+        if (_usesMobileScanner) {
           await _mobileController.start();
-        } catch (error) {
-          if (mounted) setState(() => _error = error.toString());
         }
+      } else {
+        if (_usesMobileScanner) await _mobileController.stop();
+        await _disableWakelock();
+        if (mounted) setState(() => _paused = true);
       }
-    } else {
-      if (_usesMobileScanner) await _mobileController.stop();
-      await WakelockPlus.disable();
-      if (mounted) setState(() => _paused = true);
+    } catch (error) {
+      if (mounted) setState(() => _error = _friendlyReceiveError(error));
     }
   }
 
@@ -191,6 +247,7 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
       }
     }
     _receiver.reset();
+    if (!mounted) return;
     setState(() {
       _snapshot = null;
       _receivedFile = null;
@@ -201,7 +258,7 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
       _saving = false;
       _paused = false;
     });
-    await WakelockPlus.enable();
+    await _enableWakelock();
     if (_usesMobileScanner) {
       try {
         await _mobileController.start();
@@ -216,11 +273,35 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
       .replaceFirst('FormatException: ', '')
       .replaceFirst('Bad state: ', '');
 
-  Future<void> _openReceived(StoredTransfer file) async {
+  Future<void> _toggleTorch() async {
     try {
-      await openStoredFile(file);
+      await _mobileController.toggleTorch();
     } catch (error) {
       if (mounted) setState(() => _error = _friendlyReceiveError(error));
+    }
+  }
+
+  Future<void> _enableWakelock() async {
+    try {
+      await WakelockPlus.enable();
+    } catch (_) {
+      // Wakelock is unavailable in widget tests and some desktop builds.
+    }
+  }
+
+  Future<void> _disableWakelock() async {
+    try {
+      await WakelockPlus.disable();
+    } catch (_) {
+      // Keep file actions usable even when the platform cleanup fails.
+    }
+  }
+
+  Future<void> _disposeMobileController() async {
+    try {
+      await _mobileController.dispose();
+    } catch (_) {
+      // Disposal is best effort during route teardown.
     }
   }
 
@@ -233,9 +314,7 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
           if (_usesMobileScanner)
             IconButton(
               tooltip: '手电筒',
-              onPressed: _completed || _processing
-                  ? null
-                  : () => unawaited(_mobileController.toggleTorch()),
+              onPressed: _completed || _processing ? null : _toggleTorch,
               icon: const Icon(Icons.flashlight_on_outlined),
             ),
         ],
@@ -270,7 +349,7 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
                     height: cameraHeight,
                     width: double.infinity,
                     child: ClipRRect(
-                      borderRadius: BorderRadius.circular(26),
+                      borderRadius: BorderRadius.circular(4),
                       child: Stack(
                         fit: StackFit.expand,
                         children: [
@@ -282,7 +361,7 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
                           ),
                           if (_paused || _processing)
                             Container(
-                              color: oneSendInk.withValues(alpha: 0.55),
+                              color: oneSendInk.withValues(alpha: 0.86),
                               alignment: Alignment.center,
                               child: Text(
                                 _processing ? '校验中…' : '已暂停',
@@ -315,7 +394,6 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
                         children: [
                           LinearProgressIndicator(
                             minHeight: 8,
-                            borderRadius: BorderRadius.circular(8),
                             value: progress,
                             backgroundColor: const Color(0xffe8ebe4),
                             color: oneSendInk,
@@ -348,26 +426,24 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
                     _ReceiveError(message: _error!),
                   ],
                   const SizedBox(height: 14),
-                  Row(
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: 10,
+                    runSpacing: 10,
                     children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: _processing ? null : _togglePause,
-                          icon: Icon(
-                            _paused
-                                ? Icons.play_arrow_rounded
-                                : Icons.pause_rounded,
-                          ),
-                          label: Text(_paused ? '继续扫描' : '暂停扫描'),
+                      OutlinedButton.icon(
+                        onPressed: _processing ? null : _togglePause,
+                        icon: Icon(
+                          _paused
+                              ? Icons.play_arrow_rounded
+                              : Icons.pause_rounded,
                         ),
+                        label: Text(_paused ? '继续扫描' : '暂停扫描'),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: FilledButton.icon(
-                          onPressed: _processing ? null : _reset,
-                          icon: const Icon(Icons.refresh_rounded),
-                          label: const Text('重新开始'),
-                        ),
+                      FilledButton.icon(
+                        onPressed: _processing ? null : _reset,
+                        icon: const Icon(Icons.refresh_rounded),
+                        label: const Text('重新开始'),
                       ),
                     ],
                   ),
@@ -412,7 +488,8 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
                     height: 76,
                     decoration: BoxDecoration(
                       color: oneSendLime,
-                      borderRadius: BorderRadius.circular(25),
+                      border: Border.all(color: oneSendInk, width: 2),
+                      borderRadius: BorderRadius.circular(4),
                     ),
                     child: const Icon(Icons.check_rounded, size: 42),
                   ),
@@ -422,7 +499,10 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
                     style: Theme.of(context).textTheme.headlineMedium,
                   ),
                   const SizedBox(height: 8),
-                  const Text('文件已校验通过，并保存到本机。', textAlign: TextAlign.center),
+                  Text(
+                    stored == null ? '文件已校验通过，但还没有保存成功。' : '文件已校验通过，并保存到本机。',
+                    textAlign: TextAlign.center,
+                  ),
                   const SizedBox(height: 24),
                   FileTile(
                     name: file.name,
@@ -431,36 +511,25 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
                   ),
                   if (_saving) ...[
                     const SizedBox(height: 20),
-                    const LinearProgressIndicator(),
+                    const LinearProgressIndicator(minHeight: 4),
                   ],
                   if (_error != null) ...[
                     const SizedBox(height: 14),
                     _ReceiveError(message: _error!),
                   ],
                   const SizedBox(height: 24),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: stored == null
-                              ? null
-                              : () => unawaited(_openReceived(stored)),
-                          icon: const Icon(Icons.open_in_new_rounded),
-                          label: const Text('打开文件'),
-                        ),
+                  if (stored != null)
+                    StoredFileActions(file: stored)
+                  else if (!_saving)
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        key: const ValueKey<String>('receive-retry-save'),
+                        onPressed: _retrySave,
+                        icon: const Icon(Icons.refresh_rounded),
+                        label: const Text('重试保存'),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: stored == null
-                              ? null
-                              : () => unawaited(shareStoredFile(stored)),
-                          icon: const Icon(Icons.ios_share_rounded),
-                          label: const Text('分享'),
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
                   const SizedBox(height: 12),
                   SizedBox(
                     width: double.infinity,
@@ -532,7 +601,8 @@ class _ReceiveError extends StatelessWidget {
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: const Color(0xffffe5e1),
-        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xffa32820), width: 2),
+        borderRadius: BorderRadius.circular(4),
       ),
       child: Text(
         message,

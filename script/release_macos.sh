@@ -29,7 +29,7 @@ flutter clean
 flutter pub get
 flutter analyze --no-pub
 flutter test
-flutter build macos --release --target=tool/qr_codec_self_test.dart
+flutter build macos --release --dart-define=ONESEND_NATIVE_QR_SELF_TEST=true
 "$app_path/Contents/MacOS/OneSend"
 flutter build macos --release
 

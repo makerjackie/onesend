@@ -28,6 +28,12 @@ enum UpdateCheckOutcome {
 }
 
 abstract class UpdateManager extends ChangeNotifier {
+  /// Initializes platform-specific update services, if any.
+  ///
+  /// Mobile managers intentionally keep the default no-op implementation so
+  /// startup cannot touch update preferences or create network clients.
+  Future<void> initialize() async {}
+
   bool get supportsUpdates;
   String get currentVersionLabel;
   bool get automaticChecksEnabled;
@@ -100,6 +106,44 @@ abstract interface class NativeUpdateBridge {
 typedef UpdateManifestParser =
     Future<OneSendUpdateRelease> Function(Uint8List bytes);
 
+/// Maps a Flutter target platform to the desktop updater platform.
+///
+/// This is deliberately pure: callers and tests supply both inputs instead of
+/// relying on `dart:io` platform globals. Mobile and unsupported targets do not
+/// have a desktop updater platform.
+OneSendDesktopPlatform desktopUpdatePlatformForTarget(
+  TargetPlatform targetPlatform, {
+  bool isWeb = false,
+}) {
+  if (isWeb) return OneSendDesktopPlatform.unsupported;
+  return switch (targetPlatform) {
+    TargetPlatform.macOS => OneSendDesktopPlatform.macos,
+    TargetPlatform.windows => OneSendDesktopPlatform.windows,
+    TargetPlatform.linux => OneSendDesktopPlatform.linux,
+    _ => OneSendDesktopPlatform.unsupported,
+  };
+}
+
+/// Creates the only updater that should be used by the application entrypoint.
+///
+/// Android, iOS, web, and other unsupported targets receive the disabled
+/// manager, so they never construct the desktop HTTP updater. The optional
+/// arguments make the platform decision directly unit-testable while the
+/// defaults preserve normal Flutter runtime detection.
+UpdateManager createUpdateManager({
+  TargetPlatform? targetPlatform,
+  bool? isWeb,
+}) {
+  final desktopPlatform = desktopUpdatePlatformForTarget(
+    targetPlatform ?? defaultTargetPlatform,
+    isWeb: isWeb ?? kIsWeb,
+  );
+  if (desktopPlatform == OneSendDesktopPlatform.unsupported) {
+    return DisabledUpdateManager.instance;
+  }
+  return DesktopUpdateManager(platform: desktopPlatform);
+}
+
 class MethodChannelNativeUpdateBridge implements NativeUpdateBridge {
   const MethodChannelNativeUpdateBridge();
 
@@ -131,7 +175,9 @@ class DesktopUpdateManager extends UpdateManager {
     Future<bool> Function(Uri url)? externalUrlLauncher,
     UpdateManifestParser? manifestParser,
     DateTime Function()? clock,
-  }) : _platform = platform ?? _detectPlatform(),
+  }) : _platform =
+           platform ??
+           desktopUpdatePlatformForTarget(defaultTargetPlatform, isWeb: kIsWeb),
        _client = client ?? http.Client(),
        _ownsClient = client == null,
        _nativeBridge = nativeBridge ?? const MethodChannelNativeUpdateBridge(),
@@ -163,6 +209,7 @@ class DesktopUpdateManager extends UpdateManager {
   String? _lastError;
   OneSendUpdateRelease? _availableRelease;
 
+  @override
   Future<void> initialize() async {
     _packageInfo = await _packageInfoLoader();
     _preferences = await SharedPreferences.getInstance();
@@ -441,14 +488,6 @@ class DesktopUpdateManager extends UpdateManager {
     if (_ownsClient) _client.close();
     super.dispose();
   }
-}
-
-OneSendDesktopPlatform _detectPlatform() {
-  if (kIsWeb) return OneSendDesktopPlatform.unsupported;
-  if (Platform.isMacOS) return OneSendDesktopPlatform.macos;
-  if (Platform.isWindows) return OneSendDesktopPlatform.windows;
-  if (Platform.isLinux) return OneSendDesktopPlatform.linux;
-  return OneSendDesktopPlatform.unsupported;
 }
 
 Future<bool> _openFile(String filePath) async {

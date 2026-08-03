@@ -24,11 +24,33 @@ All three platforms check at most once every 24 hours by default. The user can
 turn automatic checks off and can always run a manual check from the home menu.
 The updater never receives file-transfer contents or camera frames.
 
+## Native QR codec self-test
+
+The native QR self-test must run inside the standard macOS app so Flutter's
+native ZXing/FFI bridge is linked by the normal Runner target. Do not use
+`tool/qr_codec_self_test.dart` as a Flutter `--target` or invoke the native
+ZXing library directly with `dart run`. The tool file is only a convenience
+wrapper around the standard app path.
+
+From the repository root, the explicit release-check sequence is:
+
+```bash
+flutter build macos --release \
+  --dart-define=ONESEND_NATIVE_QR_SELF_TEST=true
+build/macos/Build/Products/Release/OneSend.app/Contents/MacOS/OneSend
+flutter build macos --release
+```
+
+For a one-shot local check, `dart run tool/qr_codec_self_test.dart` delegates
+to the same build and executable. The app exits with code 0 on success and 1
+on a QR codec failure.
+
 ## Release order
 
 1. Update `pubspec.yaml`, `CHANGELOG.md`, and platform metadata. Keep the same
    semantic version and build number across all artifacts.
-2. Run `flutter analyze`, `flutter test`, and the packaged QR codec self-test.
+2. Run `flutter analyze`, `flutter test`, and the standard-app QR codec
+   self-test described above.
 3. Merge the exact release commit, create `vX.Y.Z`, and let GitHub Actions build
    the draft Android, Windows, Linux, and validation macOS artifacts.
 4. On the release Mac, run `script/release_macos.sh`. It signs Sparkle's nested

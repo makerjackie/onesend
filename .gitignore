@@ -46,3 +46,7 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 /android/build/
+/output/
+/.playwright-cli/
+website/.playwright-cli/
+**/.cxx/
