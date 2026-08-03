@@ -1,108 +1,216 @@
-import 'dart:typed_data';
-
-import 'package:file_picker/file_picker.dart';
+import 'package:file_selector/file_selector.dart';
+import 'package:file_selector_platform_interface/file_selector_platform_interface.dart'
+    show FileSelectorPlatform, SaveDialogOptions;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:onesend/app.dart';
+import 'package:onesend/core/optical_transfer.dart';
 import 'package:onesend/core/update_manifest.dart';
+import 'package:onesend/l10n/generated/app_localizations.dart';
+import 'package:onesend/l10n/locale_support.dart';
+import 'package:onesend/services/app_settings.dart';
+import 'package:onesend/services/file_service.dart';
+import 'package:onesend/services/sample_file_service.dart';
 import 'package:onesend/services/transfer_store.dart';
 import 'package:onesend/services/update_service.dart';
 import 'package:onesend/widgets/optical_qr.dart';
+import 'package:onesend/widgets/stored_file_actions.dart';
 
 void main() {
   testWidgets('shows the OneSend home screen', (WidgetTester tester) async {
-    await tester.pumpWidget(OneSendApp(store: TransferStore()));
+    final settings = AppSettings(initialLocaleTag: 'zh-Hans');
+    addTearDown(settings.dispose);
+
+    await tester.pumpWidget(
+      OneSendApp(store: TransferStore(), settings: settings),
+    );
 
     expect(find.text('OneSend'), findsOneWidget);
     expect(find.text('发送文件'), findsOneWidget);
     expect(find.text('扫描接收'), findsOneWidget);
   });
 
-  testWidgets('send screen offers reliable and fast modes', (
+  testWidgets('new sends use fast by default without mode or FPS controls', (
     WidgetTester tester,
   ) async {
-    await tester.pumpWidget(OneSendApp(store: TransferStore()));
+    final settings = AppSettings(initialLocaleTag: 'zh-Hans');
+    addTearDown(settings.dispose);
+
+    await tester.pumpWidget(
+      OneSendApp(store: TransferStore(), settings: settings),
+    );
     await tester.tap(find.text('发送文件'));
     await tester.pumpAndSettle();
 
-    expect(find.text('可靠'), findsOneWidget);
-    expect(find.text('快速'), findsOneWidget);
-    expect(find.textContaining('8 帧/秒'), findsOneWidget);
-
-    await tester.tap(find.text('快速'));
-    await tester.pumpAndSettle();
-
-    expect(find.textContaining('24 帧/秒'), findsOneWidget);
-    expect(find.textContaining('32 KB/s'), findsOneWidget);
+    expect(find.textContaining('快速'), findsOneWidget);
+    expect(find.byType(SegmentedButton<TransferMode>), findsNothing);
+    expect(find.textContaining('FPS'), findsNothing);
+    expect(find.textContaining('帧/秒'), findsNothing);
+    expect(find.textContaining('理论码流'), findsOneWidget);
+    expect(find.textContaining('KB/s'), findsOneWidget);
   });
 
   testWidgets('picking a file starts the send flow without unsendable state', (
     WidgetTester tester,
   ) async {
-    final previousPicker = _currentFilePickerOrNull();
-    final bytes = Uint8List.fromList(List<int>.filled(12000, 0x41));
-    FilePicker.platform = _FakeFilePicker(
-      FilePickerResult(<PlatformFile>[
-        PlatformFile(name: 'fixture.txt', size: bytes.length, bytes: bytes),
-      ]),
-    );
-    addTearDown(() {
-      if (previousPicker != null) FilePicker.platform = previousPicker;
-    });
+    final settings = AppSettings(initialLocaleTag: 'zh-Hans');
+    addTearDown(settings.dispose);
 
-    await tester.pumpWidget(OneSendApp(store: TransferStore()));
+    final bytes = Uint8List.fromList(List<int>.filled(12000, 0x41));
+    final fakeSelector = _FakeFileSelector(
+      file: XFile.fromData(
+        bytes,
+        name: 'fixture.txt',
+        mimeType: 'text/plain',
+        path: '/tmp/fixture.txt',
+      ),
+    );
+    final previousSelector = FileSelectorPlatform.instance;
+    FileSelectorPlatform.instance = fakeSelector;
+    addTearDown(() => FileSelectorPlatform.instance = previousSelector);
+
+    await tester.pumpWidget(
+      OneSendApp(store: TransferStore(), settings: settings),
+    );
     await tester.tap(find.text('发送文件'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('选择文件'));
-    await tester.pump();
-    for (
-      var attempt = 0;
-      attempt < 20 && find.text('fixture.txt').evaluate().isEmpty;
-      attempt++
-    ) {
-      await tester.runAsync(
-        () => Future<void>.delayed(const Duration(milliseconds: 50)),
-      );
-      await tester.pump();
-    }
+    await tester.tap(find.byKey(const ValueKey<String>('send-pick-file')));
+    await _pumpUntil(
+      tester,
+      () => find.text('fixture.txt').evaluate().isNotEmpty,
+    );
 
     expect(find.text('fixture.txt'), findsOneWidget);
     expect(find.byType(OpticalQr), findsOneWidget);
     expect(find.textContaining('unsendable'), findsNothing);
     expect(find.textContaining('Invalid argument'), findsNothing);
+    expect(fakeSelector.openedTypeGroups, hasLength(1));
+    expect(fakeSelector.openedTypeGroups!.single.label, 'All files');
+    expect(fakeSelector.openedTypeGroups!.single.allowsAny, isTrue);
   });
 
-  testWidgets('desktop menu exposes version and automatic update setting', (
+  testWidgets('bundled sample video can trigger the same send flow', (
     WidgetTester tester,
   ) async {
-    final updates = _FakeUpdateManager();
+    final settings = AppSettings(initialLocaleTag: 'zh-Hans');
+    addTearDown(settings.dispose);
+
     await tester.pumpWidget(
-      OneSendApp(store: TransferStore(), updates: updates),
+      OneSendApp(store: TransferStore(), settings: settings),
+    );
+    await tester.tap(find.text('发送文件'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey<String>('send-sample-video')));
+    await _pumpUntil(
+      tester,
+      () => find.text(sampleVideoFileName).evaluate().isNotEmpty,
     );
 
-    await tester.tap(find.byIcon(Icons.more_horiz_rounded));
-    await tester.pumpAndSettle();
-    expect(find.text('检查更新'), findsOneWidget);
-    expect(find.text('关于 OneSend'), findsOneWidget);
-
-    await tester.tap(find.text('关于 OneSend'));
-    await tester.pumpAndSettle();
-    expect(find.text('OneSend · 扫传'), findsOneWidget);
-    expect(find.text('1.3.0 (9)'), findsOneWidget);
-    expect(find.text('自动检查更新'), findsOneWidget);
-
-    await tester.tap(find.byType(Switch));
-    await tester.pumpAndSettle();
-    expect(updates.automaticChecksEnabled, isFalse);
+    expect(find.text(sampleVideoFileName), findsOneWidget);
+    expect(find.textContaining('27.9 KB'), findsOneWidget);
+    expect(find.byType(OpticalQr), findsOneWidget);
+    expect(find.textContaining('Invalid argument'), findsNothing);
   });
+
+  testWidgets('home menu separates settings, about, and history clearing', (
+    WidgetTester tester,
+  ) async {
+    final settings = AppSettings(initialLocaleTag: 'zh-Hans');
+    addTearDown(settings.dispose);
+
+    final previousPlatform = debugDefaultTargetPlatformOverride;
+    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+    addTearDown(() {
+      debugDefaultTargetPlatformOverride = previousPlatform;
+    });
+
+    try {
+      final updates = _FakeUpdateManager();
+      await tester.pumpWidget(
+        OneSendApp(
+          store: TransferStore(),
+          settings: settings,
+          updates: updates,
+        ),
+      );
+
+      await tester.tap(find.byIcon(Icons.more_horiz_rounded));
+      await tester.pumpAndSettle();
+      expect(find.text('设置'), findsOneWidget);
+      expect(find.text('关于 OneSend'), findsOneWidget);
+      expect(find.text('检查更新'), findsNothing);
+
+      await tester.tap(find.text('设置'));
+      await tester.pumpAndSettle();
+      expect(find.text('自动更新'), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey<String>('settings-updates')));
+      await tester.pumpAndSettle();
+      expect(find.text('自动检查更新'), findsOneWidget);
+      expect(find.byType(Switch), findsOneWidget);
+      await tester.tap(find.byType(Switch));
+      await tester.pumpAndSettle();
+      expect(updates.automaticChecksEnabled, isFalse);
+      await tester.tap(find.text('完成'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byType(BackButton));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.more_horiz_rounded));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('关于 OneSend'));
+      await tester.pumpAndSettle();
+      expect(find.text('实验性离线视觉传输'), findsOneWidget);
+    } finally {
+      debugDefaultTargetPlatformOverride = previousPlatform;
+    }
+  });
+
+  testWidgets(
+    'received-file action panel shows location and adaptive actions',
+    (WidgetTester tester) async {
+      const filePath = '/tmp/onesend-widget/received.txt';
+
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: LocaleSupport.parseTag('zh-Hans'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: LocaleSupport.supportedLocales,
+          home: Scaffold(
+            body: StoredFileActions(
+              isDesktop: true,
+              pathExists: (_) => SynchronousFuture<bool>(true),
+              file: StoredTransfer(
+                name: 'received.txt',
+                mimeType: 'text/plain',
+                bytes: 8,
+                path: filePath,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('保存位置'), findsOneWidget);
+      expect(find.textContaining(filePath), findsOneWidget);
+      expect(find.text('打开'), findsOneWidget);
+      expect(find.text('分享/转发'), findsOneWidget);
+      expect(find.text('另存副本'), findsOneWidget);
+      expect(find.text('在文件夹中显示'), findsOneWidget);
+    },
+  );
 
   testWidgets('available desktop update shows notes and starts download', (
     WidgetTester tester,
   ) async {
+    final settings = AppSettings(initialLocaleTag: 'zh-Hans');
+    addTearDown(settings.dispose);
+
     final updates = _FakeUpdateManager(availableRelease: _widgetRelease());
     await tester.pumpWidget(
-      OneSendApp(store: TransferStore(), updates: updates),
+      OneSendApp(store: TransferStore(), settings: settings, updates: updates),
     );
     await tester.pumpAndSettle();
 
@@ -116,35 +224,39 @@ void main() {
   });
 }
 
-FilePicker? _currentFilePickerOrNull() {
-  try {
-    return FilePicker.platform;
-  } on Object {
-    return null;
+Future<void> _pumpUntil(WidgetTester tester, bool Function() condition) async {
+  for (var attempt = 0; attempt < 40 && !condition(); attempt++) {
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 50)),
+    );
+    await tester.pump();
   }
 }
 
-class _FakeFilePicker extends FilePicker {
-  _FakeFilePicker(this._result);
+class _FakeFileSelector extends FileSelectorPlatform {
+  _FakeFileSelector({this.file});
 
-  final FilePickerResult _result;
+  final XFile? file;
+  List<XTypeGroup>? openedTypeGroups;
+  SaveDialogOptions? saveOptions;
 
   @override
-  Future<FilePickerResult?> pickFiles({
-    String? dialogTitle,
+  Future<XFile?> openFile({
+    List<XTypeGroup>? acceptedTypeGroups,
     String? initialDirectory,
-    FileType type = FileType.any,
-    List<String>? allowedExtensions,
-    Function(FilePickerStatus)? onFileLoading,
-    bool allowCompression = false,
-    int compressionQuality = 0,
-    bool allowMultiple = false,
-    bool withData = false,
-    bool withReadStream = false,
-    bool lockParentWindow = false,
-    bool readSequential = false,
+    String? confirmButtonText,
   }) async {
-    return _result;
+    openedTypeGroups = acceptedTypeGroups;
+    return file;
+  }
+
+  @override
+  Future<FileSaveLocation?> getSaveLocation({
+    List<XTypeGroup>? acceptedTypeGroups,
+    SaveDialogOptions options = const SaveDialogOptions(),
+  }) async {
+    saveOptions = options;
+    return null;
   }
 }
 

@@ -1,5 +1,7 @@
 import Image from "next/image";
 
+import { WebTransfer } from "./web-transfer";
+
 const releaseBase =
   "https://github.com/makerjackie/onesend/releases/latest/download";
 
@@ -66,6 +68,49 @@ function qrMatrix(seed: number) {
 
 const qrFrames = [qrMatrix(3), qrMatrix(7), qrMatrix(11)];
 
+const webTransferCopy = {
+  eyebrow: "WEB TRANSFER / LOCAL ONLY",
+  title: "网页，也能扫传。",
+  lead:
+    "无需安装应用：一个浏览器显示视觉码，另一个浏览器用摄像头接收。文件始终只在本地处理。",
+  localBadge: "仅本地 / 不上传",
+  senderTitle: "发送文件",
+  receiverTitle: "接收文件",
+  fileChooser: "本地文件",
+  noFile: "还没有选择文件",
+  chooseFile: "选择一个本地文件",
+  mode: "传输模式",
+  fast: "快速",
+  reliable: "可靠",
+  fastDetail: "约 33 KB/s",
+  reliableDetail: "约 4.7 KB/s",
+  displayCode: "开始显示视觉码",
+  pause: "暂停",
+  resume: "继续",
+  stop: "结束",
+  readyToSend: "文件已准备好；开始后让另一台设备对准此码。",
+  sending: "正在持续显示",
+  paused: "已暂停显示；可以继续当前传输。",
+  pass: "轮次",
+  cameraIdle: "点击开启摄像头接收",
+  startCamera: "开启摄像头",
+  stopCamera: "停止摄像头",
+  scanning: "正在请求摄像头并准备扫描",
+  receiving: "正在接收",
+  progress: "进度",
+  speed: "速度",
+  frames: "有效帧",
+  complete: "接收完成，已自动下载",
+  download: "再次下载",
+  receiveAgain: "重新接收",
+  cameraNote: "只有点击“开启摄像头”后，浏览器才会请求相机权限。",
+  localNote: "浏览器本地运行。",
+  interopNote: "网页之间可直接互传；也兼容 OneSend v2 Flutter 扫描端。",
+  browserOnly: "WEB ↔ WEB / FLUTTER V2",
+  preparing: "准备中…",
+  errorPrefix: "无法完成：",
+} as const;
+
 function Brand() {
   return (
     <a className="brand" href="#top" aria-label="OneSend 首页">
@@ -87,6 +132,7 @@ export default function Home() {
         <nav aria-label="主导航">
           <a href="#how">原理</a>
           <a href="#reliability">可靠性</a>
+          <a href="#web-transfer">网页传输</a>
           <a href="#download">下载</a>
           <a
             className="nav-github"
@@ -159,7 +205,7 @@ export default function Home() {
               <span />
               <span />
               <span />
-              <b>OneSend · 可靠模式</b>
+              <b>OneSend · 快速模式</b>
             </div>
             <div className="qr-stage">
               <div className="qr-stack" aria-hidden="true">
@@ -176,7 +222,7 @@ export default function Home() {
               </div>
               <div className="frame-counter">
                 <span>持续播放</span>
-                <b>08 fps</b>
+                <b>约 33 KB/s</b>
               </div>
             </div>
             <div className="file-progress">
@@ -194,12 +240,12 @@ export default function Home() {
       <section className="signal-strip" aria-label="OneSend 协议摘要">
         <div className="page-shell signal-grid">
           <div>
-            <strong>2</strong>
-            <span>可靠 / 快速模式</span>
+            <strong>≈33 KB/s</strong>
+            <span>默认快速模式</span>
           </div>
           <div>
-            <strong>24 fps</strong>
-            <span>快速模式刷新同步</span>
+            <strong>≈4.7 KB/s</strong>
+            <span>兼容可靠模式</span>
           </div>
           <div>
             <strong>CRC32</strong>
@@ -211,6 +257,8 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      <WebTransfer copy={webTransferCopy} />
 
       <section className="section page-shell" id="how">
         <div className="section-heading split-heading">
@@ -248,59 +296,59 @@ export default function Home() {
         <div className="page-shell">
           <div className="section-heading centered-heading">
             <span className="section-index">02 / TWO PROFILES</span>
-            <h2>先稳，再快。</h2>
-            <p>可靠模式是默认选择；当两台设备固定、光线稳定时，再切到快速模式。</p>
+            <h2>默认快，需要时更稳。</h2>
+            <p>快速模式默认开启；环境不佳时，在设置中切换到兼容可靠模式。</p>
           </div>
           <div className="mode-grid">
             <article className="mode-card mode-reliable">
               <div className="mode-topline">
                 <span>RELIABLE</span>
-                <b>默认</b>
+                <b>兼容</b>
               </div>
               <h3>可靠模式</h3>
               <p>更强的二维码纠错，更从容的刷新节奏，适合手持和普通环境。</p>
               <dl>
                 <div>
-                  <dt>帧率</dt>
-                  <dd>约 8 fps</dd>
+                  <dt>理论有效</dt>
+                  <dd>约 4.7 KB/s</dd>
                 </div>
                 <div>
-                  <dt>每帧</dt>
-                  <dd>720 B</dd>
+                  <dt>适用环境</dt>
+                  <dd>手持 · 普通屏幕</dd>
                 </div>
                 <div>
                   <dt>QR 纠错</dt>
                   <dd>Medium</dd>
                 </div>
                 <div>
-                  <dt>理论有效</dt>
-                  <dd>约 4.6 KB/s</dd>
+                  <dt>切换位置</dt>
+                  <dd>设置</dd>
                 </div>
               </dl>
             </article>
             <article className="mode-card mode-fast">
               <div className="mode-topline">
                 <span>FAST</span>
-                <b>清晰环境</b>
+                <b>默认</b>
               </div>
               <h3>快速模式</h3>
               <p>更高的数据密度和刷新率，适合支架固定、屏幕明亮、对焦稳定。</p>
               <dl>
                 <div>
-                  <dt>帧率</dt>
-                  <dd>约 24 fps</dd>
+                  <dt>理论有效</dt>
+                  <dd>约 33 KB/s</dd>
                 </div>
                 <div>
-                  <dt>每帧</dt>
-                  <dd>1700 B</dd>
+                  <dt>适用环境</dt>
+                  <dd>固定 · 清晰屏幕</dd>
                 </div>
                 <div>
                   <dt>QR 纠错</dt>
                   <dd>V30 · Low</dd>
                 </div>
                 <div>
-                  <dt>理论有效</dt>
-                  <dd>约 32 KB/s</dd>
+                  <dt>默认设置</dt>
+                  <dd>新传输自动使用</dd>
                 </div>
               </dl>
             </article>

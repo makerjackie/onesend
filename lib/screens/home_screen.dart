@@ -1,20 +1,32 @@
 import 'package:flutter/material.dart';
 
 import '../app.dart';
+import '../core/envelope.dart';
+import '../l10n/generated/app_localizations.dart';
+import '../services/app_settings.dart';
 import '../services/file_service.dart';
 import '../services/transfer_store.dart';
 import '../services/update_service.dart';
 import '../widgets/brand_mark.dart';
 import '../widgets/file_tile.dart';
+import '../widgets/stored_file_actions.dart';
 import '../widgets/update_ui.dart';
+import 'about_screen.dart';
 import 'receive_screen.dart';
 import 'send_screen.dart';
+import 'settings_screen.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({required this.store, required this.updates, super.key});
+  const HomeScreen({
+    required this.store,
+    required this.updates,
+    this.settings,
+    super.key,
+  });
 
   final TransferStore store;
   final UpdateManager updates;
+  final AppSettings? settings;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -22,6 +34,10 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   String? _presentedUpdateVersion;
+  AppSettings? _fallbackSettings;
+
+  AppSettings get _settings =>
+      widget.settings ?? (_fallbackSettings ??= AppSettings());
 
   @override
   void initState() {
@@ -47,48 +63,26 @@ class _HomeScreenState extends State<HomeScreen> {
     await showOneSendUpdateDialog(context, widget.updates);
   }
 
-  Future<void> _checkForUpdates() async {
-    try {
-      final outcome = await widget.updates.checkForUpdates();
-      if (!mounted) return;
-      switch (outcome) {
-        case UpdateCheckOutcome.updateAvailable:
-          await _showAvailableUpdateIfNeeded();
-          break;
-        case UpdateCheckOutcome.upToDate:
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text('已经是最新版本。')));
-          break;
-        case UpdateCheckOutcome.nativeWindowOpened:
-          break;
-        case UpdateCheckOutcome.unsupported:
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text('当前平台不支持应用内更新。')));
-          break;
-      }
-    } catch (_) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(widget.updates.lastError ?? '检查更新失败，请稍后重试。')),
-      );
-    }
-  }
-
   Future<void> _handleMenuAction(_HomeMenuAction action) async {
     switch (action) {
-      case _HomeMenuAction.checkForUpdates:
-        await _checkForUpdates();
+      case _HomeMenuAction.settings:
+        await _open(
+          SettingsScreen(settings: _settings, updates: widget.updates),
+        );
         break;
       case _HomeMenuAction.about:
-        await showOneSendUpdateSettings(context, widget.updates);
-        if (mounted) await _showAvailableUpdateIfNeeded();
+        await _open(const AboutScreen());
         break;
       case _HomeMenuAction.clearHistory:
         await _clearHistory();
         break;
     }
+  }
+
+  @override
+  void dispose() {
+    _fallbackSettings?.dispose();
+    super.dispose();
   }
 
   Future<void> _open(Widget page) async {
@@ -100,19 +94,20 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _clearHistory() async {
     if (widget.store.records.isEmpty) return;
+    final l10n = AppLocalizations.of(context)!;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('清空记录？'),
-        content: const Text('只会清除 OneSend 里的传输记录，不会删除已经保存的文件。'),
+        title: Text(l10n.clearHistoryQuestion),
+        content: Text(l10n.clearHistoryDescription),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('取消'),
+            child: Text(l10n.cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('清空'),
+            child: Text(l10n.clearAction),
           ),
         ],
       ),
@@ -125,6 +120,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final records = widget.store.records;
     return Scaffold(
       body: SafeArea(
@@ -144,31 +140,30 @@ class _HomeScreenState extends State<HomeScreen> {
                         children: [
                           const BrandMark(),
                           PopupMenuButton<_HomeMenuAction>(
-                            tooltip: '更多',
+                            tooltip: l10n.more,
                             icon: const Icon(Icons.more_horiz_rounded),
                             onSelected: _handleMenuAction,
                             itemBuilder: (context) => [
-                              if (widget.updates.supportsUpdates)
-                                const PopupMenuItem(
-                                  value: _HomeMenuAction.checkForUpdates,
-                                  child: _MenuRow(
-                                    icon: Icons.system_update_alt_rounded,
-                                    label: '检查更新',
-                                  ),
+                              PopupMenuItem(
+                                value: _HomeMenuAction.settings,
+                                child: _MenuRow(
+                                  icon: Icons.tune_rounded,
+                                  label: l10n.settings,
                                 ),
-                              const PopupMenuItem(
+                              ),
+                              PopupMenuItem(
                                 value: _HomeMenuAction.about,
                                 child: _MenuRow(
                                   icon: Icons.info_outline_rounded,
-                                  label: '关于 OneSend',
+                                  label: l10n.about,
                                 ),
                               ),
                               if (records.isNotEmpty)
-                                const PopupMenuItem(
+                                PopupMenuItem(
                                   value: _HomeMenuAction.clearHistory,
                                   child: _MenuRow(
                                     icon: Icons.delete_outline_rounded,
-                                    label: '清空记录',
+                                    label: l10n.clearHistory,
                                   ),
                                 ),
                             ],
@@ -177,7 +172,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       const SizedBox(height: 44),
                       Text(
-                        '文件，\n用光传过去。',
+                        l10n.homeHeadline,
                         style: Theme.of(context).textTheme.headlineMedium
                             ?.copyWith(
                               fontSize: horizontal ? 52 : 42,
@@ -186,7 +181,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        'OneSend · 扫传\n无需网络、无需配对，只要一块屏幕和一枚摄像头。',
+                        l10n.homeSubtitle,
                         style: Theme.of(
                           context,
                         ).textTheme.bodyLarge?.copyWith(color: oneSendMuted),
@@ -202,12 +197,16 @@ class _HomeScreenState extends State<HomeScreen> {
                             enabled: horizontal,
                             child: _ActionCard(
                               icon: Icons.north_east_rounded,
-                              eyebrow: 'SEND',
-                              title: '发送文件',
-                              description: '把二维码放到屏幕上，另一台设备对准它。',
+                              eyebrow: l10n.sendEyebrow,
+                              title: l10n.sendFile,
+                              description: l10n.sendCardDescription,
                               accent: oneSendLime,
-                              onTap: () =>
-                                  _open(SendScreen(store: widget.store)),
+                              onTap: () => _open(
+                                SendScreen(
+                                  store: widget.store,
+                                  settings: _settings,
+                                ),
+                              ),
                             ),
                           ),
                           SizedBox(
@@ -218,10 +217,10 @@ class _HomeScreenState extends State<HomeScreen> {
                             enabled: horizontal,
                             child: _ActionCard(
                               icon: Icons.center_focus_strong_rounded,
-                              eyebrow: 'RECEIVE',
-                              title: '扫描接收',
-                              description: '打开摄像头，持续扫描变化中的二维码。',
-                              accent: const Color(0xffdce9ff),
+                              eyebrow: l10n.receiveEyebrow,
+                              title: l10n.receiveFile,
+                              description: l10n.receiveCardDescription,
+                              accent: const Color(0xffe2e5de),
                               onTap: () =>
                                   _open(ReceiveScreen(store: widget.store)),
                             ),
@@ -233,12 +232,12 @@ class _HomeScreenState extends State<HomeScreen> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            '最近传输',
+                            l10n.recentTransfers,
                             style: Theme.of(context).textTheme.titleLarge,
                           ),
                           if (records.isNotEmpty)
                             Text(
-                              '${records.length} 条',
+                              l10n.recordCount(records.length),
                               style: Theme.of(context).textTheme.bodyMedium,
                             ),
                         ],
@@ -267,7 +266,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       const SizedBox(height: 28),
                       Center(
                         child: Text(
-                          '屏幕 ↔ 摄像头 · 文件只在两台设备之间经过光传递',
+                          l10n.historyFooter,
                           style: Theme.of(
                             context,
                           ).textTheme.bodySmall?.copyWith(color: oneSendMuted),
@@ -285,7 +284,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-enum _HomeMenuAction { checkForUpdates, about, clearHistory }
+enum _HomeMenuAction { settings, about, clearHistory }
 
 class _MenuRow extends StatelessWidget {
   const _MenuRow({required this.icon, required this.label});
@@ -333,10 +332,13 @@ class _ActionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Material(
       color: Colors.white,
-      borderRadius: BorderRadius.circular(24),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.all(Radius.circular(6)),
+        side: BorderSide(color: oneSendInk, width: 2),
+      ),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: const BorderRadius.all(Radius.circular(4)),
         child: Padding(
           padding: const EdgeInsets.all(22),
           child: Column(
@@ -350,7 +352,8 @@ class _ActionCard extends StatelessWidget {
                     height: 52,
                     decoration: BoxDecoration(
                       color: accent,
-                      borderRadius: BorderRadius.circular(17),
+                      border: Border.all(color: oneSendInk, width: 2),
+                      borderRadius: BorderRadius.circular(4),
                     ),
                     child: Icon(icon, color: oneSendInk, size: 25),
                   ),
@@ -384,20 +387,21 @@ class _EmptyHistory extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
       decoration: BoxDecoration(
-        border: Border.all(color: const Color(0xffdfe3da)),
-        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: oneSendInk, width: 2),
+        borderRadius: BorderRadius.circular(4),
       ),
-      child: const Row(
+      child: Row(
         children: [
           Icon(Icons.wb_sunny_outlined, color: oneSendMuted),
           SizedBox(width: 12),
           Expanded(
             child: Text(
-              '还没有传输记录。选一个文件，开始第一次光传。',
+              l10n.emptyHistory,
               style: TextStyle(color: oneSendMuted),
             ),
           ),
@@ -414,14 +418,14 @@ class _HistoryRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final received = record.direction == TransferDirection.received;
-    final when = _relativeTime(record.createdAt);
-    final canOpen = received && record.path != null;
+    final when = _relativeTime(record.createdAt, l10n);
     final directionLabel = received
-        ? '收到并校验'
+        ? l10n.receivedAndVerified
         : record.status == 'broadcast-ended'
-        ? '发送已结束'
-        : '发出';
+        ? l10n.sendEnded
+        : l10n.sent;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 12),
       child: FileTile(
@@ -429,30 +433,77 @@ class _HistoryRow extends StatelessWidget {
         bytes: record.bytes,
         icon: received ? Icons.south_west_rounded : Icons.north_east_rounded,
         subtitle: '$directionLabel · $when',
-        onTap: canOpen ? () => _openFile(context, record.path!) : null,
+        onTap: received ? () => _showActions(context) : null,
       ),
     );
   }
 
-  Future<void> _openFile(BuildContext context, String path) async {
-    try {
-      await openStoredPath(path);
-    } catch (error) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(error.toString().replaceFirst('Bad state: ', '')),
+  Future<void> _showActions(BuildContext context) async {
+    final l10n = AppLocalizations.of(context)!;
+    final path = record.path ?? '';
+    final stored = StoredTransfer(
+      name: record.fileName,
+      mimeType: guessMimeType(record.fileName),
+      bytes: record.bytes,
+      path: path,
+    );
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      builder: (context) => SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 620),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          l10n.receivedFileActions,
+                          style: const TextStyle(
+                            color: oneSendInk,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: l10n.close,
+                        onPressed: () => Navigator.of(context).pop(),
+                        icon: const Icon(Icons.close_rounded),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  FileTile(
+                    name: record.fileName,
+                    bytes: record.bytes,
+                    icon: Icons.south_west_rounded,
+                  ),
+                  const SizedBox(height: 12),
+                  StoredFileActions(file: stored),
+                ],
+              ),
+            ),
+          ),
         ),
-      );
-    }
+      ),
+    );
   }
 
-  String _relativeTime(DateTime date) {
+  String _relativeTime(DateTime date, AppLocalizations l10n) {
     final difference = DateTime.now().difference(date);
-    if (difference.inMinutes < 1) return '刚刚';
-    if (difference.inHours < 1) return '${difference.inMinutes} 分钟前';
-    if (difference.inDays < 1) return '${difference.inHours} 小时前';
-    if (difference.inDays < 7) return '${difference.inDays} 天前';
-    return '${date.month}/${date.day}';
+    if (difference.inMinutes < 1) return l10n.justNow;
+    if (difference.inHours < 1) {
+      return l10n.minutesAgo(difference.inMinutes);
+    }
+    if (difference.inDays < 1) return l10n.hoursAgo(difference.inHours);
+    if (difference.inDays < 7) return l10n.daysAgo(difference.inDays);
+    return l10n.monthDay(date.day, date.month);
   }
 }

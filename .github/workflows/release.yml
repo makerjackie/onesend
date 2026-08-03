@@ -86,7 +86,7 @@ jobs:
       - name: Verify native QR encode/decode bridge
         run: |
           for attempt in 1 2 3; do
-            if flutter build macos --release --target=tool/qr_codec_self_test.dart; then
+            if flutter build macos --release --dart-define=ONESEND_NATIVE_QR_SELF_TEST=true; then
               break
             fi
             if [[ "$attempt" -eq 3 ]]; then

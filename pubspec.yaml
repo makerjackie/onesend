@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.3.0+9
+version: 1.4.0+12
 
 environment:
   sdk: ^3.12.2
@@ -30,15 +30,17 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  intl: any
 
   camera: ^0.12.0+2
   camera_desktop: ^1.2.1
   crypto: ^3.0.7
   cryptography_plus: ^2.7.1
-  # 10.x keeps the Android plugin compatible with Flutter's AGP 9 fallback
-  # mode while preserving the stable picker API used by OneSend.
-  file_picker: ^10.3.10
-  flutter_zxing: ^2.3.0
+  file_selector: ^1.1.0
+  flutter_zxing:
+    path: packages/flutter_zxing
   http: ^1.6.0
   mobile_scanner: ^7.4.0
   onesend_macos_updater:
@@ -56,6 +58,7 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  file_selector_platform_interface: ^2.7.0
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is
@@ -69,6 +72,7 @@ dev_dependencies:
 
 # The following section is specific to Flutter packages.
 flutter:
+  generate: true
 
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
@@ -78,6 +82,7 @@ flutter:
   assets:
     - THIRD_PARTY_NOTICES.md
     - licenses/
+    - assets/demo/onesend-optical-test.mp4
 
   # To add assets to your application, add an assets section, like this:
   # assets:

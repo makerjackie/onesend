@@ -21,9 +21,10 @@ class FileTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final subtitleText = subtitle;
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(4),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 4),
         child: Row(
@@ -33,7 +34,8 @@ class FileTile extends StatelessWidget {
               height: 48,
               decoration: BoxDecoration(
                 color: oneSendLime.withValues(alpha: 0.45),
-                borderRadius: BorderRadius.circular(15),
+                border: Border.all(color: oneSendInk, width: 2),
+                borderRadius: BorderRadius.circular(4),
               ),
               child: Icon(icon, color: oneSendInk),
             ),
@@ -51,15 +53,17 @@ class FileTile extends StatelessWidget {
                       fontWeight: FontWeight.w700,
                     ),
                   ),
-                  const SizedBox(height: 3),
-                  Text(
-                    subtitle ?? formatBytes(bytes),
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
+                  if (subtitleText != null) ...[
+                    const SizedBox(height: 3),
+                    Text(
+                      subtitleText,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
                 ],
               ),
             ),
-            if (subtitle == null) ...[
+            if (subtitleText == null) ...[
               const SizedBox(width: 12),
               Text(
                 formatBytes(bytes),

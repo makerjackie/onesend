@@ -1,6 +1,6 @@
 {
   "name": "onesend-site",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "private": true,
   "engines": {
     "node": ">=22.13.0"
@@ -9,13 +9,16 @@
     "dev": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext dev",
     "build": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext build",
     "start": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext start",
-    "test": "npm run build && node --test tests/rendered-html.test.mjs",
+    "test": "npm run build && node --test tests/*.test.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate"
   },
   "dependencies": {
+    "@zxing/browser": "^0.2.1",
+    "@zxing/library": "^0.23.0",
     "drizzle-orm": "0.45.2",
     "next": "16.2.12",
+    "qrcode": "^1.5.4",
     "react": "19.2.8",
     "react-dom": "19.2.8"
   },
@@ -23,6 +26,7 @@
     "@cloudflare/vite-plugin": "1.50.0",
     "@tailwindcss/postcss": "4.3.3",
     "@types/node": "22.19.19",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "6.0.5",
