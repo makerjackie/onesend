@@ -40,6 +40,11 @@ test("server-renders the OneSend product page", async () => {
   assert.match(html, /1700 B/);
   assert.match(html, /32 KB\/s/);
   assert.match(html, /onesend-android\.apk/);
+  assert.match(html, /onesend-macos-universal\.dmg/);
+  assert.match(html, /onesend-windows-setup\.exe/);
+  assert.match(html, /onesend-linux-x64\.tar\.gz/);
+  assert.match(html, /桌面自动更新/);
+  assert.match(html, /Ed25519/);
   assert.match(html, /\/privacy/);
   assert.doesNotMatch(html, /codex-preview|loading skeleton|Starter Project/i);
 });

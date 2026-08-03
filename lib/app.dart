@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'screens/home_screen.dart';
 import 'services/transfer_store.dart';
+import 'services/update_service.dart';
 
 const Color oneSendInk = Color(0xff10130f);
 const Color oneSendLime = Color(0xffd9f866);
@@ -9,9 +10,10 @@ const Color oneSendPaper = Color(0xfff5f6f0);
 const Color oneSendMuted = Color(0xff737970);
 
 class OneSendApp extends StatelessWidget {
-  const OneSendApp({required this.store, super.key});
+  const OneSendApp({required this.store, this.updates, super.key});
 
   final TransferStore store;
+  final UpdateManager? updates;
 
   @override
   Widget build(BuildContext context) {
@@ -85,7 +87,10 @@ class OneSendApp extends StatelessWidget {
           bodyMedium: TextStyle(color: oneSendMuted, height: 1.45),
         ),
       ),
-      home: HomeScreen(store: store),
+      home: HomeScreen(
+        store: store,
+        updates: updates ?? DisabledUpdateManager.instance,
+      ),
     );
   }
 }

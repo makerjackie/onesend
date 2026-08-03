@@ -25,6 +25,8 @@ OneSend 是一个极简、离线优先的跨设备文件传输工具。发送端
 - 逐帧 CRC32、完整载荷 CRC32、文件原文/压缩数据双重 CRC32
 - 文本等可压缩内容自动 gzip；已压缩媒体不会重复压缩
 - 接收文件保存在本机，可直接打开、系统分享，并从最近记录再次打开
+- 桌面端每天自动检查更新，也可在“关于 OneSend”中关闭或手动检查
+- macOS / Windows 更新包使用 Ed25519 签名；Linux 下载还会校验长度与 SHA-256
 - 兼容 OneSend 1.0 / decimen 风格协议 v1，以及 OneSend 1.1 的两档接收流
 - 无账号、无分析 SDK、无广告、无云端上传
 
@@ -66,9 +68,13 @@ OneSend 协议 v2 使用原始二进制 QR payload：
 - 接收端限制块大小、块数量和总载荷，避免异常二维码触发无界内存分配
 
 测试覆盖协议 v1/v2、压缩与损坏拒绝、迟到接入、随机丢帧、位翻转、重复、乱序、
-会话隔离、30% 丢帧预算、显示节奏、两档 QR 容量，以及 Flutter UI。GitHub Release
-只有在静态分析和完整测试通过后才会构建，并附带 `SHA256SUMS.txt`。macOS 的最终 ZIP/DMG 使用 Developer ID、
-hardened runtime 与 Apple Notary Service，并在发布前执行 Gatekeeper 验证。
+会话隔离、30% 丢帧预算、显示节奏、两档 QR 容量、更新清单篡改、更新包损坏，
+以及 Flutter UI。GitHub Release 只有在静态分析和完整测试通过后才会构建，并附带
+`SHA256SUMS.txt`。macOS 的最终 ZIP/DMG 使用 Developer ID、hardened runtime 与
+Apple Notary Service，并在发布前执行 Gatekeeper 验证。
+
+桌面更新只传输公开的版本信息和安装包，不会接触待传输文件。应用会自动检查，
+但安装前仍由用户确认；更新服务失效时，光学文件传输继续正常工作。
 
 ## 安全与隐私边界
 
@@ -93,7 +99,8 @@ git push origin vX.Y.Z
 ```
 
 iOS 签名、TestFlight 和 Beta App Review 流程见
-[`docs/ios-release.md`](docs/ios-release.md)。
+[`docs/ios-release.md`](docs/ios-release.md)。桌面签名更新源、macOS 公证和发布顺序见
+[`docs/desktop-updates.md`](docs/desktop-updates.md)。
 
 ## 开源与致谢
 

@@ -122,13 +122,21 @@ packages:
     source: hosted
     version: "0.3.5+4"
   crypto:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: crypto
       sha256: c8ea0233063ba03258fbcf2ca4d6dadfefe14f02fab57702265467a19f27fadf
       url: "https://pub.dev"
     source: hosted
     version: "3.0.7"
+  cryptography_plus:
+    dependency: "direct main"
+    description:
+      name: cryptography_plus
+      sha256: "34db787df4f4740a39474b6fb0a610aa6dc13a5b5b68754b4787a79939ac0454"
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.7.1"
   dbus:
     dependency: transitive
     description:
@@ -257,7 +265,7 @@ packages:
     source: hosted
     version: "2.0.2"
   http:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: http
       sha256: "87721a4a50b19c7f1d49001e51409bddc46303966ce89a65af4f4e6004896412"
@@ -368,6 +376,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.0.0"
+  js:
+    dependency: transitive
+    description:
+      name: js
+      sha256: "53385261521cc4a0c4658fd0ad07a7d14591cf8fc33abbceae306ddb974888dc"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.7.2"
   leak_tracker:
     dependency: transitive
     description:
@@ -456,6 +472,13 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "9.5.0"
+  onesend_macos_updater:
+    dependency: "direct main"
+    description:
+      path: "packages/onesend_macos_updater"
+      relative: true
+    source: path
+    version: "1.0.0"
   open_filex:
     dependency: "direct main"
     description:
@@ -473,7 +496,7 @@ packages:
     source: hosted
     version: "3.0.0"
   package_info_plus:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: package_info_plus
       sha256: "468c26b4254ab01979fa5e4a98cb343ea3631b9acee6f21028997419a80e1a20"
@@ -741,6 +764,30 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.4.0"
+  url_launcher:
+    dependency: "direct main"
+    description:
+      name: url_launcher
+      sha256: f6a7e5c4835bb4e3026a04793a4199ca2d14c739ec378fdfe23fc8075d0439f8
+      url: "https://pub.dev"
+    source: hosted
+    version: "6.3.2"
+  url_launcher_android:
+    dependency: transitive
+    description:
+      name: url_launcher_android
+      sha256: b413d49b73867ac08dd2f9890efd3cc11f2a0e577618d50843440a1fb3776c32
+      url: "https://pub.dev"
+    source: hosted
+    version: "6.3.32"
+  url_launcher_ios:
+    dependency: transitive
+    description:
+      name: url_launcher_ios
+      sha256: "580fe5dfb51671ae38191d316e027f6b76272b026370708c2d898799750a02b0"
+      url: "https://pub.dev"
+    source: hosted
+    version: "6.4.1"
   url_launcher_linux:
     dependency: transitive
     description:
@@ -749,6 +796,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.2.2"
+  url_launcher_macos:
+    dependency: transitive
+    description:
+      name: url_launcher_macos
+      sha256: "368adf46f71ad3c21b8f06614adb38346f193f3a59ba8fe9a2fd74133070ba18"
+      url: "https://pub.dev"
+    source: hosted
+    version: "3.2.5"
   url_launcher_platform_interface:
     dependency: transitive
     description:

@@ -8,6 +8,8 @@
 
 #include "win32_window.h"
 
+class DesktopUpdater;
+
 // A window that does nothing but host a Flutter view.
 class FlutterWindow : public Win32Window {
  public:
@@ -28,6 +30,9 @@ class FlutterWindow : public Win32Window {
 
   // The Flutter instance hosted by this window.
   std::unique_ptr<flutter::FlutterViewController> flutter_controller_;
+
+  // Native, signed update flow for Windows desktop releases.
+  std::unique_ptr<DesktopUpdater> desktop_updater_;
 };
 
 #endif  // RUNNER_FLUTTER_WINDOW_H_

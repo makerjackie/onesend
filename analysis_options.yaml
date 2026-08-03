@@ -14,6 +14,11 @@ include: package:flutter_lints/flutter.yaml
 # Flutter sources in the release repository.
 analyzer:
   exclude:
+    - .dart_tool/**
+    - build/**
+    - macos/.symlinks/**
+    - linux/flutter/ephemeral/**
+    - windows/flutter/ephemeral/**
     - website/**
 
 linter:
