@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:isolate';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -10,6 +9,7 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 import '../app.dart';
 import '../core/envelope.dart';
 import '../core/optical_transfer.dart';
+import '../core/transfer_codec.dart';
 import '../services/file_service.dart';
 import '../services/transfer_store.dart';
 import '../widgets/desktop_camera_receiver.dart';
@@ -108,7 +108,7 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
   Future<void> _finishTransfer(Uint8List payload) async {
     try {
       if (_usesMobileScanner) await _mobileController.stop();
-      final file = await Isolate.run(() => decodeTransferFile(payload));
+      final file = await decodeTransferFileInBackground(payload);
       final stored = await saveReceivedFile(file);
       await widget.store.add(
         TransferRecord(
