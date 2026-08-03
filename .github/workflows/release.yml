@@ -85,7 +85,16 @@ jobs:
       - run: flutter pub get
       - name: Verify native QR encode/decode bridge
         run: |
-          flutter build macos --release --target=tool/qr_codec_self_test.dart
+          for attempt in 1 2 3; do
+            if flutter build macos --release --target=tool/qr_codec_self_test.dart; then
+              break
+            fi
+            if [[ "$attempt" -eq 3 ]]; then
+              echo "macOS build failed after $attempt attempts." >&2
+              exit 1
+            fi
+            echo "::warning::SwiftPM/Xcode build attempt $attempt failed; retrying on the hosted runner."
+          done
           build/macos/Build/Products/Release/OneSend.app/Contents/MacOS/OneSend
       - run: flutter build macos --release
       - name: Package artifact
