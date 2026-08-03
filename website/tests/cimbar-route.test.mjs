@@ -40,6 +40,29 @@ test("cimbar route and local release assets are present", () => {
   assert.equal(existsSync(resolve(assetRoot, "recv-sw.js")), false);
 });
 
+test("worker deployment keeps dynamic routes and static assets available", () => {
+  const viteConfig = text(resolve(websiteRoot, "vite.config.ts"));
+  assert.match(viteConfig, /assets:\s*\{/);
+  assert.match(viteConfig, /binding:\s*"ASSETS"/);
+  assert.match(viteConfig, /run_worker_first:\s*true/);
+});
+
+test("desktop update feeds target the current release", () => {
+  const updatesRoot = resolve(websiteRoot, "public", "updates");
+  const appcast = text(resolve(updatesRoot, "appcast.xml"));
+  const latest = JSON.parse(text(resolve(updatesRoot, "latest.json")));
+  const payload = JSON.parse(Buffer.from(latest.payload, "base64").toString("utf8"));
+
+  assert.match(appcast, /<sparkle:shortVersionString>1\.5\.0<\/sparkle:shortVersionString>/);
+  assert.match(appcast, /<sparkle:version>13<\/sparkle:version>/);
+  assert.match(appcast, /releases\/download\/v1\.5\.0\/onesend-macos-universal\.zip/);
+  assert.equal(payload.version, "1.5.0");
+  assert.equal(payload.buildNumber, 13);
+  assert.equal(payload.assets.macos.sha256, "36e645904ed9bba3e006a3e7bcbaa20456b5b3855f13db236c8b20c5cc4feae3");
+  assert.equal(payload.assets.windows.sha256, "8310afdf8f3846fa994e148067b6ae3f7fc255ef52809afc5217f67913bde398");
+  assert.equal(payload.assets.linux.sha256, "7c33c72e87d0cb0b11998e0a95231f215bbd7d7017b9f88779c1e12013be0033");
+});
+
 test("cimbar copy and camera behavior stay local and opt-in", () => {
   const page = text(resolve(appRoot, "page.tsx"));
   const client = text(resolve(appRoot, "cimbar-client.tsx"));
