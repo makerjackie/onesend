@@ -7,6 +7,7 @@ project(runner LANGUAGES CXX)
 #
 # Any new source files that you add to the application should be added here.
 add_executable(${BINARY_NAME} WIN32
+  "desktop_updater.cpp"
   "flutter_window.cpp"
   "main.cpp"
   "utils.cpp"
@@ -36,5 +37,43 @@ target_link_libraries(${BINARY_NAME} PRIVATE flutter flutter_wrapper_app)
 target_link_libraries(${BINARY_NAME} PRIVATE "dwmapi.lib")
 target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_SOURCE_DIR}")
 
+# WinSparkle is fetched from the publisher's pinned release archive and
+# verified before extraction. Only the x64 runtime is linked into OneSend.
+include(FetchContent)
+FetchContent_Declare(
+  winsparkle
+  URL "https://github.com/vslavik/winsparkle/releases/download/v0.9.4/WinSparkle-0.9.4.zip"
+  URL_HASH "SHA256=6037df37fc263bd1650a1c4949681a9d40ffe991d01f35892a406cb5d103c976"
+  DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+)
+FetchContent_GetProperties(winsparkle)
+if(NOT winsparkle_POPULATED)
+  FetchContent_Populate(winsparkle)
+endif()
+
+if(EXISTS "${winsparkle_SOURCE_DIR}/x64/Release/WinSparkle.lib")
+  set(WINSPARKLE_ROOT "${winsparkle_SOURCE_DIR}")
+else()
+  set(WINSPARKLE_ROOT "${winsparkle_SOURCE_DIR}/WinSparkle-0.9.4")
+endif()
+
+target_include_directories(${BINARY_NAME} PRIVATE "${WINSPARKLE_ROOT}/include")
+target_link_libraries(${BINARY_NAME} PRIVATE
+  "${WINSPARKLE_ROOT}/x64/Release/WinSparkle.lib"
+)
+
 # Run the Flutter tool portions of the build. This must not be removed.
 add_dependencies(${BINARY_NAME} flutter_assemble)
+
+set(ONESEND_WINSPARKLE_DLL
+  "${WINSPARKLE_ROOT}/x64/Release/WinSparkle.dll"
+  PARENT_SCOPE
+)
+set(ONESEND_WINSPARKLE_LICENSE
+  "${WINSPARKLE_ROOT}/COPYING"
+  PARENT_SCOPE
+)
+set(ONESEND_WINSPARKLE_EXPAT_LICENSE
+  "${WINSPARKLE_ROOT}/COPYING.expat"
+  PARENT_SCOPE
+)

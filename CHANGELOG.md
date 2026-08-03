@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.3.0 - 2026-08-03
+
+- Added signed desktop update checks and an in-app version/update settings UI.
+- Integrated sandbox-compatible Sparkle 2.9.5 on macOS and WinSparkle 0.9.4
+  with a per-user Inno Setup installer on Windows.
+- Added a signed Linux release manifest with strict download URL, length, and
+  SHA-256 verification before an archive can be opened.
+- Added a dedicated Ed25519 update key, signed appcast generation, signed-feed
+  verification, and fail-closed tests for tampering and corrupted downloads.
+- Added deterministic macOS nested signing, notarization, stapling, and final
+  ZIP/DMG verification scripts, including every Sparkle helper and XPC service.
+- Added clean-install and in-place-upgrade smoke tests for the Windows installer.
+- Kept optical file transfer available if the update service is unavailable.
+
 ## 1.2.1 - 2026-08-03
 
 - Fixed file selection failing with `Invalid argument: object is unsendable` on

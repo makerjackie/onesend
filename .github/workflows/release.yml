@@ -24,6 +24,11 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
+      - name: Validate release tag matches pubspec
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          VERSION_RECORD="$(awk '/^version: / {print $2; exit}' pubspec.yaml)"
+          test "$GITHUB_REF_NAME" = "v${VERSION_RECORD%%+*}"
       - run: flutter analyze
       - run: flutter test
 
@@ -49,7 +54,7 @@ jobs:
         run: |
           test -n "$KEYSTORE_BASE64"
           printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$ONESEND_ANDROID_KEYSTORE_PATH"
-      - run: flutter build apk --release --build-number=${{ github.run_number }}
+      - run: flutter build apk --release
       - name: Verify Android release signature and permissions
         run: |
           BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
@@ -80,15 +85,24 @@ jobs:
       - run: flutter pub get
       - name: Verify native QR encode/decode bridge
         run: |
-          flutter build macos --release --target=tool/qr_codec_self_test.dart --build-number=${{ github.run_number }}
+          for attempt in 1 2 3; do
+            if flutter build macos --release --target=tool/qr_codec_self_test.dart; then
+              break
+            fi
+            if [[ "$attempt" -eq 3 ]]; then
+              echo "macOS build failed after $attempt attempts." >&2
+              exit 1
+            fi
+            echo "::warning::SwiftPM/Xcode build attempt $attempt failed; retrying on the hosted runner."
+          done
           build/macos/Build/Products/Release/OneSend.app/Contents/MacOS/OneSend
-      - run: flutter build macos --release --build-number=${{ github.run_number }}
+      - run: flutter build macos --release
       - name: Package artifact
-        run: ditto -c -k --sequesterRsrc --keepParent build/macos/Build/Products/Release/OneSend.app onesend-macos.zip
+        run: ditto -c -k --sequesterRsrc --keepParent build/macos/Build/Products/Release/OneSend.app onesend-macos-universal.zip
       - uses: actions/upload-artifact@v7
         with:
           name: onesend-macos
-          path: onesend-macos.zip
+          path: onesend-macos-universal.zip
 
   windows:
     needs: quality
@@ -101,14 +115,76 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
-      - run: flutter build windows --release --build-number=${{ github.run_number }}
-      - name: Package artifact
+      - run: flutter build windows --release
+      - name: Verify updater runtime is bundled
+        shell: pwsh
+        run: |
+          $bundle = 'build\windows\x64\runner\Release'
+          if (-not (Test-Path "$bundle\onesend.exe")) { throw 'onesend.exe is missing' }
+          if (-not (Test-Path "$bundle\WinSparkle.dll")) { throw 'WinSparkle.dll is missing' }
+      - name: Package portable artifact
         shell: pwsh
         run: Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath onesend-windows.zip
+      - name: Build per-user installer
+        shell: pwsh
+        run: |
+          choco install innosetup --no-progress -y
+          $versionLine = (Select-String -Path 'pubspec.yaml' -Pattern '^version:\s+').Line
+          $env:ONESEND_WINDOWS_VERSION = (($versionLine -replace '^version:\s+', '') -split '\+')[0]
+          if ($env:ONESEND_WINDOWS_VERSION -notmatch '^\d+\.\d+\.\d+$') { throw 'Invalid pubspec version' }
+          $env:ONESEND_WINDOWS_SOURCE_DIR = (Resolve-Path 'build\windows\x64\runner\Release').Path
+          $env:ONESEND_WINDOWS_OUTPUT_DIR = (Resolve-Path '.').Path
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" 'packaging\windows\onesend.iss'
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Smoke-test clean install and in-place upgrade
+        shell: pwsh
+        run: |
+          function Invoke-ProcessWithTimeout {
+            param(
+              [Parameter(Mandatory = $true)][string]$FilePath,
+              [Parameter(Mandatory = $true)][string]$ArgumentList,
+              [int]$TimeoutSeconds = 60
+            )
+
+            $process = Start-Process $FilePath -ArgumentList $ArgumentList -PassThru
+            if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {
+              try { $process.Kill($true) } catch { }
+              throw "Process timed out after $TimeoutSeconds seconds: $FilePath"
+            }
+            return $process.ExitCode
+          }
+
+          $installer = (Resolve-Path 'onesend-windows-setup.exe').Path
+          $installDir = Join-Path $env:RUNNER_TEMP 'onesend-installer-smoke'
+          $arguments = "/VERYSILENT /SP- /SUPPRESSMSGBOXES /NORESTART /DIR=`"$installDir`""
+          foreach ($pass in 1..2) {
+            $exitCode = Invoke-ProcessWithTimeout $installer $arguments
+            if ($exitCode -ne 0) { throw "Installer pass $pass failed" }
+            if (-not (Test-Path "$installDir\onesend.exe")) { throw 'Installed app is missing' }
+            if (-not (Test-Path "$installDir\WinSparkle.dll")) { throw 'Installed updater is missing' }
+          }
+          # Wait only for the installer process. PowerShell's Start-Process -Wait
+          # also waits for the relaunched app, which deadlocks this smoke test.
+          $exitCode = Invoke-ProcessWithTimeout $installer "$arguments /ONESENDUPDATE=1"
+          if ($exitCode -ne 0) { throw 'Updater-mode installer failed' }
+          $deadline = (Get-Date).AddSeconds(10)
+          do {
+            $runningApp = Get-Process -Name 'onesend' -ErrorAction SilentlyContinue
+            if ($runningApp) { break }
+            Start-Sleep -Milliseconds 250
+          } while ((Get-Date) -lt $deadline)
+          if (-not $runningApp) { throw 'Updater-mode installer did not relaunch OneSend' }
+          $runningApp | Stop-Process -Force
+          $runningApp | Wait-Process
+          $uninstaller = Join-Path $installDir 'unins000.exe'
+          $exitCode = Invoke-ProcessWithTimeout $uninstaller '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART'
+          if ($exitCode -ne 0) { throw 'Uninstaller failed' }
       - uses: actions/upload-artifact@v7
         with:
           name: onesend-windows
-          path: onesend-windows.zip
+          path: |
+            onesend-windows.zip
+            onesend-windows-setup.exe
 
   linux:
     needs: quality
@@ -125,13 +201,13 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
-      - run: flutter build linux --release --build-number=${{ github.run_number }}
+      - run: flutter build linux --release
       - name: Package artifact
-        run: tar -czf onesend-linux.tar.gz -C build/linux/x64/release bundle
+        run: tar -czf onesend-linux-x64.tar.gz -C build/linux/x64/release bundle
       - uses: actions/upload-artifact@v7
         with:
           name: onesend-linux
-          path: onesend-linux.tar.gz
+          path: onesend-linux-x64.tar.gz
 
   github-release:
     if: startsWith(github.ref, 'refs/tags/v')

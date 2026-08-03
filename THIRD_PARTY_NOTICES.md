@@ -36,6 +36,19 @@ OneSend also evaluated the public architecture of
 repository did not declare a license when OneSend v1.1 was developed, so no
 source code or assets from it are included here.
 
+## Desktop update frameworks
+
+The macOS app embeds
+[`Sparkle 2.9.5`](https://github.com/sparkle-project/Sparkle/tree/2.9.5), and the
+Windows app embeds
+[`WinSparkle 0.9.4`](https://github.com/vslavik/winsparkle/tree/v0.9.4). Both
+are used only to check, authenticate, download, and install OneSend desktop
+releases. Their complete bundled notices are preserved in:
+
+- [`licenses/Sparkle-LICENSE.txt`](licenses/Sparkle-LICENSE.txt)
+- [`licenses/WinSparkle-COPYING.txt`](licenses/WinSparkle-COPYING.txt)
+- [`licenses/WinSparkle-COPYING.expat.txt`](licenses/WinSparkle-COPYING.expat.txt)
+
 Dependency licenses remain with their respective copyright holders. Flutter
 and Dart dependency manifests in this repository identify the exact versions
 used by each release.

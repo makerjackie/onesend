@@ -15,21 +15,21 @@ const platforms = [
     mark: "M",
     name: "macOS",
     detail: "已公证 DMG · Apple Silicon / Intel",
-    href: `${releaseBase}/onesend-macos.dmg`,
+    href: `${releaseBase}/onesend-macos-universal.dmg`,
     action: "下载 DMG",
   },
   {
     mark: "W",
     name: "Windows",
-    detail: "ZIP · Windows 10+",
-    href: `${releaseBase}/onesend-windows.zip`,
-    action: "下载 ZIP",
+    detail: "安装器 · Windows 10+",
+    href: `${releaseBase}/onesend-windows-setup.exe`,
+    action: "下载安装器",
   },
   {
     mark: "L",
     name: "Linux",
     detail: "TAR.GZ · x64",
-    href: `${releaseBase}/onesend-linux.tar.gz`,
+    href: `${releaseBase}/onesend-linux-x64.tar.gz`,
     action: "下载 TAR.GZ",
   },
 ];
@@ -127,6 +127,7 @@ export default function Home() {
           <ul className="trust-row" aria-label="产品特性">
             <li>无需网络</li>
             <li>无需账号</li>
+            <li>桌面自动更新</li>
             <li>MIT 开源</li>
           </ul>
         </div>
@@ -384,6 +385,10 @@ export default function Home() {
               <em>Beta 审核中 ↗</em>
             </a>
           </div>
+          <p className="download-security-note">
+            桌面版每天自动检查一次更新；macOS / Windows 安装包使用 Ed25519
+            签名，Linux 下载还会核对长度与 SHA-256。安装前始终由你确认。
+          </p>
         </div>
       </section>
 

@@ -952,6 +952,15 @@ a:focus-visible {
   grid-column: span 2;
 }
 
+.download-security-note {
+  max-width: 760px;
+  margin: 22px auto 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.75;
+  text-align: center;
+}
+
 .privacy-section {
   padding-bottom: 80px;
 }

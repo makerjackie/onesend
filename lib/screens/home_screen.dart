@@ -3,21 +3,94 @@ import 'package:flutter/material.dart';
 import '../app.dart';
 import '../services/file_service.dart';
 import '../services/transfer_store.dart';
+import '../services/update_service.dart';
 import '../widgets/brand_mark.dart';
 import '../widgets/file_tile.dart';
+import '../widgets/update_ui.dart';
 import 'receive_screen.dart';
 import 'send_screen.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({required this.store, super.key});
+  const HomeScreen({required this.store, required this.updates, super.key});
 
   final TransferStore store;
+  final UpdateManager updates;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  String? _presentedUpdateVersion;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _performStartupUpdateCheck();
+    });
+  }
+
+  Future<void> _performStartupUpdateCheck() async {
+    await widget.updates.performStartupCheck();
+    if (!mounted) return;
+    await _showAvailableUpdateIfNeeded();
+  }
+
+  Future<void> _showAvailableUpdateIfNeeded() async {
+    final release = widget.updates.availableRelease;
+    final releaseIdentifier = release == null
+        ? null
+        : '${release.version}+${release.buildNumber}';
+    if (release == null || releaseIdentifier == _presentedUpdateVersion) return;
+    _presentedUpdateVersion = releaseIdentifier;
+    await showOneSendUpdateDialog(context, widget.updates);
+  }
+
+  Future<void> _checkForUpdates() async {
+    try {
+      final outcome = await widget.updates.checkForUpdates();
+      if (!mounted) return;
+      switch (outcome) {
+        case UpdateCheckOutcome.updateAvailable:
+          await _showAvailableUpdateIfNeeded();
+          break;
+        case UpdateCheckOutcome.upToDate:
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('已经是最新版本。')));
+          break;
+        case UpdateCheckOutcome.nativeWindowOpened:
+          break;
+        case UpdateCheckOutcome.unsupported:
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('当前平台不支持应用内更新。')));
+          break;
+      }
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(widget.updates.lastError ?? '检查更新失败，请稍后重试。')),
+      );
+    }
+  }
+
+  Future<void> _handleMenuAction(_HomeMenuAction action) async {
+    switch (action) {
+      case _HomeMenuAction.checkForUpdates:
+        await _checkForUpdates();
+        break;
+      case _HomeMenuAction.about:
+        await showOneSendUpdateSettings(context, widget.updates);
+        if (mounted) await _showAvailableUpdateIfNeeded();
+        break;
+      case _HomeMenuAction.clearHistory:
+        await _clearHistory();
+        break;
+    }
+  }
+
   Future<void> _open(Widget page) async {
     await Navigator.of(
       context,
@@ -70,10 +143,35 @@ class _HomeScreenState extends State<HomeScreen> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           const BrandMark(),
-                          IconButton(
-                            onPressed: records.isEmpty ? null : _clearHistory,
-                            tooltip: '清空记录',
-                            icon: const Icon(Icons.delete_outline_rounded),
+                          PopupMenuButton<_HomeMenuAction>(
+                            tooltip: '更多',
+                            icon: const Icon(Icons.more_horiz_rounded),
+                            onSelected: _handleMenuAction,
+                            itemBuilder: (context) => [
+                              if (widget.updates.supportsUpdates)
+                                const PopupMenuItem(
+                                  value: _HomeMenuAction.checkForUpdates,
+                                  child: _MenuRow(
+                                    icon: Icons.system_update_alt_rounded,
+                                    label: '检查更新',
+                                  ),
+                                ),
+                              const PopupMenuItem(
+                                value: _HomeMenuAction.about,
+                                child: _MenuRow(
+                                  icon: Icons.info_outline_rounded,
+                                  label: '关于 OneSend',
+                                ),
+                              ),
+                              if (records.isNotEmpty)
+                                const PopupMenuItem(
+                                  value: _HomeMenuAction.clearHistory,
+                                  child: _MenuRow(
+                                    icon: Icons.delete_outline_rounded,
+                                    label: '清空记录',
+                                  ),
+                                ),
+                            ],
                           ),
                         ],
                       ),
@@ -183,6 +281,22 @@ class _HomeScreenState extends State<HomeScreen> {
           },
         ),
       ),
+    );
+  }
+}
+
+enum _HomeMenuAction { checkForUpdates, about, clearHistory }
+
+class _MenuRow extends StatelessWidget {
+  const _MenuRow({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [Icon(icon, size: 20), const SizedBox(width: 12), Text(label)],
     );
   }
 }
