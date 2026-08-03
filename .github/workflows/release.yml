@@ -139,17 +139,34 @@ jobs:
       - name: Smoke-test clean install and in-place upgrade
         shell: pwsh
         run: |
+          function Invoke-ProcessWithTimeout {
+            param(
+              [Parameter(Mandatory = $true)][string]$FilePath,
+              [Parameter(Mandatory = $true)][string]$ArgumentList,
+              [int]$TimeoutSeconds = 60
+            )
+
+            $process = Start-Process $FilePath -ArgumentList $ArgumentList -PassThru
+            if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {
+              try { $process.Kill($true) } catch { }
+              throw "Process timed out after $TimeoutSeconds seconds: $FilePath"
+            }
+            return $process.ExitCode
+          }
+
           $installer = (Resolve-Path 'onesend-windows-setup.exe').Path
           $installDir = Join-Path $env:RUNNER_TEMP 'onesend-installer-smoke'
           $arguments = "/VERYSILENT /SP- /SUPPRESSMSGBOXES /NORESTART /DIR=`"$installDir`""
           foreach ($pass in 1..2) {
-            $process = Start-Process $installer -ArgumentList $arguments -Wait -PassThru
-            if ($process.ExitCode -ne 0) { throw "Installer pass $pass failed" }
+            $exitCode = Invoke-ProcessWithTimeout $installer $arguments
+            if ($exitCode -ne 0) { throw "Installer pass $pass failed" }
             if (-not (Test-Path "$installDir\onesend.exe")) { throw 'Installed app is missing' }
             if (-not (Test-Path "$installDir\WinSparkle.dll")) { throw 'Installed updater is missing' }
           }
-          $process = Start-Process $installer -ArgumentList "$arguments /ONESENDUPDATE=1" -Wait -PassThru
-          if ($process.ExitCode -ne 0) { throw 'Updater-mode installer failed' }
+          # Wait only for the installer process. PowerShell's Start-Process -Wait
+          # also waits for the relaunched app, which deadlocks this smoke test.
+          $exitCode = Invoke-ProcessWithTimeout $installer "$arguments /ONESENDUPDATE=1"
+          if ($exitCode -ne 0) { throw 'Updater-mode installer failed' }
           $deadline = (Get-Date).AddSeconds(10)
           do {
             $runningApp = Get-Process -Name 'onesend' -ErrorAction SilentlyContinue
@@ -160,8 +177,8 @@ jobs:
           $runningApp | Stop-Process -Force
           $runningApp | Wait-Process
           $uninstaller = Join-Path $installDir 'unins000.exe'
-          $process = Start-Process $uninstaller -ArgumentList '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART' -Wait -PassThru
-          if ($process.ExitCode -ne 0) { throw 'Uninstaller failed' }
+          $exitCode = Invoke-ProcessWithTimeout $uninstaller '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART'
+          if ($exitCode -ne 0) { throw 'Uninstaller failed' }
       - uses: actions/upload-artifact@v7
         with:
           name: onesend-windows
