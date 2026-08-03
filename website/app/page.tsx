@@ -428,9 +428,9 @@ export default function Home() {
               <span className="platform-mark">i</span>
               <div>
                 <strong>iPhone / iPad</strong>
-                <small>TestFlight 公测 · 已提交 Apple 审核</small>
+                <small>TestFlight 公测 · 1.5.0 待提交审核</small>
               </div>
-              <em>Beta 审核中 ↗</em>
+              <em>内测已开放 · 公测待审 ↗</em>
             </a>
           </div>
           <p className="download-security-note">
