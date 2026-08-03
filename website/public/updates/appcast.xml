@@ -7,26 +7,26 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
     <description>Stable desktop releases for OneSend · 扫传</description>
     <language>zh-cn</language>
     <item>
-      <title>OneSend 1.4.0</title>
-      <link>https://github.com/makerjackie/onesend/releases/tag/v1.4.0</link>
-      <sparkle:version>12</sparkle:version>
-      <sparkle:shortVersionString>1.4.0</sparkle:shortVersionString>
+      <title>OneSend 1.5.0</title>
+      <link>https://github.com/makerjackie/onesend/releases/tag/v1.5.0</link>
+      <sparkle:version>13</sparkle:version>
+      <sparkle:shortVersionString>1.5.0</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>10.15</sparkle:minimumSystemVersion>
-      <description><![CDATA[<ul><li>默认使用 Fast 模式。</li><li>修复任意文件传输问题。</li><li>接收完成后支持打开、分享和另存为。</li><li>支持 9 种 App 内语言。</li></ul>]]></description>
-      <pubDate>Mon, 03 Aug 2026 14:26:22 +0000</pubDate>
-      <enclosure url="https://github.com/makerjackie/onesend/releases/download/v1.4.0/onesend-macos-universal.zip" sparkle:edSignature="0u8vDYICJXN5gIXDSwG2FYARvUM120TgEng1OshqpLt82xIreLWEGiVLjSGucuqDrzHNsJ8X3krokfFkLhy4DQ==" sparkle:os="macos" length="21008377" type="application/octet-stream"></enclosure>
+      <description><![CDATA[<ul><li>QR Fast remains the stable default at about 33 KB&#47;s protocol-estimated throughput.</li><li>Turbo QR adds an experimental profile estimated at about 56 KB&#47;s.</li><li>CIMBAR Mode B is available experimentally on Android, iOS, and the website.</li><li>Received files now show location and support open, share, and save-copy actions.</li></ul>]]></description>
+      <pubDate>Mon, 03 Aug 2026 18:40:00 +0000</pubDate>
+      <enclosure url="https://github.com/makerjackie/onesend/releases/download/v1.5.0/onesend-macos-universal.zip" sparkle:edSignature="p+O2/MVhLmgmii7/HR/kclVIAXO6/1ZxvIANbVe8XLP7Hr9eqoulPx0Q4jak+vNZSgw4p1cSXgPe/uFwfjYmBg==" sparkle:os="macos" length="22254470" type="application/octet-stream"></enclosure>
     </item>
     <item>
-      <title>OneSend 1.4.0</title>
-      <link>https://github.com/makerjackie/onesend/releases/tag/v1.4.0</link>
-      <sparkle:version>12</sparkle:version>
-      <sparkle:shortVersionString>1.4.0</sparkle:shortVersionString>
-      <description><![CDATA[<ul><li>默认使用 Fast 模式。</li><li>修复任意文件传输问题。</li><li>接收完成后支持打开、分享和另存为。</li><li>支持 9 种 App 内语言。</li></ul>]]></description>
-      <pubDate>Mon, 03 Aug 2026 14:26:22 +0000</pubDate>
-      <enclosure url="https://github.com/makerjackie/onesend/releases/download/v1.4.0/onesend-windows-setup.exe" sparkle:edSignature="Gww67Xq8ZB4fAO02uk7qgCgzJyeEP8wqPv+XEWj0eRAz263hhWPyAXuOkjr5tiL3v7rhwrMJPF/SPk3WBK/GDQ==" sparkle:installerArguments="/SILENT /SP- /NOICONS /NORESTART /ONESENDUPDATE=1" sparkle:os="windows-x64" length="12805476" type="application/octet-stream"></enclosure>
+      <title>OneSend 1.5.0</title>
+      <link>https://github.com/makerjackie/onesend/releases/tag/v1.5.0</link>
+      <sparkle:version>13</sparkle:version>
+      <sparkle:shortVersionString>1.5.0</sparkle:shortVersionString>
+      <description><![CDATA[<ul><li>QR Fast remains the stable default at about 33 KB&#47;s protocol-estimated throughput.</li><li>Turbo QR adds an experimental profile estimated at about 56 KB&#47;s.</li><li>CIMBAR Mode B is available experimentally on Android, iOS, and the website.</li><li>Received files now show location and support open, share, and save-copy actions.</li></ul>]]></description>
+      <pubDate>Mon, 03 Aug 2026 18:40:00 +0000</pubDate>
+      <enclosure url="https://github.com/makerjackie/onesend/releases/download/v1.5.0/onesend-windows-setup.exe" sparkle:edSignature="VJ9p/uDJfnvdPXtk2ktCvjGtD0+i8JuFx8ftMbsZnnELkOA2oMBN6A4UOdSwTm7Knr2fYuQYAhq7XmrpsTahCg==" sparkle:installerArguments="/SILENT /SP- /NOICONS /NORESTART /ONESENDUPDATE=1" sparkle:os="windows-x64" length="13333697" type="application/octet-stream"></enclosure>
     </item>
   </channel>
 </rss><!-- sparkle-signatures:
-edSignature: /9Aj5AVu5Us6cpXLQCqvKcly95mclck1ruIv3QZZNizzTtNSm5VgJUI+gWykHP/SLRF5j/bA2TvUHKa1PzzoCA==
-length: 2449
+edSignature: digI0gE0jFKcp0dN6f6x/U4E5uN9O2AdbYpA6YQfKHoV/hdZ4Y2jq7sqgF/6hCGgYCDkU9N+vvyAWFJztfM4Bw==
+length: 2789
 -->
