@@ -10,6 +10,7 @@ import '../app.dart';
 import '../core/frame_pacer.dart';
 import '../core/optical_transfer.dart';
 import '../core/transfer_codec.dart';
+import '../l10n/generated/app_localizations.dart';
 import '../services/app_settings.dart';
 import '../services/file_service.dart';
 import '../services/sample_file_service.dart';
@@ -201,12 +202,13 @@ class _SendScreenState extends State<SendScreen>
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('发送文件'),
+        title: Text(l10n.sendFile),
         actions: [
           IconButton(
-            tooltip: '选择其他文件',
+            tooltip: l10n.chooseOtherFile,
             onPressed: _preparing ? null : _pickFile,
             icon: const Icon(Icons.attach_file_rounded),
           ),
@@ -219,6 +221,7 @@ class _SendScreenState extends State<SendScreen>
   }
 
   Widget _buildPicker() {
+    final l10n = AppLocalizations.of(context)!;
     final theoretical = formatTransferSpeed(_mode.usefulBytesPerSecond);
     return Center(
       child: SingleChildScrollView(
@@ -242,10 +245,13 @@ class _SendScreenState extends State<SendScreen>
                     child: const Icon(Icons.upload_file_rounded, size: 34),
                   ),
                   const SizedBox(height: 18),
-                  Text('选一个文件', style: Theme.of(context).textTheme.titleLarge),
+                  Text(
+                    l10n.chooseAFile,
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
                   const SizedBox(height: 8),
-                  const Text(
-                    '文件会被编码成一串不断变化的二维码。\n最大支持 64 MB，建议从小文件开始体验。',
+                  Text(
+                    l10n.sendFileDescription(formatBytes(maxTransferBytes)),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 16),
@@ -258,7 +264,10 @@ class _SendScreenState extends State<SendScreen>
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
-                      '新传输默认使用${_mode.label}模式 · 理论码流约 $theoretical',
+                      l10n.newTransferStatus(
+                        _localizedModeLabel(l10n, _mode),
+                        theoretical,
+                      ),
                       textAlign: TextAlign.center,
                       style: const TextStyle(fontWeight: FontWeight.w700),
                     ),
@@ -279,7 +288,7 @@ class _SendScreenState extends State<SendScreen>
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
                           : const Icon(Icons.folder_open_rounded),
-                      label: Text(_preparing ? '读取中…' : '选择文件'),
+                      label: Text(_preparing ? l10n.reading : l10n.chooseFile),
                     ),
                   ),
                   const SizedBox(height: 10),
@@ -289,7 +298,7 @@ class _SendScreenState extends State<SendScreen>
                       key: const ValueKey<String>('send-sample-video'),
                       onPressed: _preparing ? null : _sendSampleVideo,
                       icon: const Icon(Icons.movie_outlined),
-                      label: const Text('一键发送内置测试视频'),
+                      label: Text(l10n.sampleVideo),
                     ),
                   ),
                 ],
@@ -302,6 +311,7 @@ class _SendScreenState extends State<SendScreen>
   }
 
   Widget _buildActiveTransfer() {
+    final l10n = AppLocalizations.of(context)!;
     final file = _file!;
     final sender = _sender;
     final progress = sender?.passProgress ?? 0;
@@ -352,7 +362,7 @@ class _SendScreenState extends State<SendScreen>
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Text(
-                              '${_mode.label}模式',
+                              l10n.modeBadge(_localizedModeLabel(l10n, _mode)),
                               style: const TextStyle(
                                 color: oneSendInk,
                                 fontSize: 12,
@@ -362,12 +372,14 @@ class _SendScreenState extends State<SendScreen>
                           ),
                           const SizedBox(height: 10),
                           Text(
-                            sender?.isPaused == true ? '已暂停播放' : '正在持续播放二维码',
+                            sender?.isPaused == true
+                                ? l10n.pausedPlayback
+                                : l10n.broadcasting,
                             style: Theme.of(context).textTheme.titleMedium,
                           ),
                           const SizedBox(height: 5),
                           Text(
-                            '请把另一台设备的摄像头对准这块白色区域',
+                            l10n.cameraAim,
                             style: Theme.of(context).textTheme.bodyMedium,
                             textAlign: TextAlign.center,
                           ),
@@ -400,11 +412,11 @@ class _SendScreenState extends State<SendScreen>
                             spacing: 18,
                             children: [
                               Text(
-                                '第 $pass 轮 · 已发 $_framesSent 帧',
+                                l10n.passAndFrames(_framesSent, pass),
                                 style: Theme.of(context).textTheme.bodySmall,
                               ),
                               Text(
-                                '运行 $elapsed',
+                                l10n.runningTime(elapsed),
                                 style: Theme.of(context).textTheme.bodySmall,
                               ),
                             ],
@@ -413,7 +425,8 @@ class _SendScreenState extends State<SendScreen>
                           Align(
                             alignment: Alignment.centerLeft,
                             child: Text(
-                              '理论码流 ${formatTransferSpeed(_mode.usefulBytesPerSecond)} · 当前码流 ${formatTransferSpeed(currentRate)}',
+                              '${l10n.theoreticalRate(formatTransferSpeed(_mode.usefulBytesPerSecond))} · '
+                              '${l10n.currentRate(formatTransferSpeed(currentRate))}',
                               style: const TextStyle(
                                 color: oneSendMuted,
                                 fontWeight: FontWeight.w700,
@@ -441,19 +454,21 @@ class _SendScreenState extends State<SendScreen>
                               ? Icons.play_arrow_rounded
                               : Icons.pause_rounded,
                         ),
-                        label: Text(sender?.isPaused == true ? '继续' : '暂停'),
+                        label: Text(
+                          sender?.isPaused == true ? l10n.resume : l10n.pause,
+                        ),
                       ),
                       FilledButton.icon(
                         onPressed: _endTransfer,
                         icon: const Icon(Icons.stop_rounded),
-                        label: const Text('结束传输'),
+                        label: Text(l10n.endTransfer),
                       ),
                     ],
                   ),
                   const SizedBox(height: 8),
                   TextButton(
                     onPressed: _preparing ? null : _pickFile,
-                    child: const Text('发送另一个文件'),
+                    child: Text(l10n.sendAnother),
                   ),
                 ],
               ),
@@ -494,10 +509,7 @@ class _SendScreenState extends State<SendScreen>
   }
 
   String _friendlyError(Object error) {
-    return error
-        .toString()
-        .replaceFirst('FormatException: ', '')
-        .replaceFirst('Bad state: ', '');
+    return localizedTransferError(context, error);
   }
 
   String _formatDuration(Duration duration) {
@@ -506,6 +518,14 @@ class _SendScreenState extends State<SendScreen>
     }
     return '${duration.inMinutes.toString().padLeft(2, '0')}:${(duration.inSeconds % 60).toString().padLeft(2, '0')}';
   }
+}
+
+String _localizedModeLabel(AppLocalizations l10n, TransferMode mode) {
+  return switch (mode) {
+    TransferMode.reliable => l10n.modeReliable,
+    TransferMode.fast => l10n.modeFast,
+    TransferMode.turbo => l10n.modeTurboQr,
+  };
 }
 
 class _ErrorText extends StatelessWidget {

@@ -7,7 +7,7 @@ import 'package:onesend/core/optical_transfer.dart';
 import 'package:onesend/core/protocol.dart';
 
 void main() {
-  test('both profiles survive randomized loss, corruption, and reordering', () {
+  test('all profiles survive randomized loss, corruption, and reordering', () {
     for (final mode in TransferMode.values) {
       for (final blockCount in <int>[1, 7, 31, 127, 1023]) {
         final trials = blockCount >= 1023 ? 2 : 4;
@@ -82,6 +82,7 @@ void _runChannelSimulation(
   final startSequence = random.nextInt(encoder.blockCount * 2 + 1);
   final candidates = <Uint8List>[];
   var corruptedFrames = 0;
+  Uint8List? lastAcceptedFrame;
 
   for (
     var sequence = startSequence;
@@ -112,7 +113,9 @@ void _runChannelSimulation(
 
   Uint8List? reconstructed;
   for (final frame in candidates) {
-    reconstructed ??= receiver.consume(frame)?.payload;
+    final event = receiver.consume(frame);
+    if (event != null) lastAcceptedFrame = frame;
+    reconstructed ??= event?.payload;
     if (reconstructed != null) break;
   }
 
@@ -122,6 +125,11 @@ void _runChannelSimulation(
     reason:
         '${mode.name}, $requestedBlockCount blocks, trial $trial did not recover',
   );
+  // Replay a frame after completion so the duplicate path is exercised even
+  // when the shuffled channel would otherwise finish before a duplicate.
+  expect(lastAcceptedFrame, isNotNull);
+  receiver.consume(lastAcceptedFrame!);
+  expect(receiver.snapshot!.framesDuplicate, greaterThan(0));
   if (corruptedFrames > 0) {
     expect(receiver.snapshot!.framesNew, lessThan(candidates.length));
   }

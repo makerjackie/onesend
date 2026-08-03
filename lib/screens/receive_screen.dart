@@ -10,6 +10,7 @@ import '../app.dart';
 import '../core/envelope.dart';
 import '../core/optical_transfer.dart';
 import '../core/transfer_codec.dart';
+import '../l10n/generated/app_localizations.dart';
 import '../services/file_service.dart';
 import '../services/transfer_store.dart';
 import '../widgets/desktop_camera_receiver.dart';
@@ -307,13 +308,14 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('扫描接收'),
+        title: Text(l10n.scanReceive),
         actions: [
           if (_usesMobileScanner)
             IconButton(
-              tooltip: '手电筒',
+              tooltip: l10n.torch,
               onPressed: _completed || _processing ? null : _toggleTorch,
               icon: const Icon(Icons.flashlight_on_outlined),
             ),
@@ -324,15 +326,18 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
   }
 
   Widget _buildScanner() {
+    final l10n = AppLocalizations.of(context)!;
     final snapshot = _snapshot;
     final progress = snapshot?.progress;
     final status = _processing
-        ? '正在校验并保存文件…'
+        ? l10n.checkingAndSaving
         : _paused
-        ? '已暂停，点击继续即可保留当前进度'
+        ? l10n.pausedKeepProgress
         : snapshot == null
-        ? '正在寻找发送端…'
-        : '已锁定${snapshot.mode?.label ?? '兼容'}模式 · 正在收集二维码';
+        ? l10n.lookingForSender
+        : l10n.lockedModeCollecting(
+            _localizedReceiveModeLabel(l10n, snapshot.mode),
+          );
     return LayoutBuilder(
       builder: (context, constraints) {
         final cameraHeight = constraints.maxWidth >= 760
@@ -364,7 +369,7 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
                               color: oneSendInk.withValues(alpha: 0.86),
                               alignment: Alignment.center,
                               child: Text(
-                                _processing ? '校验中…' : '已暂停',
+                                _processing ? l10n.verifying : l10n.paused,
                                 style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 20,
@@ -381,8 +386,8 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
                   const SizedBox(height: 5),
                   Text(
                     _usesMobileScanner
-                        ? '把二维码完整放进框内，保持设备稳定。'
-                        : '桌面端使用摄像头截图解码，速度会比手机慢一些。',
+                        ? l10n.scanInstruction
+                        : l10n.desktopCameraInstruction,
                     style: Theme.of(context).textTheme.bodyMedium,
                     textAlign: TextAlign.center,
                   ),
@@ -404,15 +409,25 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
                             children: [
                               Text(
                                 snapshot == null
-                                    ? '等待第一帧'
+                                    ? l10n.waitingFirstFrame
                                     : snapshot.usesRatelessFountain
-                                    ? '${snapshot.framesNew} 帧 · Fountain 恢复中'
-                                    : '${snapshot.framesNew} 帧 · ${snapshot.solvedBlocks}/${snapshot.blockCount} 块',
+                                    ? l10n.fountainProgress(snapshot.framesNew)
+                                    : l10n.blockProgress(
+                                        snapshot.blockCount,
+                                        snapshot.framesNew,
+                                        snapshot.solvedBlocks,
+                                      ),
                                 style: Theme.of(context).textTheme.bodySmall,
                               ),
                               if (snapshot != null)
                                 Text(
-                                  '${snapshot.mode?.label ?? '兼容'} · ${formatBytes(snapshot.totalLength)}',
+                                  l10n.modeAndSize(
+                                    _localizedReceiveModeLabel(
+                                      l10n,
+                                      snapshot.mode,
+                                    ),
+                                    formatBytes(snapshot.totalLength),
+                                  ),
                                   style: Theme.of(context).textTheme.bodySmall,
                                 ),
                             ],
@@ -438,12 +453,12 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
                               ? Icons.play_arrow_rounded
                               : Icons.pause_rounded,
                         ),
-                        label: Text(_paused ? '继续扫描' : '暂停扫描'),
+                        label: Text(_paused ? l10n.resumeScan : l10n.pauseScan),
                       ),
                       FilledButton.icon(
                         onPressed: _processing ? null : _reset,
                         icon: const Icon(Icons.refresh_rounded),
-                        label: const Text('重新开始'),
+                        label: Text(l10n.restart),
                       ),
                     ],
                   ),
@@ -471,6 +486,7 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
   }
 
   Widget _buildCompleted() {
+    final l10n = AppLocalizations.of(context)!;
     final file = _receivedFile!;
     final stored = _storedFile;
     return Center(
@@ -495,12 +511,12 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
                   ),
                   const SizedBox(height: 20),
                   Text(
-                    '接收完成',
+                    l10n.receivedComplete,
                     style: Theme.of(context).textTheme.headlineMedium,
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    stored == null ? '文件已校验通过，但还没有保存成功。' : '文件已校验通过，并保存到本机。',
+                    stored == null ? l10n.verifiedNotSaved : l10n.verifiedSaved,
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 24),
@@ -527,7 +543,7 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
                         key: const ValueKey<String>('receive-retry-save'),
                         onPressed: _retrySave,
                         icon: const Icon(Icons.refresh_rounded),
-                        label: const Text('重试保存'),
+                        label: Text(l10n.retrySave),
                       ),
                     ),
                   const SizedBox(height: 12),
@@ -536,7 +552,7 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
                     child: FilledButton.icon(
                       onPressed: _reset,
                       icon: const Icon(Icons.qr_code_scanner_rounded),
-                      label: const Text('继续接收'),
+                      label: Text(l10n.continueReceiving),
                     ),
                   ),
                 ],
@@ -547,6 +563,15 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
       ),
     );
   }
+}
+
+String _localizedReceiveModeLabel(AppLocalizations l10n, TransferMode? mode) {
+  return switch (mode) {
+    TransferMode.reliable => l10n.modeReliable,
+    TransferMode.fast => l10n.modeFast,
+    TransferMode.turbo => l10n.modeTurboQr,
+    null => l10n.compatibilityMode,
+  };
 }
 
 class _ScannerOverlayPainter extends CustomPainter {

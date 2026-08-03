@@ -1,0 +1,801 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:file_selector/file_selector.dart';
+import 'package:flutter/material.dart';
+import 'package:webview_flutter/webview_flutter.dart';
+import 'package:webview_flutter_android/webview_flutter_android.dart';
+import 'package:webview_flutter_wkwebview/webview_flutter_wkwebview.dart';
+
+import '../app.dart';
+import '../core/envelope.dart';
+import '../l10n/generated/app_localizations.dart';
+import '../services/cimbar_bridge.dart';
+import '../services/file_service.dart';
+import '../services/transfer_store.dart';
+import '../widgets/stored_file_actions.dart';
+
+enum CimbarDirection { send, receive }
+
+/// The mobile CIMBAR payload ceiling. The wire envelope may add its small
+/// metadata header, but the user-selected/recovered file is capped here.
+const int cimbarMobileMaxFileBytes = 16 * 1024 * 1024;
+
+enum _CimbarStatus {
+  loading,
+  pageReadySend,
+  pageReadyReceive,
+  engineReadySend,
+  preparing,
+  paused,
+  playing,
+  broadcasting,
+  decoderReady,
+  decoderReadyStart,
+  cameraStarted,
+  decoding,
+  fileHeaderReceived,
+  receiving,
+  recoveredSaving,
+  recoveredNotSaved,
+  receiveComplete,
+  loadFailed,
+  transferFailed,
+  reloading,
+  requestingCamera,
+}
+
+/// Standalone libcimbar 0.6.7c mobile experiment.
+class CimbarTransferScreen extends StatefulWidget {
+  const CimbarTransferScreen({
+    required this.direction,
+    required this.store,
+    super.key,
+  });
+
+  final CimbarDirection direction;
+  final TransferStore store;
+
+  @override
+  State<CimbarTransferScreen> createState() => _CimbarTransferScreenState();
+}
+
+class _CimbarTransferScreenState extends State<CimbarTransferScreen> {
+  final CimbarBridge _bridge = CimbarBridge();
+  WebViewController? _controller;
+  Stopwatch? _receiveStopwatch;
+  Timer? _statusTimer;
+
+  String? _error;
+  _CimbarStatus _status = _CimbarStatus.loading;
+  String? _fileName;
+  int _fileSize = 0;
+  int _sendBytesRead = 0;
+  bool _pageReady = false;
+  bool _sendPaused = false;
+  bool _receiveStarted = false;
+  bool _saving = false;
+  bool _sendHistoryWritten = false;
+  double? _decodeProgress;
+  int _receivedBytes = 0;
+  int? _expectedBytes;
+  TransferFile? _receivedFile;
+  StoredTransfer? _storedFile;
+
+  bool get _supportedPlatform => Platform.isAndroid || Platform.isIOS;
+  bool get _isSending => widget.direction == CimbarDirection.send;
+  AppLocalizations get _l10n => AppLocalizations.of(context)!;
+
+  @override
+  void initState() {
+    super.initState();
+    if (_supportedPlatform) {
+      unawaited(_initializeWebView());
+    }
+  }
+
+  @override
+  void dispose() {
+    // Do not call a state-updating async helper from dispose. The JavaScript
+    // cleanup is deliberately fire-and-forget and does not touch Flutter
+    // state, so camera tracks and workers are still stopped during teardown.
+    _cancelReceiveResources();
+    _bridge.reset();
+    final controller = _controller;
+    _controller = null;
+    if (controller != null) {
+      unawaited(_cleanupWebView(controller, stopAll: true));
+    }
+    super.dispose();
+  }
+
+  Future<void> _initializeWebView() async {
+    try {
+      PlatformWebViewControllerCreationParams params =
+          const PlatformWebViewControllerCreationParams();
+      if (WebViewPlatform.instance is WebKitWebViewPlatform) {
+        params =
+            WebKitWebViewControllerCreationParams.fromPlatformWebViewControllerCreationParams(
+              params,
+              allowsInlineMediaPlayback: true,
+              // Muted video may autoplay; audio must remain user-action-only.
+              mediaTypesRequiringUserAction: const <PlaybackMediaTypes>{
+                PlaybackMediaTypes.audio,
+              },
+            );
+      }
+
+      final controller = WebViewController.fromPlatformCreationParams(
+        params,
+        onPermissionRequest: _handlePermissionRequest,
+      );
+      await controller.setJavaScriptMode(JavaScriptMode.unrestricted);
+      await controller.setBackgroundColor(oneSendInk);
+      await controller.addJavaScriptChannel(
+        cimbarBridgeChannelName,
+        onMessageReceived: _handleJavaScriptMessage,
+      );
+      await controller.setNavigationDelegate(
+        NavigationDelegate(
+          onPageFinished: (_) {
+            if (!mounted) return;
+            setState(() {
+              _pageReady = true;
+              if (_error == null) {
+                _status = _isSending
+                    ? _CimbarStatus.pageReadySend
+                    : _CimbarStatus.pageReadyReceive;
+              }
+            });
+          },
+          onWebResourceError: (_) {
+            if (!mounted) return;
+            setState(() {
+              _error = _l10n.cimbarPageLoadError;
+              _status = _CimbarStatus.loadFailed;
+            });
+          },
+        ),
+      );
+
+      if (_isSending && controller.platform is AndroidWebViewController) {
+        final androidController =
+            controller.platform as AndroidWebViewController;
+        await androidController.setOnShowFileSelector(_showAndroidFileSelector);
+      }
+
+      if (!mounted) {
+        unawaited(_cleanupWebView(controller, stopAll: true));
+        return;
+      }
+      setState(() => _controller = controller);
+      await controller.loadFlutterAsset(
+        _isSending ? 'assets/cimbar/send.html' : 'assets/cimbar/receive.html',
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _error = _l10n.cimbarPageLoadError;
+        _status = _CimbarStatus.loadFailed;
+      });
+    }
+  }
+
+  void _handlePermissionRequest(WebViewPermissionRequest request) {
+    final cameraOnly =
+        request.types.length == 1 &&
+        request.types.contains(WebViewPermissionResourceType.camera);
+    final allow = !_isSending && cameraOnly;
+    unawaited(allow ? request.grant() : request.deny());
+  }
+
+  Future<List<String>> _showAndroidFileSelector(
+    FileSelectorParams params,
+  ) async {
+    if (params.mode != FileSelectorMode.open &&
+        params.mode != FileSelectorMode.openMultiple) {
+      return <String>[];
+    }
+    final file = await openFile(
+      acceptedTypeGroups: <XTypeGroup>[
+        XTypeGroup(label: _l10n.cimbarAllFiles, extensions: <String>[]),
+      ],
+    );
+    if (file == null || file.path.trim().isEmpty) return <String>[];
+    return <String>[file.path];
+  }
+
+  void _handleJavaScriptMessage(JavaScriptMessage message) {
+    if (!mounted) return;
+    try {
+      final event = _bridge.parse(message.message);
+      _handleEvent(event);
+    } on Object catch (_) {
+      _handleBridgeFailure(_l10n.cimbarBridgeError);
+    }
+  }
+
+  void _handleEvent(CimbarBridgeEvent event) {
+    switch (event.type) {
+      case 'send-ready':
+        if (!_isSending) return;
+        _setState(() => _status = _CimbarStatus.engineReadySend);
+      case 'send-prepared':
+        if (!_isSending) return;
+        final size = event.integerValue('size') ?? -1;
+        if (size < 0 || size > cimbarMobileMaxFileBytes) {
+          _handleTransferTooLarge();
+          return;
+        }
+        _setState(() {
+          _fileName = event.stringValue('name') ?? _l10n.cimbarSelectedFileName;
+          _fileSize = size;
+          _sendBytesRead = 0;
+          _status = _CimbarStatus.preparing;
+          _error = null;
+        });
+      case 'send-progress':
+        if (!_isSending) return;
+        final bytesRead = event.integerValue('bytesRead') ?? _sendBytesRead;
+        _setState(() {
+          _sendBytesRead = bytesRead.clamp(0, _fileSize).toInt();
+          _status = _CimbarStatus.preparing;
+        });
+      case 'send-paused':
+        if (!_isSending) return;
+        _setState(() {
+          _sendPaused = event.booleanValue('paused') ?? _sendPaused;
+          _status = _sendPaused ? _CimbarStatus.paused : _CimbarStatus.playing;
+        });
+      case 'send-complete':
+        if (!_isSending) return;
+        _setState(() {
+          _status = _CimbarStatus.broadcasting;
+          _sendBytesRead = _fileSize;
+          _error = null;
+        });
+        unawaited(_recordSendHistory());
+      case 'receive-ready':
+        if (_isSending) return;
+        _setState(() {
+          _status = _receiveStarted
+              ? _CimbarStatus.decoderReady
+              : _CimbarStatus.decoderReadyStart;
+        });
+      case 'receive-started':
+        if (_isSending) return;
+        _receiveStopwatch?.stop();
+        _receiveStopwatch = Stopwatch()..start();
+        _statusTimer?.cancel();
+        _statusTimer = Timer.periodic(const Duration(milliseconds: 500), (_) {
+          if (mounted && _receiveStarted) setState(() {});
+        });
+        _setState(() {
+          _receiveStarted = true;
+          _error = null;
+          _decodeProgress = null;
+          _status = _CimbarStatus.cameraStarted;
+        });
+      case 'decode-progress':
+        if (_isSending) return;
+        final values = event.progressValues();
+        final progress = values == null || values.isEmpty
+            ? null
+            : values.reduce((a, b) => a + b) / values.length;
+        _setState(() {
+          _decodeProgress = progress?.clamp(0, 1).toDouble();
+          _status = _CimbarStatus.decoding;
+        });
+      case 'receive-file-start':
+        if (_isSending) return;
+        final size = event.integerValue('size') ?? -1;
+        if (size < 0 || size > cimbarMobileMaxFileBytes) {
+          _handleTransferTooLarge();
+          return;
+        }
+        _bridge.accept(_encodeEventAgain(event));
+        _setState(() {
+          _fileName = event.stringValue('name') ?? _l10n.cimbarReceivedFileName;
+          _fileSize = size;
+          _receivedBytes = 0;
+          _expectedBytes = size;
+          _status = _CimbarStatus.fileHeaderReceived;
+        });
+      case 'receive-file-chunk':
+        if (_isSending) return;
+        _bridge.accept(_encodeEventAgain(event));
+        _setState(() {
+          _receivedBytes = _bridge.assembler.receivedBytes;
+          _expectedBytes = _bridge.assembler.expectedBytes;
+          _status = _CimbarStatus.receiving;
+        });
+      case 'receive-file-complete':
+        if (_isSending) return;
+        final file = _bridge.accept(_encodeEventAgain(event));
+        if (file == null) {
+          _handleBridgeFailure(_l10n.cimbarVerificationError);
+          return;
+        }
+        if (file.bytes.length > cimbarMobileMaxFileBytes) {
+          _handleTransferTooLarge();
+          return;
+        }
+        _receiveStopwatch?.stop();
+        _statusTimer?.cancel();
+        _setState(() {
+          _receivedFile = file;
+          _receivedBytes = file.bytes.length;
+          _expectedBytes = file.bytes.length;
+          _fileName = file.name;
+          _fileSize = file.bytes.length;
+          _receiveStarted = false;
+          _status = _CimbarStatus.recoveredSaving;
+          _error = null;
+        });
+        unawaited(_completeReceive(file));
+      case 'receive-complete':
+        if (_isSending) return;
+        unawaited(_stopReceiveResources());
+        if (_storedFile == null && !_saving) {
+          _setState(() => _status = _CimbarStatus.recoveredSaving);
+        }
+      case 'error':
+        final phase = event.stringValue('phase');
+        final detail = event.stringValue('message') ?? 'unknown error';
+        debugPrint('[OneSend CIMBAR] ${phase ?? 'engine'}: $detail');
+        var userMessage = _localizedBridgeError(phase);
+        assert(() {
+          userMessage = '$userMessage\n[$phase] $detail';
+          return true;
+        }());
+        _handleBridgeFailure(userMessage);
+    }
+  }
+
+  // CimbarBridgeEvent intentionally exposes immutable fields. Re-encoding
+  // here keeps the assembler's single public entry point strict and testable.
+  String _encodeEventAgain(CimbarBridgeEvent event) => jsonEncode(event.fields);
+
+  String _localizedBridgeError(String? phase) {
+    return switch (phase) {
+      'camera' => _l10n.cimbarCameraError,
+      'send' || 'send-init' || 'send-pause' => _l10n.cimbarSendError,
+      'receive' || 'decode' => _l10n.cimbarReceiveError,
+      _ => _l10n.cimbarEngineError,
+    };
+  }
+
+  void _handleTransferTooLarge() {
+    _bridge.reset();
+    unawaited(_releaseResources(clearProgress: true));
+    _setState(() {
+      _error = _l10n.cimbarFileTooLarge(_maxSizeLabel(_l10n));
+      _status = _CimbarStatus.transferFailed;
+      _receiveStarted = false;
+      _saving = false;
+      _receivedBytes = 0;
+      _expectedBytes = null;
+      _fileName = null;
+      _fileSize = 0;
+      _sendBytesRead = 0;
+    });
+  }
+
+  void _handleBridgeFailure(String message) {
+    _bridge.reset();
+    unawaited(_releaseResources(clearProgress: true));
+    _setState(() {
+      _error = message;
+      _status = _CimbarStatus.transferFailed;
+      _receiveStarted = false;
+      _saving = false;
+      _receivedBytes = 0;
+      _expectedBytes = null;
+    });
+  }
+
+  void _cancelReceiveResources() {
+    _receiveStopwatch?.stop();
+    _statusTimer?.cancel();
+    _statusTimer = null;
+  }
+
+  Future<void> _cleanupWebView(
+    WebViewController controller, {
+    required bool stopAll,
+  }) async {
+    try {
+      await controller.runJavaScript(
+        stopAll ? 'OneSendCimbar.stop();' : 'OneSendCimbar.stopReceive();',
+      );
+    } catch (_) {
+      // The WebView can already be tearing down. Native state is cleaned up
+      // synchronously before this call, and JavaScript cleanup is best effort.
+    }
+  }
+
+  Future<void> _releaseResources({bool clearProgress = false}) async {
+    _cancelReceiveResources();
+    if (clearProgress) _receiveStopwatch = null;
+    final controller = _controller;
+    if (controller == null) return;
+    await _cleanupWebView(controller, stopAll: true);
+  }
+
+  Future<void> _stopReceiveResources({bool clearProgress = false}) async {
+    if (_isSending) return;
+    _cancelReceiveResources();
+    if (clearProgress) _receiveStopwatch = null;
+    _setState(() {
+      _receiveStarted = false;
+      if (clearProgress) {
+        _receivedBytes = 0;
+        _expectedBytes = null;
+        _decodeProgress = null;
+      }
+    });
+
+    final controller = _controller;
+    if (controller == null) return;
+    await _cleanupWebView(controller, stopAll: false);
+  }
+
+  Future<void> _completeReceive(TransferFile file) async {
+    await _stopReceiveResources();
+    if (!mounted) return;
+    await _saveReceivedFile(file);
+  }
+
+  Future<void> _saveReceivedFile(TransferFile file) async {
+    if (_saving || _storedFile != null) return;
+    _setState(() {
+      _saving = true;
+      _status = _CimbarStatus.recoveredSaving;
+    });
+    try {
+      final stored = await saveReceivedFile(file);
+      if (!mounted) return;
+      _setState(() {
+        _storedFile = stored;
+        _saving = false;
+        _status = _CimbarStatus.receiveComplete;
+        _error = null;
+      });
+      try {
+        await widget.store.add(
+          TransferRecord(
+            id: DateTime.now().microsecondsSinceEpoch.toString(),
+            direction: TransferDirection.received,
+            fileName: stored.name,
+            bytes: stored.bytes,
+            createdAt: DateTime.now(),
+            status: 'cimbar-received',
+            path: stored.path,
+            verified: true,
+          ),
+        );
+      } on Object catch (_) {
+        if (mounted) _setState(() => _error = _l10n.cimbarHistoryError);
+      }
+    } on Object catch (_) {
+      unawaited(_releaseResources());
+      if (!mounted) return;
+      _setState(() {
+        _saving = false;
+        _error = _l10n.cimbarSaveError;
+        _status = _CimbarStatus.recoveredNotSaved;
+      });
+    }
+  }
+
+  Future<void> _recordSendHistory() async {
+    if (_sendHistoryWritten || _fileName == null) return;
+    _sendHistoryWritten = true;
+    try {
+      await widget.store.add(
+        TransferRecord(
+          id: DateTime.now().microsecondsSinceEpoch.toString(),
+          direction: TransferDirection.sent,
+          fileName: safeStorageFileName(_fileName!),
+          bytes: _fileSize,
+          createdAt: DateTime.now(),
+          status: 'cimbar-broadcasting',
+        ),
+      );
+    } on Object catch (_) {
+      if (mounted) _setState(() => _error = _l10n.cimbarHistoryError);
+    }
+  }
+
+  Future<void> _startReceive() async {
+    if (!_pageReady || _controller == null || _isSending) return;
+    await _stopReceiveResources();
+    _setState(() {
+      _receiveStarted = true;
+      _status = _CimbarStatus.requestingCamera;
+      _error = null;
+    });
+    unawaited(_runWebViewScript('OneSendCimbar.startReceive();'));
+  }
+
+  void _chooseSendFile() {
+    if (!_pageReady || _controller == null || !_isSending) return;
+    unawaited(_runWebViewScript('OneSendCimbar.chooseFile();'));
+  }
+
+  void _toggleSendPause(bool paused) {
+    if (!_pageReady || _controller == null || !_isSending) return;
+    _setState(() => _sendPaused = paused);
+    unawaited(
+      _runWebViewScript(
+        'OneSendCimbar.togglePause(${paused ? 'true' : 'false'});',
+      ),
+    );
+  }
+
+  Future<void> _runWebViewScript(String script) async {
+    final controller = _controller;
+    if (controller == null) return;
+    try {
+      await controller.runJavaScript(script);
+    } on Object catch (_) {
+      if (mounted) _handleBridgeFailure(_l10n.cimbarEngineError);
+    }
+  }
+
+  Future<void> _retry() async {
+    await _releaseResources(clearProgress: true);
+    if (_saving) return;
+    final file = _receivedFile;
+    if (!_isSending && file != null && _storedFile == null) {
+      await _saveReceivedFile(file);
+      return;
+    }
+    _bridge.reset();
+    final controller = _controller;
+    if (controller == null) {
+      _setState(() {
+        _error = null;
+        _status = _CimbarStatus.reloading;
+      });
+      unawaited(_initializeWebView());
+      return;
+    }
+    _setState(() {
+      _error = null;
+      _fileName = null;
+      _fileSize = 0;
+      _sendBytesRead = 0;
+      _receivedBytes = 0;
+      _expectedBytes = null;
+      _receivedFile = null;
+      _storedFile = null;
+      _receiveStarted = false;
+      _sendPaused = false;
+      _pageReady = false;
+      _status = _CimbarStatus.reloading;
+    });
+    await controller.reload();
+  }
+
+  void _setState(VoidCallback callback) {
+    if (mounted) setState(callback);
+  }
+
+  String _maxSizeLabel(AppLocalizations l10n) => l10n.cimbarMebibytes('16');
+
+  String _statusText(AppLocalizations l10n) {
+    return switch (_status) {
+      _CimbarStatus.loading => l10n.cimbarLoading,
+      _CimbarStatus.pageReadySend => l10n.cimbarPageReadySend,
+      _CimbarStatus.pageReadyReceive => l10n.cimbarPageReadyReceive,
+      _CimbarStatus.engineReadySend => l10n.cimbarEngineReady,
+      _CimbarStatus.preparing => l10n.cimbarPreparingFile,
+      _CimbarStatus.paused => l10n.cimbarPaused,
+      _CimbarStatus.playing => l10n.cimbarPlaying,
+      _CimbarStatus.broadcasting => l10n.cimbarBroadcasting,
+      _CimbarStatus.decoderReady => l10n.cimbarDecoderReady,
+      _CimbarStatus.decoderReadyStart => l10n.cimbarDecoderReadyStart,
+      _CimbarStatus.cameraStarted => l10n.cimbarCameraStarted,
+      _CimbarStatus.decoding => l10n.cimbarDecoding,
+      _CimbarStatus.fileHeaderReceived => l10n.cimbarFileHeaderReceived,
+      _CimbarStatus.receiving => l10n.cimbarReceiving,
+      _CimbarStatus.recoveredSaving => l10n.cimbarRecoveredSaving,
+      _CimbarStatus.recoveredNotSaved => l10n.cimbarRecoveredNotSaved,
+      _CimbarStatus.receiveComplete => l10n.cimbarReceiveComplete,
+      _CimbarStatus.loadFailed => l10n.cimbarLoadFailed,
+      _CimbarStatus.transferFailed => l10n.cimbarTransferFailed,
+      _CimbarStatus.reloading => l10n.cimbarReloading,
+      _CimbarStatus.requestingCamera => l10n.cimbarRequestingCamera,
+    };
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = _l10n;
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(
+          _isSending ? l10n.cimbarSendTitle : l10n.cimbarReceiveTitle,
+        ),
+      ),
+      body: SafeArea(
+        child: !_supportedPlatform
+            ? _buildUnsupported(l10n)
+            : Column(
+                children: [
+                  Expanded(child: _buildWebView()),
+                  _buildStatusPanel(l10n),
+                ],
+              ),
+      ),
+    );
+  }
+
+  Widget _buildUnsupported(AppLocalizations l10n) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Card(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Text(
+              l10n.cimbarUnsupported,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWebView() {
+    final controller = _controller;
+    if (controller == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    return ColoredBox(
+      color: oneSendInk,
+      child: WebViewWidget(controller: controller),
+    );
+  }
+
+  Widget _buildStatusPanel(AppLocalizations l10n) {
+    final theme = Theme.of(context);
+    final elapsed = _receiveStopwatch?.elapsed ?? Duration.zero;
+    final measuredSpeed = elapsed.inMilliseconds <= 0
+        ? 0.0
+        : _receivedBytes / 1000 / (elapsed.inMilliseconds / 1000);
+    final progress = _expectedBytes == null || _expectedBytes == 0
+        ? null
+        : (_receivedBytes / _expectedBytes!).clamp(0, 1).toDouble();
+    final maxHeight = (MediaQuery.sizeOf(context).height * 0.44)
+        .clamp(200.0, 400.0)
+        .toDouble();
+
+    return Material(
+      color: oneSendPaper,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: maxHeight),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(_statusText(l10n), style: theme.textTheme.titleMedium),
+              if (_fileName != null) ...[
+                const SizedBox(height: 4),
+                Text(
+                  l10n.cimbarFileInfo(
+                    _fileName!,
+                    _formatBytes(l10n, _fileSize),
+                  ),
+                  style: theme.textTheme.bodyMedium,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+              if (_isSending && _fileSize > 0) ...[
+                const SizedBox(height: 8),
+                LinearProgressIndicator(
+                  value: _fileSize == 0 ? null : _sendBytesRead / _fileSize,
+                  minHeight: 4,
+                ),
+                const SizedBox(height: 5),
+                Text(l10n.cimbarSendRate, style: theme.textTheme.bodySmall),
+              ],
+              if (!_isSending) ...[
+                const SizedBox(height: 6),
+                if (progress != null) LinearProgressIndicator(value: progress),
+                Text(
+                  _expectedBytes == null
+                      ? l10n.cimbarReceiveProgressNoTotal(
+                          _formatBytes(l10n, _receivedBytes),
+                          (elapsed.inMilliseconds / 1000.0).toStringAsFixed(1),
+                        )
+                      : l10n.cimbarReceiveProgress(
+                          _formatBytes(l10n, _receivedBytes),
+                          _formatBytes(l10n, _expectedBytes!),
+                          (elapsed.inMilliseconds / 1000.0).toStringAsFixed(1),
+                        ),
+                  style: theme.textTheme.bodySmall,
+                ),
+                if (_decodeProgress != null && progress == null)
+                  LinearProgressIndicator(value: _decodeProgress),
+                Text(
+                  l10n.cimbarReceiveRate(measuredSpeed.toStringAsFixed(1)),
+                  style: theme.textTheme.bodySmall,
+                ),
+              ],
+              if (_error != null) ...[
+                const SizedBox(height: 6),
+                Text(
+                  _error!,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.error,
+                  ),
+                ),
+              ],
+              if (!_isSending && _storedFile != null) ...[
+                const SizedBox(height: 10),
+                StoredFileActions(file: _storedFile!),
+              ],
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  if (_isSending) ...[
+                    OutlinedButton.icon(
+                      onPressed: _pageReady ? _chooseSendFile : null,
+                      icon: const Icon(Icons.attach_file_rounded),
+                      label: Text(l10n.chooseFile),
+                    ),
+                    OutlinedButton(
+                      onPressed: _pageReady
+                          ? () => _toggleSendPause(true)
+                          : null,
+                      child: Text(l10n.pause),
+                    ),
+                    FilledButton(
+                      onPressed: _pageReady
+                          ? () => _toggleSendPause(false)
+                          : null,
+                      child: Text(l10n.resume),
+                    ),
+                  ] else ...[
+                    FilledButton(
+                      onPressed: _pageReady && !_receiveStarted && !_saving
+                          ? _startReceive
+                          : null,
+                      child: Text(l10n.cimbarStartReceive),
+                    ),
+                  ],
+                  if (_error != null)
+                    OutlinedButton(
+                      onPressed: _saving ? null : _retry,
+                      child: Text(
+                        _receivedFile != null && !_isSending
+                            ? l10n.retrySave
+                            : l10n.restart,
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+String _formatBytes(AppLocalizations l10n, int bytes) {
+  if (bytes < 1024) return l10n.cimbarBytes(bytes.toString());
+  if (bytes < 1024 * 1024) {
+    return l10n.cimbarKibibytes((bytes / 1024).toStringAsFixed(1));
+  }
+  return l10n.cimbarMebibytes((bytes / (1024 * 1024)).toStringAsFixed(2));
+}

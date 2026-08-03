@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.4.0+12
+version: 1.5.0+13
 
 environment:
   sdk: ^3.12.2
@@ -54,6 +54,9 @@ dependencies:
   shared_preferences: ^2.5.5
   url_launcher: ^6.3.2
   wakelock_plus: ^1.5.2
+  webview_flutter: ^4.14.1
+  webview_flutter_android: ^4.13.0
+  webview_flutter_wkwebview: ^3.26.0
 
 dev_dependencies:
   flutter_test:
@@ -83,6 +86,8 @@ flutter:
     - THIRD_PARTY_NOTICES.md
     - licenses/
     - assets/demo/onesend-optical-test.mp4
+    - assets/cimbar/
+    - assets/cimbar/upstream/
 
   # To add assets to your application, add an assets section, like this:
   # assets:

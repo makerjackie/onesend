@@ -142,6 +142,24 @@ abstract class AppLocalizations {
   /// **'Reliable'**
   String get modeReliable;
 
+  /// No description provided for @modeTurboQr.
+  ///
+  /// In en, this message translates to:
+  /// **'Turbo QR (experimental)'**
+  String get modeTurboQr;
+
+  /// No description provided for @modeCimbar.
+  ///
+  /// In en, this message translates to:
+  /// **'CIMBAR color visual code (experimental)'**
+  String get modeCimbar;
+
+  /// No description provided for @compatibilityMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Compatibility'**
+  String get compatibilityMode;
+
   /// No description provided for @cancel.
   ///
   /// In en, this message translates to:
@@ -379,7 +397,7 @@ abstract class AppLocalizations {
   /// No description provided for @algorithmDescription.
   ///
   /// In en, this message translates to:
-  /// **'Fast is best for a steady setup; Reliable gives handheld scanning more headroom.'**
+  /// **'Choose a QR profile or the experimental CIMBAR color visual code. QR receive mode is described by each frame.'**
   String get algorithmDescription;
 
   /// No description provided for @theoreticalSpeed.
@@ -391,19 +409,31 @@ abstract class AppLocalizations {
   /// No description provided for @fastModeDescription.
   ///
   /// In en, this message translates to:
-  /// **'{speed}; best for a steady setup and bright screen.'**
+  /// **'{speed}; stable and fast for a steady setup and bright screen.'**
   String fastModeDescription(Object speed);
 
   /// No description provided for @reliableModeDescription.
   ///
   /// In en, this message translates to:
-  /// **'{speed}; more error-correction headroom, but slower.'**
+  /// **'{speed}; reliable compatibility with more error-correction headroom, but slower.'**
   String reliableModeDescription(Object speed);
+
+  /// No description provided for @turboModeDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'{speed}; experimental high-capacity QR profile with less scanning headroom.'**
+  String turboModeDescription(Object speed);
+
+  /// No description provided for @cimbarModeDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'About 106 KB/s upstream reference; experimental color visual code on Android and iOS.'**
+  String get cimbarModeDescription;
 
   /// No description provided for @modeSaveError.
   ///
   /// In en, this message translates to:
-  /// **'Could not save the default transfer mode. Try again.'**
+  /// **'Could not save the default transfer settings. Try again.'**
   String get modeSaveError;
 
   /// No description provided for @appSection.
@@ -1107,6 +1137,286 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The update package could not be downloaded. Try again later.'**
   String get downloadError;
+
+  /// No description provided for @cimbarSendTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'CIMBAR high-speed send'**
+  String get cimbarSendTitle;
+
+  /// No description provided for @cimbarReceiveTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'CIMBAR high-speed receive'**
+  String get cimbarReceiveTitle;
+
+  /// No description provided for @cimbarUnsupported.
+  ///
+  /// In en, this message translates to:
+  /// **'The CIMBAR experimental transfer engine is available only on Android and iOS.'**
+  String get cimbarUnsupported;
+
+  /// No description provided for @cimbarLoading.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading the experimental engine…'**
+  String get cimbarLoading;
+
+  /// No description provided for @cimbarPageReadySend.
+  ///
+  /// In en, this message translates to:
+  /// **'Experimental engine loaded. Choose a file.'**
+  String get cimbarPageReadySend;
+
+  /// No description provided for @cimbarPageReadyReceive.
+  ///
+  /// In en, this message translates to:
+  /// **'Experimental engine loaded. Tap start to request camera access.'**
+  String get cimbarPageReadyReceive;
+
+  /// No description provided for @cimbarEngineReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Experimental engine ready · Mode B'**
+  String get cimbarEngineReady;
+
+  /// No description provided for @cimbarPreparingFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing file…'**
+  String get cimbarPreparingFile;
+
+  /// No description provided for @cimbarPaused.
+  ///
+  /// In en, this message translates to:
+  /// **'Playback paused'**
+  String get cimbarPaused;
+
+  /// No description provided for @cimbarPlaying.
+  ///
+  /// In en, this message translates to:
+  /// **'Playing'**
+  String get cimbarPlaying;
+
+  /// No description provided for @cimbarBroadcasting.
+  ///
+  /// In en, this message translates to:
+  /// **'File ready; broadcasting the visual code'**
+  String get cimbarBroadcasting;
+
+  /// No description provided for @cimbarDecoderReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Decoder ready. Looking for CIMBAR.'**
+  String get cimbarDecoderReady;
+
+  /// No description provided for @cimbarDecoderReadyStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Decoder ready. Tap start to request camera access.'**
+  String get cimbarDecoderReadyStart;
+
+  /// No description provided for @cimbarCameraStarted.
+  ///
+  /// In en, this message translates to:
+  /// **'Camera started. Looking for CIMBAR.'**
+  String get cimbarCameraStarted;
+
+  /// No description provided for @cimbarDecoding.
+  ///
+  /// In en, this message translates to:
+  /// **'Decoding with the upstream worker'**
+  String get cimbarDecoding;
+
+  /// No description provided for @cimbarFileHeaderReceived.
+  ///
+  /// In en, this message translates to:
+  /// **'File header verified. Receiving chunks.'**
+  String get cimbarFileHeaderReceived;
+
+  /// No description provided for @cimbarReceiving.
+  ///
+  /// In en, this message translates to:
+  /// **'Receiving verified bytes'**
+  String get cimbarReceiving;
+
+  /// No description provided for @cimbarRecoveredSaving.
+  ///
+  /// In en, this message translates to:
+  /// **'File fully recovered. Saving…'**
+  String get cimbarRecoveredSaving;
+
+  /// No description provided for @cimbarRecoveredNotSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'File fully recovered, but it has not been saved.'**
+  String get cimbarRecoveredNotSaved;
+
+  /// No description provided for @cimbarReceiveComplete.
+  ///
+  /// In en, this message translates to:
+  /// **'Receive complete'**
+  String get cimbarReceiveComplete;
+
+  /// No description provided for @cimbarLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading failed. Try again.'**
+  String get cimbarLoadFailed;
+
+  /// No description provided for @cimbarTransferFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'CIMBAR transfer failed. Try again.'**
+  String get cimbarTransferFailed;
+
+  /// No description provided for @cimbarReloading.
+  ///
+  /// In en, this message translates to:
+  /// **'Reloading the experimental engine…'**
+  String get cimbarReloading;
+
+  /// No description provided for @cimbarRequestingCamera.
+  ///
+  /// In en, this message translates to:
+  /// **'Requesting camera access…'**
+  String get cimbarRequestingCamera;
+
+  /// No description provided for @cimbarFileInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'File: {name} · {size}'**
+  String cimbarFileInfo(Object name, Object size);
+
+  /// No description provided for @cimbarSendRate.
+  ///
+  /// In en, this message translates to:
+  /// **'Upstream reference: 106 KB/s · Mode B'**
+  String get cimbarSendRate;
+
+  /// No description provided for @cimbarReceiveRate.
+  ///
+  /// In en, this message translates to:
+  /// **'Upstream reference: 106 KB/s · Measured for this receive: {speed} KB/s'**
+  String cimbarReceiveRate(Object speed);
+
+  /// No description provided for @cimbarReceiveProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Recovered {received} / {expected} · {seconds} s'**
+  String cimbarReceiveProgress(
+    Object expected,
+    Object received,
+    Object seconds,
+  );
+
+  /// No description provided for @cimbarReceiveProgressNoTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Recovered {received} · {seconds} s'**
+  String cimbarReceiveProgressNoTotal(Object received, Object seconds);
+
+  /// No description provided for @cimbarStartReceive.
+  ///
+  /// In en, this message translates to:
+  /// **'Start receiving (request camera)'**
+  String get cimbarStartReceive;
+
+  /// No description provided for @cimbarFileTooLarge.
+  ///
+  /// In en, this message translates to:
+  /// **'Mobile CIMBAR files must be no larger than {maxSize}.'**
+  String cimbarFileTooLarge(Object maxSize);
+
+  /// No description provided for @cimbarPageLoadError.
+  ///
+  /// In en, this message translates to:
+  /// **'The offline CIMBAR page could not be loaded. Try again.'**
+  String get cimbarPageLoadError;
+
+  /// No description provided for @cimbarBridgeError.
+  ///
+  /// In en, this message translates to:
+  /// **'The CIMBAR transfer sent an invalid event. Try again.'**
+  String get cimbarBridgeError;
+
+  /// No description provided for @cimbarEngineError.
+  ///
+  /// In en, this message translates to:
+  /// **'The CIMBAR engine is unavailable. Try again.'**
+  String get cimbarEngineError;
+
+  /// No description provided for @cimbarCameraError.
+  ///
+  /// In en, this message translates to:
+  /// **'Camera access or decoding failed. Check permission and try again.'**
+  String get cimbarCameraError;
+
+  /// No description provided for @cimbarSendError.
+  ///
+  /// In en, this message translates to:
+  /// **'The CIMBAR sender could not prepare the file. Try again.'**
+  String get cimbarSendError;
+
+  /// No description provided for @cimbarReceiveError.
+  ///
+  /// In en, this message translates to:
+  /// **'The CIMBAR receiver could not decode the file. Try again.'**
+  String get cimbarReceiveError;
+
+  /// No description provided for @cimbarVerificationError.
+  ///
+  /// In en, this message translates to:
+  /// **'The received file could not be verified. Try again.'**
+  String get cimbarVerificationError;
+
+  /// No description provided for @cimbarSaveError.
+  ///
+  /// In en, this message translates to:
+  /// **'The recovered file could not be saved. Try Retry save.'**
+  String get cimbarSaveError;
+
+  /// No description provided for @cimbarHistoryError.
+  ///
+  /// In en, this message translates to:
+  /// **'The file was saved, but its transfer history record could not be written.'**
+  String get cimbarHistoryError;
+
+  /// No description provided for @cimbarAllFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'All files'**
+  String get cimbarAllFiles;
+
+  /// No description provided for @cimbarSelectedFileName.
+  ///
+  /// In en, this message translates to:
+  /// **'selected.bin'**
+  String get cimbarSelectedFileName;
+
+  /// No description provided for @cimbarReceivedFileName.
+  ///
+  /// In en, this message translates to:
+  /// **'received.bin'**
+  String get cimbarReceivedFileName;
+
+  /// No description provided for @cimbarBytes.
+  ///
+  /// In en, this message translates to:
+  /// **'{value} B'**
+  String cimbarBytes(Object value);
+
+  /// No description provided for @cimbarKibibytes.
+  ///
+  /// In en, this message translates to:
+  /// **'{value} KiB'**
+  String cimbarKibibytes(Object value);
+
+  /// No description provided for @cimbarMebibytes.
+  ///
+  /// In en, this message translates to:
+  /// **'{value} MiB'**
+  String cimbarMebibytes(Object value);
 
   /// No description provided for @durationHoursMinutes.
   ///

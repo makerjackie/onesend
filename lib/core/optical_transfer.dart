@@ -8,7 +8,13 @@ import 'protocol.dart';
 const int maxOpticalPayloadBytes = 72 * 1024 * 1024;
 const int maxOpticalBlocks = 110000;
 const int minOpticalBlockLength = 64;
-const int maxOpticalBlockLength = 2048;
+// QR V40-L carries at most 2953 byte-mode bytes. The v2 frame spends 28
+// bytes on its header and 4 bytes on its per-frame CRC, leaving 2921 bytes
+// for the fountain block. Keep this limit here as a receiver-side guard too.
+const int maxOpticalBlockLength = 2921;
+const int opticalFrameOverheadBytes = frameHeaderLength + frameChecksumLength;
+const int maxOpticalFrameLength =
+    maxOpticalBlockLength + opticalFrameOverheadBytes;
 const int maxRatelessFountainBlocks = 8192;
 
 enum TransferMode {
@@ -22,6 +28,12 @@ enum TransferMode {
     id: 2,
     label: '快速',
     blockLength: 1700,
+    frameInterval: Duration(microseconds: 41667),
+  ),
+  turbo(
+    id: 3,
+    label: 'Turbo',
+    blockLength: 2921,
     frameInterval: Duration(microseconds: 41667),
   );
 
@@ -40,16 +52,28 @@ enum TransferMode {
   int get framesPerSecond =>
       (Duration.microsecondsPerSecond / frameInterval.inMicroseconds).round();
 
+  /// Net fountain-block bytes offered by the raw frame stream per second.
+  int get rawBytesPerSecond => blockLength * framesPerSecond;
+
+  /// Full protocol bytes put into QR per second, including the v2 frame
+  /// header and CRC. This is a code-stream figure, not useful file throughput.
+  int get theoreticalCodeStreamBytesPerSecond =>
+      (blockLength + opticalFrameOverheadBytes) * framesPerSecond;
+
+  /// Conservative net file throughput: reserve one of every five frame slots
+  /// for repair/recovery. It is a protocol estimate, not a camera measurement.
   double get usefulBytesPerSecond =>
-      blockLength * framesPerSecond * sourceFramesPerGroup / framesPerGroup;
+      rawBytesPerSecond * sourceFramesPerGroup / framesPerGroup;
 
   bool usesRatelessFountainFor(int blockCount) =>
-      this == fast && blockCount <= maxRatelessFountainBlocks;
+      (this == fast || this == turbo) &&
+      blockCount <= maxRatelessFountainBlocks;
 
   static TransferMode? fromId(int id) {
     return switch (id) {
       0 => reliable,
       1 || 2 => fast,
+      3 => turbo,
       _ => null,
     };
   }
@@ -60,6 +84,7 @@ enum TransferMode {
       // OneSend 1.1 fast streams remain readable after the 1.2 speed upgrade.
       (1, 1320) => fast,
       (2, 1700) => fast,
+      (3, 2921) => turbo,
       _ => null,
     };
   }
@@ -217,10 +242,11 @@ class ReceiverSnapshot {
   final int solvedBlocks;
 
   TransferMode? get mode => TransferMode.fromProfile(profileId, blockLength);
-  bool get usesRatelessFountain =>
-      protocolVersion >= currentProtocolVersion &&
-      profileId == TransferMode.fast.id &&
-      TransferMode.fast.usesRatelessFountainFor(blockCount);
+  bool get usesRatelessFountain {
+    if (protocolVersion < currentProtocolVersion) return false;
+    final transferMode = mode;
+    return transferMode?.usesRatelessFountainFor(blockCount) ?? false;
+  }
 
   double get progress {
     if (blockCount == 0) return 0;
@@ -284,13 +310,14 @@ class OpticalReceiver {
         header.blockCount > maxOpticalBlocks) {
       return null;
     }
+    TransferMode? mode;
     if (header.protocolVersion == currentProtocolVersion) {
-      final mode = TransferMode.fromProfile(
-        header.profileId,
-        header.blockLength,
-      );
+      mode = TransferMode.fromProfile(header.profileId, header.blockLength);
       if (mode == null) return null;
     }
+    final usesRatelessFountain =
+        header.protocolVersion >= currentProtocolVersion &&
+        (mode?.usesRatelessFountainFor(header.blockCount) ?? false);
 
     if (_decoder == null) {
       _configuration = header;
@@ -300,10 +327,7 @@ class OpticalReceiver {
         sessionId: header.sessionId,
         totalLength: header.totalLength,
         protocolVersion: header.protocolVersion,
-        systematicFrames:
-            !(header.protocolVersion >= currentProtocolVersion &&
-                header.profileId == TransferMode.fast.id &&
-                TransferMode.fast.usesRatelessFountainFor(header.blockCount)),
+        systematicFrames: !usesRatelessFountain,
       );
       _startedAt = DateTime.now();
       _delivered = false;

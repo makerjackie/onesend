@@ -27,7 +27,7 @@
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>NSCameraUsageDescription</key>
-	<string>光传需要使用摄像头扫描持续变化的二维码来接收文件。</string>
+	<string>OneSend uses the camera only to scan changing visual codes and receive files.</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>LSSupportsOpeningDocumentsInPlace</key>

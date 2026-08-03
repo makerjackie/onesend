@@ -12,132 +12,141 @@ class AppLocalizationsEs extends AppLocalizations {
   String get appTitle => 'OneSend';
 
   @override
-  String get followSystem => 'Follow system';
+  String get followSystem => 'Seguir el sistema';
 
   @override
-  String get language => 'Language';
+  String get language => 'Idioma';
 
   @override
-  String get modeFast => 'Fast';
+  String get modeFast => 'Rápido';
 
   @override
-  String get modeReliable => 'Reliable';
+  String get modeReliable => 'Fiable';
 
   @override
-  String get cancel => 'Cancel';
+  String get modeTurboQr => 'Turbo QR (experimental)';
 
   @override
-  String get done => 'Done';
+  String get modeCimbar => 'Código visual de color CIMBAR (experimental)';
 
   @override
-  String get close => 'Close';
+  String get compatibilityMode => 'Compatibilidad';
 
   @override
-  String get openFile => 'Open';
+  String get cancel => 'Cancelar';
 
   @override
-  String get shareFile => 'Share / forward';
+  String get done => 'Listo';
 
   @override
-  String get saveCopy => 'Save a copy';
+  String get close => 'Cerrar';
 
   @override
-  String get revealInFolder => 'Reveal in folder';
+  String get openFile => 'Abrir';
 
   @override
-  String get more => 'More';
+  String get shareFile => 'Compartir / reenviar';
 
   @override
-  String get settings => 'Settings';
+  String get saveCopy => 'Guardar una copia';
 
   @override
-  String get about => 'About OneSend';
+  String get revealInFolder => 'Mostrar en la carpeta';
 
   @override
-  String get clearHistory => 'Clear history';
+  String get more => 'Más';
 
   @override
-  String get clearHistoryQuestion => 'Clear transfer history?';
+  String get settings => 'Ajustes';
+
+  @override
+  String get about => 'Acerca de OneSend';
+
+  @override
+  String get clearHistory => 'Borrar historial';
+
+  @override
+  String get clearHistoryQuestion => '¿Borrar el historial de transferencias?';
 
   @override
   String get clearHistoryDescription =>
-      'This only removes records from OneSend. Saved files will not be deleted.';
+      'Esto solo elimina los registros de OneSend. Los archivos guardados no se eliminarán.';
 
   @override
-  String get clearAction => 'Clear';
+  String get clearAction => 'Borrar';
 
   @override
-  String get homeHeadline => 'Send files,\nwith light.';
+  String get homeHeadline => 'Envía archivos,\ncon luz.';
 
   @override
   String get homeSubtitle =>
-      'No network. No pairing.\nJust a screen and a camera.';
+      'Sin red. Sin emparejamiento.\nSolo una pantalla y una cámara.';
 
   @override
-  String get sendEyebrow => 'SEND';
+  String get sendEyebrow => 'ENVIAR';
 
   @override
-  String get receiveEyebrow => 'RECEIVE';
+  String get receiveEyebrow => 'RECIBIR';
 
   @override
-  String get sendFile => 'Send a file';
+  String get sendFile => 'Enviar un archivo';
 
   @override
-  String get receiveFile => 'Scan to receive';
+  String get receiveFile => 'Escanear para recibir';
 
   @override
   String get sendCardDescription =>
-      'Put the code on screen and aim another device at it.';
+      'Pon el código en pantalla y apunta otro dispositivo hacia él.';
 
   @override
   String get receiveCardDescription =>
-      'Open the camera and scan the changing visual code.';
+      'Abre la cámara y escanea el código visual cambiante.';
 
   @override
-  String get recentTransfers => 'Recent transfers';
+  String get recentTransfers => 'Transferencias recientes';
 
   @override
   String recordCount(num count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '# records',
-      one: '1 record',
-      zero: '0 records',
+      other: '# registros',
+      one: '1 registro',
+      zero: '0 registros',
     );
     return '$_temp0';
   }
 
   @override
   String get historyFooter =>
-      'Screen ↔ camera · Files travel only as light between two devices';
+      'Pantalla ↔ cámara · Los archivos viajan solo como luz entre dos dispositivos';
 
   @override
   String get emptyHistory =>
-      'No transfer history yet. Choose a file to start your first optical transfer.';
+      'Aún no hay historial de transferencias. Elige un archivo para iniciar tu primera transferencia óptica.';
 
   @override
-  String get receivedAndVerified => 'Received and verified';
+  String get receivedAndVerified => 'Recibido y verificado';
 
   @override
-  String get sendEnded => 'Sending ended';
+  String get sendEnded => 'Envío finalizado';
 
   @override
-  String get sent => 'Sent';
+  String get sent => 'Enviado';
 
   @override
-  String get receivedFileActions => 'Received file actions';
+  String get receivedFileActions => 'Acciones del archivo recibido';
 
   @override
-  String get justNow => 'Just now';
+  String get justNow => 'Ahora mismo';
 
   @override
   String minutesAgo(num count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '# minutes ago',
-      one: '1 minute ago',
+      other: 'hace # minutos',
+      one: 'hace 1 minuto',
     );
     return '$_temp0';
   }
@@ -147,8 +156,8 @@ class AppLocalizationsEs extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '# hours ago',
-      one: '1 hour ago',
+      other: 'hace # horas',
+      one: 'hace 1 hora',
     );
     return '$_temp0';
   }
@@ -158,8 +167,8 @@ class AppLocalizationsEs extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '# days ago',
-      one: '1 day ago',
+      other: 'hace # días',
+      one: 'hace 1 día',
     );
     return '$_temp0';
   }
@@ -170,42 +179,54 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
-  String get settingsIntroTitle => 'Tune the next transfer to your device.';
+  String get settingsIntroTitle =>
+      'Ajusta la próxima transferencia a tu dispositivo.';
 
   @override
-  String get settingsIntroBody => 'The default mode is used for new sends.';
+  String get settingsIntroBody =>
+      'El modo predeterminado se usa para los nuevos envíos.';
 
   @override
-  String get transportSection => 'TRANSFER';
+  String get transportSection => 'TRANSFERENCIA';
 
   @override
-  String get defaultTransferAlgorithm => 'Default transfer algorithm';
+  String get defaultTransferAlgorithm =>
+      'Algoritmo de transferencia predeterminado';
 
   @override
   String get algorithmDescription =>
-      'Fast is best for a steady setup; Reliable gives handheld scanning more headroom.';
+      'Elige un perfil QR o el código visual de color CIMBAR experimental. El modo de recepción QR se describe en cada fotograma.';
 
   @override
   String theoreticalSpeed(Object speed) {
-    return 'About $speed';
+    return 'Aproximadamente $speed';
   }
 
   @override
   String fastModeDescription(Object speed) {
-    return '$speed; best for a steady setup and bright screen.';
+    return '$speed; estable y rápido con una configuración fija y una pantalla brillante.';
   }
 
   @override
   String reliableModeDescription(Object speed) {
-    return '$speed; more error-correction headroom, but slower.';
+    return '$speed; compatibilidad fiable con mayor margen de corrección de errores, pero más lento.';
   }
 
   @override
-  String get modeSaveError =>
-      'Could not save the default transfer mode. Try again.';
+  String turboModeDescription(Object speed) {
+    return '$speed; perfil QR experimental de alta capacidad con menos margen para el escaneo.';
+  }
 
   @override
-  String get appSection => 'APP';
+  String get cimbarModeDescription =>
+      'Referencia de subida de unos 106 KB/s; código visual de color experimental para Android e iOS.';
+
+  @override
+  String get modeSaveError =>
+      'No se pudieron guardar los ajustes de transferencia predeterminados. Inténtalo de nuevo.';
+
+  @override
+  String get appSection => 'APLICACIÓN';
 
   @override
   String languageSubtitle(Object language) {
@@ -213,22 +234,22 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
-  String get desktopUpdates => 'Automatic updates';
+  String get desktopUpdates => 'Actualizaciones automáticas';
 
   @override
   String get desktopUpdatesSubtitle =>
-      'Check for updates and configure automatic checks on desktop.';
+      'Buscar actualizaciones y configurar comprobaciones automáticas en el escritorio.';
 
   @override
   String get mobileOfflineNote =>
-      'Mobile stays offline: only transfer and language settings are available.';
+      'El móvil permanece sin conexión: solo están disponibles los ajustes de transferencia e idioma.';
 
   @override
-  String get languagePickerTitle => 'Choose language';
+  String get languagePickerTitle => 'Elegir idioma';
 
   @override
   String get languageSaveError =>
-      'Could not save the language setting. Try again.';
+      'No se pudo guardar el ajuste de idioma. Inténtalo de nuevo.';
 
   @override
   String modeAccessibilityLabel(Object mode, Object speed) {
@@ -237,207 +258,211 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get experimentalVisualTransfer =>
-      'Experimental offline visual transfer';
+      'Transferencia visual sin conexión experimental';
 
   @override
-  String get workingPrinciple => 'How it works';
+  String get workingPrinciple => 'Cómo funciona';
 
   @override
   String get workingPrincipleBody =>
-      'A file is encoded into a changing sequence of visual codes. The sender displays them; the receiver reads and verifies each frame with its camera, then restores the file. The path is only light between the screen and camera.';
+      'Un archivo se codifica en una secuencia cambiante de códigos visuales. El emisor los muestra; el receptor lee y verifica cada fotograma con su cámara y, después, restaura el archivo. El trayecto es solo luz entre la pantalla y la cámara.';
 
   @override
-  String get whyWeBuiltIt => 'Why we built it';
+  String get whyWeBuiltIt => 'Por qué lo creamos';
 
   @override
   String get whyWeBuiltItBody =>
-      'Two devices can exchange a file without a network, account, or pairing. OneSend turns the screen and camera already on your devices into a simple offline channel.';
+      'Dos dispositivos pueden intercambiar un archivo sin red, cuenta ni emparejamiento. OneSend convierte la pantalla y la cámara que ya tienen tus dispositivos en un canal sencillo sin conexión.';
 
   @override
-  String get privacy => 'Privacy';
+  String get privacy => 'Privacidad';
 
   @override
   String get privacyBody =>
-      'Transfers do not use a network or server. Mobile needs camera access only.';
+      'Las transferencias no usan red ni servidor. En el móvil solo se necesita acceso a la cámara.';
 
   @override
-  String get openSourceAndAuthor => 'Open source & author';
+  String get openSourceAndAuthor => 'Código abierto y autor';
 
   @override
-  String get author => 'Author';
+  String get author => 'Autor';
 
   @override
-  String get license => 'License';
+  String get license => 'Licencia';
 
   @override
-  String get version => 'Version';
+  String get version => 'Versión';
 
   @override
   String get github => 'GitHub';
 
   @override
-  String get openGithub => 'Open GitHub';
+  String get openGithub => 'Abrir GitHub';
 
   @override
-  String get opening => 'Opening…';
+  String get opening => 'Abriendo…';
 
   @override
-  String get versionUnavailable => 'Version unavailable';
+  String get versionUnavailable => 'Versión no disponible';
 
   @override
-  String get readingVersion => 'Reading version…';
+  String get readingVersion => 'Leyendo la versión…';
 
   @override
-  String get cannotOpenGithub => 'Could not open the GitHub page. Try again.';
+  String get cannotOpenGithub =>
+      'No se pudo abrir la página de GitHub. Inténtalo de nuevo.';
 
   @override
-  String get aboutFooter => 'OneSend · optical file transfer';
+  String get aboutFooter => 'OneSend · transferencia óptica de archivos';
 
   @override
   String versionLabel(Object version) {
-    return 'Version $version';
+    return 'Versión $version';
   }
 
   @override
-  String get chooseAFile => 'Choose a file';
+  String get chooseAFile => 'Elegir un archivo';
 
   @override
   String sendFileDescription(Object maxSize) {
-    return 'The file becomes a changing sequence of visual codes.\nUp to $maxSize; start with a small file for the first test.';
+    return 'El archivo se convierte en una secuencia cambiante de códigos visuales.\nHasta $maxSize; comienza con un archivo pequeño para la primera prueba.';
   }
 
   @override
   String newTransferStatus(Object mode, Object speed) {
-    return 'New sends use $mode mode · theoretical rate about $speed';
+    return 'Los nuevos envíos usan el modo $mode · velocidad teórica de aproximadamente $speed';
   }
 
   @override
-  String get reading => 'Reading…';
+  String get reading => 'Leyendo…';
 
   @override
-  String get chooseFile => 'Choose file';
+  String get chooseFile => 'Elegir archivo';
 
   @override
-  String get sampleVideo => 'Send the built-in test video';
+  String get sampleVideo => 'Enviar el vídeo de prueba incluido';
 
   @override
   String get encodedPayloadTooLarge =>
-      'The encoded file is larger than the optical transfer limit.';
+      'El archivo codificado supera el límite de la transferencia óptica.';
 
   @override
   String modeBadge(Object mode) {
-    return '$mode mode';
+    return 'Modo $mode';
   }
 
   @override
-  String get broadcasting => 'Broadcasting the changing visual code';
+  String get broadcasting => 'Emitiendo el código visual cambiante';
 
   @override
-  String get pausedPlayback => 'Playback paused';
+  String get pausedPlayback => 'Reproducción en pausa';
 
   @override
-  String get cameraAim => 'Aim the other device\'s camera at this white area';
+  String get cameraAim =>
+      'Apunta la cámara del otro dispositivo a esta zona blanca';
 
   @override
   String passAndFrames(Object frames, Object pass) {
-    return 'Pass $pass · $frames frames sent';
+    return 'Pasada $pass · $frames fotogramas enviados';
   }
 
   @override
   String runningTime(Object duration) {
-    return 'Running $duration';
+    return 'Tiempo transcurrido $duration';
   }
 
   @override
   String theoreticalRate(Object speed) {
-    return 'Theoretical rate $speed';
+    return 'Velocidad teórica $speed';
   }
 
   @override
   String currentRate(Object speed) {
-    return 'Current rate $speed';
+    return 'Velocidad actual $speed';
   }
 
   @override
-  String get resume => 'Resume';
+  String get resume => 'Reanudar';
 
   @override
-  String get pause => 'Pause';
+  String get pause => 'Pausar';
 
   @override
-  String get endTransfer => 'End transfer';
+  String get endTransfer => 'Finalizar transferencia';
 
   @override
-  String get sendAnother => 'Send another file';
+  String get sendAnother => 'Enviar otro archivo';
 
   @override
-  String get chooseOtherFile => 'Choose another file';
+  String get chooseOtherFile => 'Elegir otro archivo';
 
   @override
   String fileTooLarge(Object maxSize) {
-    return 'Files must be no larger than $maxSize.';
+    return 'Los archivos no pueden superar $maxSize.';
   }
 
   @override
-  String get cannotReadFile => 'OneSend could not read this file.';
+  String get cannotReadFile => 'OneSend no pudo leer este archivo.';
 
   @override
-  String get sampleVideoEmpty => 'The built-in test video is unavailable.';
+  String get sampleVideoEmpty =>
+      'El vídeo de prueba incluido no está disponible.';
 
   @override
   String sampleVideoTooLarge(Object maxSize) {
-    return 'The built-in test video is larger than $maxSize.';
+    return 'El vídeo de prueba incluido supera $maxSize.';
   }
 
   @override
-  String get genericTransferError => 'Transfer could not start. Try again.';
+  String get genericTransferError =>
+      'No se pudo iniciar la transferencia. Inténtalo de nuevo.';
 
   @override
-  String get scanReceive => 'Scan to receive';
+  String get scanReceive => 'Escanear para recibir';
 
   @override
-  String get torch => 'Torch';
+  String get torch => 'Linterna';
 
   @override
-  String get checkingAndSaving => 'Verifying and saving…';
+  String get checkingAndSaving => 'Verificando y guardando…';
 
   @override
   String get pausedKeepProgress =>
-      'Paused. Tap resume to keep the current progress.';
+      'En pausa. Toca Reanudar para conservar el progreso actual.';
 
   @override
-  String get lookingForSender => 'Looking for a sender…';
+  String get lookingForSender => 'Buscando un emisor…';
 
   @override
   String lockedModeCollecting(Object mode) {
-    return 'Locked to $mode mode · collecting visual codes';
+    return 'Modo $mode bloqueado · recopilando códigos visuales';
   }
 
   @override
   String get scanInstruction =>
-      'Keep the visual code fully inside the frame and hold the device steady.';
+      'Mantén el código visual completamente dentro del encuadre y sujeta el dispositivo sin moverlo.';
 
   @override
   String get desktopCameraInstruction =>
-      'Desktop camera decoding uses screenshots, so it is slower than mobile.';
+      'La decodificación con la cámara del escritorio usa capturas de pantalla, por lo que es más lenta que en el móvil.';
 
   @override
-  String get verifying => 'Verifying…';
+  String get verifying => 'Verificando…';
 
   @override
-  String get paused => 'Paused';
+  String get paused => 'En pausa';
 
   @override
-  String get waitingFirstFrame => 'Waiting for the first frame';
+  String get waitingFirstFrame => 'Esperando el primer fotograma';
 
   @override
   String fountainProgress(Object frames) {
-    return '$frames frames · Fountain recovery';
+    return '$frames fotogramas · recuperación Fountain';
   }
 
   @override
   String blockProgress(Object blocks, Object frames, Object solved) {
-    return '$frames frames · $solved/$blocks blocks';
+    return '$frames fotogramas · $solved/$blocks bloques';
   }
 
   @override
@@ -446,190 +471,371 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
-  String get resumeScan => 'Resume scan';
+  String get resumeScan => 'Reanudar escaneo';
 
   @override
-  String get pauseScan => 'Pause scan';
+  String get pauseScan => 'Pausar escaneo';
 
   @override
-  String get restart => 'Restart';
+  String get restart => 'Reiniciar';
 
   @override
-  String get receivedComplete => 'Received';
+  String get receivedComplete => 'Recibido';
 
   @override
   String get verifiedNotSaved =>
-      'The file was verified, but could not be saved yet.';
+      'El archivo se verificó, pero aún no se ha podido guardar.';
 
   @override
-  String get verifiedSaved => 'The file was verified and saved on this device.';
+  String get verifiedSaved =>
+      'El archivo se verificó y se guardó en este dispositivo.';
 
   @override
-  String get retrySave => 'Retry save';
+  String get retrySave => 'Reintentar guardar';
 
   @override
-  String get continueReceiving => 'Receive another';
+  String get continueReceiving => 'Recibir otro';
 
   @override
   String recordWriteError(Object error) {
-    return 'The file was saved, but its history record could not be written: $error';
+    return 'El archivo se guardó, pero no se pudo escribir su registro en el historial: $error';
   }
 
   @override
   String saveFailed(Object error) {
-    return 'Save failed: $error';
+    return 'Error al guardar: $error';
   }
 
   @override
-  String get fileActions => 'File actions';
+  String get fileActions => 'Acciones del archivo';
 
   @override
-  String get saveLocation => 'Saved location';
+  String get saveLocation => 'Ubicación guardada';
 
   @override
-  String get unrecordedLocation => 'No saved location was recorded.';
+  String get unrecordedLocation =>
+      'No se registró ninguna ubicación de guardado.';
 
   @override
   String get fileMissing =>
-      'The file is missing; it may have been moved or deleted.';
+      'Falta el archivo; puede haberse movido o eliminado.';
 
   @override
   String savedTo(Object path) {
-    return 'Saved to: $path';
+    return 'Guardado en: $path';
   }
 
   @override
   String iosSavedLocation(Object name) {
-    return 'Files > On My iPhone/iPad > OneSend > Received > $name';
+    return 'Archivos > En mi iPhone/iPad > OneSend > Received > $name';
   }
 
   @override
   String androidSavedLocation(Object name) {
-    return 'Saved in app storage: $name. Use Save a copy to choose a visible folder.';
+    return 'Guardado en el almacenamiento de la aplicación: $name. Usa Guardar una copia para elegir una carpeta visible.';
   }
 
   @override
   String copyExported(Object name) {
-    return 'Copy exported: $name (the system file picker chose the location)';
+    return 'Copia exportada: $name (el selector de archivos del sistema eligió la ubicación)';
   }
 
   @override
   String copyExportedDesktop(Object path) {
-    return 'Copy exported to: $path';
+    return 'Copia exportada a: $path';
   }
 
   @override
-  String get fileOperationError => 'File operation failed. Try again.';
+  String get fileOperationError =>
+      'Error en la operación del archivo. Inténtalo de nuevo.';
 
   @override
-  String get fileNotFound => 'The file does not exist.';
+  String get fileNotFound => 'El archivo no existe.';
 
   @override
   String get fileAccessDenied =>
-      'You do not have permission to access this file.';
+      'No tienes permiso para acceder a este archivo.';
 
   @override
-  String get operationCancelled => 'Operation cancelled.';
+  String get operationCancelled => 'Operación cancelada.';
 
   @override
   String get unsupportedOperation =>
-      'This operation is not supported on the current device.';
+      'Esta operación no es compatible con el dispositivo actual.';
 
   @override
-  String get openFileError => 'The system could not open this file.';
+  String get openFileError => 'El sistema no pudo abrir este archivo.';
 
   @override
-  String get shareFileError => 'Could not share this file. Try again.';
+  String get shareFileError =>
+      'No se pudo compartir este archivo. Inténtalo de nuevo.';
 
   @override
   String get revealFileError =>
-      'Could not reveal the file in its folder. Try again.';
+      'No se pudo mostrar el archivo en su carpeta. Inténtalo de nuevo.';
 
   @override
-  String get saveFileError => 'Could not export the file. Try again.';
+  String get saveFileError =>
+      'No se pudo exportar el archivo. Inténtalo de nuevo.';
 
   @override
-  String get locationPathUnknown => 'The saved location is unknown.';
+  String get locationPathUnknown => 'Se desconoce la ubicación guardada.';
 
   @override
   String get updateAppDescription =>
-      'Offline file transfer between a screen and a camera.';
+      'Transferencia de archivos sin conexión entre una pantalla y una cámara.';
 
   @override
-  String get currentVersion => 'Current version';
+  String get currentVersion => 'Versión actual';
 
   @override
-  String get automaticChecks => 'Check for updates automatically';
+  String get automaticChecks => 'Buscar actualizaciones automáticamente';
 
   @override
   String get automaticChecksSubtitle =>
-      'Check quietly once a day and notify you only when a new version is found.';
+      'Comprobar discretamente una vez al día y avisarte solo cuando se encuentre una versión nueva.';
 
   @override
-  String get downloadPage => 'Download page';
+  String get downloadPage => 'Página de descarga';
 
   @override
-  String get checking => 'Checking…';
+  String get checking => 'Comprobando…';
 
   @override
-  String get checkForUpdates => 'Check for updates';
+  String get checkForUpdates => 'Buscar actualizaciones';
 
   @override
   String updateAvailable(Object version) {
-    return 'OneSend $version is available';
+    return 'OneSend $version está disponible';
   }
 
   @override
-  String get releaseNotes => 'What\'s new';
+  String get releaseNotes => 'Novedades';
 
   @override
-  String get downloading => 'Downloading and verifying…';
+  String get downloading => 'Descargando y verificando…';
 
   @override
   String downloadingPercent(Object percent) {
-    return 'Downloading and verifying $percent%';
+    return 'Descargando y verificando $percent%';
   }
 
   @override
-  String get viewRelease => 'View release page';
+  String get viewRelease => 'Ver página de la versión';
 
   @override
-  String get later => 'Later';
+  String get later => 'Más tarde';
 
   @override
-  String get downloadUpdate => 'Download update';
+  String get downloadUpdate => 'Descargar actualización';
 
   @override
-  String get latestVersion => 'You already have the latest version.';
+  String get latestVersion => 'Ya tienes la versión más reciente.';
 
   @override
-  String get updateCheckWindowOpened => 'The update check window is open.';
+  String get updateCheckWindowOpened =>
+      'La ventana de comprobación de actualizaciones está abierta.';
 
   @override
   String get unsupportedUpdate =>
-      'In-app updates are not supported on this platform.';
+      'Las actualizaciones dentro de la aplicación no son compatibles con esta plataforma.';
 
   @override
   String get updateCheckFailed =>
-      'Could not check for updates. Try again later.';
+      'No se pudieron comprobar las actualizaciones. Inténtalo más tarde.';
 
   @override
   String get automaticUpdateError =>
-      'Could not change automatic update settings.';
+      'No se pudieron cambiar los ajustes de actualización automática.';
 
   @override
-  String get downloadPageError => 'Could not open the download page.';
+  String get downloadPageError => 'No se pudo abrir la página de descarga.';
 
   @override
-  String get releasePageError => 'Could not open the release page.';
+  String get releasePageError => 'No se pudo abrir la página de la versión.';
 
   @override
   String get downloadError =>
-      'The update package could not be downloaded. Try again later.';
+      'No se pudo descargar el paquete de actualización. Inténtalo más tarde.';
+
+  @override
+  String get cimbarSendTitle => 'Envío rápido CIMBAR';
+
+  @override
+  String get cimbarReceiveTitle => 'Recepción rápida CIMBAR';
+
+  @override
+  String get cimbarUnsupported =>
+      'La transferencia experimental CIMBAR solo está disponible en Android e iOS.';
+
+  @override
+  String get cimbarLoading => 'Cargando el motor experimental…';
+
+  @override
+  String get cimbarPageReadySend =>
+      'Motor experimental cargado. Elige un archivo.';
+
+  @override
+  String get cimbarPageReadyReceive =>
+      'Motor experimental cargado. Toca iniciar para solicitar acceso a la cámara.';
+
+  @override
+  String get cimbarEngineReady => 'Motor experimental listo · Modo B';
+
+  @override
+  String get cimbarPreparingFile => 'Preparando el archivo…';
+
+  @override
+  String get cimbarPaused => 'Reproducción pausada';
+
+  @override
+  String get cimbarPlaying => 'Reproduciendo';
+
+  @override
+  String get cimbarBroadcasting => 'Archivo listo; mostrando el código visual';
+
+  @override
+  String get cimbarDecoderReady => 'Decodificador listo. Buscando CIMBAR.';
+
+  @override
+  String get cimbarDecoderReadyStart =>
+      'Decodificador listo. Toca iniciar para solicitar acceso a la cámara.';
+
+  @override
+  String get cimbarCameraStarted => 'Cámara iniciada. Buscando CIMBAR.';
+
+  @override
+  String get cimbarDecoding => 'Decodificando con el worker upstream';
+
+  @override
+  String get cimbarFileHeaderReceived =>
+      'Cabecera verificada. Recibiendo bloques.';
+
+  @override
+  String get cimbarReceiving => 'Recibiendo bytes verificados';
+
+  @override
+  String get cimbarRecoveredSaving =>
+      'Archivo recuperado por completo. Guardando…';
+
+  @override
+  String get cimbarRecoveredNotSaved =>
+      'Archivo recuperado por completo, pero aún no se ha guardado.';
+
+  @override
+  String get cimbarReceiveComplete => 'Recepción completada';
+
+  @override
+  String get cimbarLoadFailed => 'Error al cargar. Inténtalo de nuevo.';
+
+  @override
+  String get cimbarTransferFailed =>
+      'Error en la transferencia CIMBAR. Inténtalo de nuevo.';
+
+  @override
+  String get cimbarReloading => 'Recargando el motor experimental…';
+
+  @override
+  String get cimbarRequestingCamera => 'Solicitando acceso a la cámara…';
+
+  @override
+  String cimbarFileInfo(Object name, Object size) {
+    return 'Archivo: $name · $size';
+  }
+
+  @override
+  String get cimbarSendRate => 'Referencia upstream: 106 KB/s · Modo B';
+
+  @override
+  String cimbarReceiveRate(Object speed) {
+    return 'Referencia upstream: 106 KB/s · Medido en esta recepción: $speed KB/s';
+  }
+
+  @override
+  String cimbarReceiveProgress(
+    Object expected,
+    Object received,
+    Object seconds,
+  ) {
+    return 'Recuperado $received / $expected · $seconds s';
+  }
+
+  @override
+  String cimbarReceiveProgressNoTotal(Object received, Object seconds) {
+    return 'Recuperado $received · $seconds s';
+  }
+
+  @override
+  String get cimbarStartReceive => 'Iniciar recepción (solicitar cámara)';
+
+  @override
+  String cimbarFileTooLarge(Object maxSize) {
+    return 'Los archivos CIMBAR móviles no pueden superar $maxSize.';
+  }
+
+  @override
+  String get cimbarPageLoadError =>
+      'No se pudo cargar la página CIMBAR sin conexión. Inténtalo de nuevo.';
+
+  @override
+  String get cimbarBridgeError =>
+      'La transferencia CIMBAR envió un evento no válido. Inténtalo de nuevo.';
+
+  @override
+  String get cimbarEngineError =>
+      'El motor CIMBAR no está disponible. Inténtalo de nuevo.';
+
+  @override
+  String get cimbarCameraError =>
+      'Falló el acceso a la cámara o la decodificación. Comprueba el permiso e inténtalo de nuevo.';
+
+  @override
+  String get cimbarSendError =>
+      'El emisor CIMBAR no pudo preparar el archivo. Inténtalo de nuevo.';
+
+  @override
+  String get cimbarReceiveError =>
+      'El receptor CIMBAR no pudo decodificar el archivo. Inténtalo de nuevo.';
+
+  @override
+  String get cimbarVerificationError =>
+      'No se pudo verificar el archivo recibido. Inténtalo de nuevo.';
+
+  @override
+  String get cimbarSaveError =>
+      'No se pudo guardar el archivo recuperado. Inténtalo de nuevo.';
+
+  @override
+  String get cimbarHistoryError =>
+      'El archivo se guardó, pero no se pudo escribir el historial de transferencias.';
+
+  @override
+  String get cimbarAllFiles => 'Todos los archivos';
+
+  @override
+  String get cimbarSelectedFileName => 'selected.bin';
+
+  @override
+  String get cimbarReceivedFileName => 'received.bin';
+
+  @override
+  String cimbarBytes(Object value) {
+    return '$value B';
+  }
+
+  @override
+  String cimbarKibibytes(Object value) {
+    return '$value KiB';
+  }
+
+  @override
+  String cimbarMebibytes(Object value) {
+    return '$value MiB';
+  }
 
   @override
   String durationHoursMinutes(Object hours, Object minutes) {
-    return '${hours}h ${minutes}m';
+    return '$hours h $minutes min';
   }
 
   @override

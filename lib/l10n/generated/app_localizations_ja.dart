@@ -12,132 +12,136 @@ class AppLocalizationsJa extends AppLocalizations {
   String get appTitle => 'OneSend';
 
   @override
-  String get followSystem => 'Follow system';
+  String get followSystem => 'システムに従う';
 
   @override
-  String get language => 'Language';
+  String get language => '言語';
 
   @override
-  String get modeFast => 'Fast';
+  String get modeFast => '高速';
 
   @override
-  String get modeReliable => 'Reliable';
+  String get modeReliable => '安定';
 
   @override
-  String get cancel => 'Cancel';
+  String get modeTurboQr => 'Turbo QR（実験的）';
 
   @override
-  String get done => 'Done';
+  String get modeCimbar => 'CIMBAR カラービジュアルコード（実験的）';
 
   @override
-  String get close => 'Close';
+  String get compatibilityMode => '互換性';
 
   @override
-  String get openFile => 'Open';
+  String get cancel => 'キャンセル';
 
   @override
-  String get shareFile => 'Share / forward';
+  String get done => '完了';
 
   @override
-  String get saveCopy => 'Save a copy';
+  String get close => '閉じる';
 
   @override
-  String get revealInFolder => 'Reveal in folder';
+  String get openFile => '開く';
 
   @override
-  String get more => 'More';
+  String get shareFile => '共有／転送';
 
   @override
-  String get settings => 'Settings';
+  String get saveCopy => 'コピーを保存';
 
   @override
-  String get about => 'About OneSend';
+  String get revealInFolder => 'フォルダで表示';
 
   @override
-  String get clearHistory => 'Clear history';
+  String get more => 'その他';
 
   @override
-  String get clearHistoryQuestion => 'Clear transfer history?';
+  String get settings => '設定';
+
+  @override
+  String get about => 'OneSend について';
+
+  @override
+  String get clearHistory => '履歴を消去';
+
+  @override
+  String get clearHistoryQuestion => '転送履歴を消去しますか？';
 
   @override
   String get clearHistoryDescription =>
-      'This only removes records from OneSend. Saved files will not be deleted.';
+      'これは OneSend から記録だけを削除します。保存済みファイルは削除されません。';
 
   @override
-  String get clearAction => 'Clear';
+  String get clearAction => '消去';
 
   @override
-  String get homeHeadline => 'Send files,\nwith light.';
+  String get homeHeadline => 'ファイルを、\n光で送る。';
 
   @override
-  String get homeSubtitle =>
-      'No network. No pairing.\nJust a screen and a camera.';
+  String get homeSubtitle => 'ネットワーク不要。ペアリング不要。\n画面とカメラだけ。';
 
   @override
-  String get sendEyebrow => 'SEND';
+  String get sendEyebrow => '送信';
 
   @override
-  String get receiveEyebrow => 'RECEIVE';
+  String get receiveEyebrow => '受信';
 
   @override
-  String get sendFile => 'Send a file';
+  String get sendFile => 'ファイルを送信';
 
   @override
-  String get receiveFile => 'Scan to receive';
+  String get receiveFile => 'スキャンして受信';
 
   @override
-  String get sendCardDescription =>
-      'Put the code on screen and aim another device at it.';
+  String get sendCardDescription => 'コードを画面に表示し、別の端末を向けてください。';
 
   @override
-  String get receiveCardDescription =>
-      'Open the camera and scan the changing visual code.';
+  String get receiveCardDescription => 'カメラを開き、変化するビジュアルコードをスキャンしてください。';
 
   @override
-  String get recentTransfers => 'Recent transfers';
+  String get recentTransfers => '最近の転送';
 
   @override
   String recordCount(num count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '# records',
-      one: '1 record',
-      zero: '0 records',
+      other: '# 件',
+      one: '1 件',
+      zero: '0 件',
     );
     return '$_temp0';
   }
 
   @override
-  String get historyFooter =>
-      'Screen ↔ camera · Files travel only as light between two devices';
+  String get historyFooter => '画面 ↔ カメラ · 2 台の端末間を光だけでファイルが移動';
 
   @override
-  String get emptyHistory =>
-      'No transfer history yet. Choose a file to start your first optical transfer.';
+  String get emptyHistory => '転送履歴はまだありません。ファイルを選んで、最初の光転送を始めましょう。';
 
   @override
-  String get receivedAndVerified => 'Received and verified';
+  String get receivedAndVerified => '受信して検証済み';
 
   @override
-  String get sendEnded => 'Sending ended';
+  String get sendEnded => '送信終了';
 
   @override
-  String get sent => 'Sent';
+  String get sent => '送信済み';
 
   @override
-  String get receivedFileActions => 'Received file actions';
+  String get receivedFileActions => '受信ファイルの操作';
 
   @override
-  String get justNow => 'Just now';
+  String get justNow => 'たった今';
 
   @override
   String minutesAgo(num count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '# minutes ago',
-      one: '1 minute ago',
+      other: '# 分前',
+      one: '1 分前',
     );
     return '$_temp0';
   }
@@ -147,8 +151,8 @@ class AppLocalizationsJa extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '# hours ago',
-      one: '1 hour ago',
+      other: '# 時間前',
+      one: '1 時間前',
     );
     return '$_temp0';
   }
@@ -158,8 +162,8 @@ class AppLocalizationsJa extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '# days ago',
-      one: '1 day ago',
+      other: '# 日前',
+      one: '1 日前',
     );
     return '$_temp0';
   }
@@ -170,42 +174,50 @@ class AppLocalizationsJa extends AppLocalizations {
   }
 
   @override
-  String get settingsIntroTitle => 'Tune the next transfer to your device.';
+  String get settingsIntroTitle => '次の転送を端末に合わせて調整';
 
   @override
-  String get settingsIntroBody => 'The default mode is used for new sends.';
+  String get settingsIntroBody => '新しい送信にはデフォルトのモードが使われます。';
 
   @override
-  String get transportSection => 'TRANSFER';
+  String get transportSection => '転送';
 
   @override
-  String get defaultTransferAlgorithm => 'Default transfer algorithm';
+  String get defaultTransferAlgorithm => 'デフォルトの転送アルゴリズム';
 
   @override
   String get algorithmDescription =>
-      'Fast is best for a steady setup; Reliable gives handheld scanning more headroom.';
+      'QR プロファイルまたは実験的な CIMBAR カラービジュアルコードを選択します。QR 受信モードは各フレームに記述されています。';
 
   @override
   String theoreticalSpeed(Object speed) {
-    return 'About $speed';
+    return '約 $speed';
   }
 
   @override
   String fastModeDescription(Object speed) {
-    return '$speed; best for a steady setup and bright screen.';
+    return '$speed；安定した環境と明るい画面に適した、高速で安定したモード。';
   }
 
   @override
   String reliableModeDescription(Object speed) {
-    return '$speed; more error-correction headroom, but slower.';
+    return '$speed；エラー訂正の余裕が大きく互換性に優れますが、低速です。';
   }
 
   @override
-  String get modeSaveError =>
-      'Could not save the default transfer mode. Try again.';
+  String turboModeDescription(Object speed) {
+    return '$speed；実験的な大容量 QR プロファイル。スキャンの余裕は小さくなります。';
+  }
 
   @override
-  String get appSection => 'APP';
+  String get cimbarModeDescription =>
+      '上流方向の基準値は約 106 KB/s。Android と iOS で使える実験的なカラービジュアルコードです。';
+
+  @override
+  String get modeSaveError => 'デフォルトの転送設定を保存できませんでした。もう一度お試しください。';
+
+  @override
+  String get appSection => 'アプリ';
 
   @override
   String languageSubtitle(Object language) {
@@ -213,231 +225,223 @@ class AppLocalizationsJa extends AppLocalizations {
   }
 
   @override
-  String get desktopUpdates => 'Automatic updates';
+  String get desktopUpdates => '自動更新';
 
   @override
-  String get desktopUpdatesSubtitle =>
-      'Check for updates and configure automatic checks on desktop.';
+  String get desktopUpdatesSubtitle => 'デスクトップで更新を確認し、自動確認を設定します。';
 
   @override
-  String get mobileOfflineNote =>
-      'Mobile stays offline: only transfer and language settings are available.';
+  String get mobileOfflineNote => 'モバイルはオフラインのままです。利用できるのは転送と言語設定だけです。';
 
   @override
-  String get languagePickerTitle => 'Choose language';
+  String get languagePickerTitle => '言語を選択';
 
   @override
-  String get languageSaveError =>
-      'Could not save the language setting. Try again.';
+  String get languageSaveError => '言語設定を保存できませんでした。もう一度お試しください。';
 
   @override
   String modeAccessibilityLabel(Object mode, Object speed) {
-    return '$mode, $speed';
+    return '$mode、$speed';
   }
 
   @override
-  String get experimentalVisualTransfer =>
-      'Experimental offline visual transfer';
+  String get experimentalVisualTransfer => '実験的なオフライン光転送';
 
   @override
-  String get workingPrinciple => 'How it works';
+  String get workingPrinciple => '仕組み';
 
   @override
   String get workingPrincipleBody =>
-      'A file is encoded into a changing sequence of visual codes. The sender displays them; the receiver reads and verifies each frame with its camera, then restores the file. The path is only light between the screen and camera.';
+      'ファイルは変化するビジュアルコードの連続に変換されます。送信側が表示し、受信側がカメラで各フレームを読み取って検証し、ファイルを復元します。経路は画面とカメラの間の光だけです。';
 
   @override
-  String get whyWeBuiltIt => 'Why we built it';
+  String get whyWeBuiltIt => '開発した理由';
 
   @override
   String get whyWeBuiltItBody =>
-      'Two devices can exchange a file without a network, account, or pairing. OneSend turns the screen and camera already on your devices into a simple offline channel.';
+      '2 台の端末は、ネットワーク、アカウント、ペアリングなしでファイルを交換できます。OneSend は端末にある画面とカメラを、シンプルなオフライン経路に変えます。';
 
   @override
-  String get privacy => 'Privacy';
+  String get privacy => 'プライバシー';
 
   @override
-  String get privacyBody =>
-      'Transfers do not use a network or server. Mobile needs camera access only.';
+  String get privacyBody => '転送にネットワークやサーバーは使いません。モバイルではカメラへのアクセスだけが必要です。';
 
   @override
-  String get openSourceAndAuthor => 'Open source & author';
+  String get openSourceAndAuthor => 'オープンソースと作者';
 
   @override
-  String get author => 'Author';
+  String get author => '作者';
 
   @override
-  String get license => 'License';
+  String get license => 'ライセンス';
 
   @override
-  String get version => 'Version';
+  String get version => 'バージョン';
 
   @override
   String get github => 'GitHub';
 
   @override
-  String get openGithub => 'Open GitHub';
+  String get openGithub => 'GitHub を開く';
 
   @override
-  String get opening => 'Opening…';
+  String get opening => '開いています…';
 
   @override
-  String get versionUnavailable => 'Version unavailable';
+  String get versionUnavailable => 'バージョンを取得できません';
 
   @override
-  String get readingVersion => 'Reading version…';
+  String get readingVersion => 'バージョンを読み取り中…';
 
   @override
-  String get cannotOpenGithub => 'Could not open the GitHub page. Try again.';
+  String get cannotOpenGithub => 'GitHub ページを開けませんでした。もう一度お試しください。';
 
   @override
-  String get aboutFooter => 'OneSend · optical file transfer';
+  String get aboutFooter => 'OneSend · 光ファイル転送';
 
   @override
   String versionLabel(Object version) {
-    return 'Version $version';
+    return 'バージョン $version';
   }
 
   @override
-  String get chooseAFile => 'Choose a file';
+  String get chooseAFile => 'ファイルを選択';
 
   @override
   String sendFileDescription(Object maxSize) {
-    return 'The file becomes a changing sequence of visual codes.\nUp to $maxSize; start with a small file for the first test.';
+    return 'ファイルは変化するビジュアルコードの連続になります。\n$maxSize まで。最初のテストは小さなファイルから始めてください。';
   }
 
   @override
   String newTransferStatus(Object mode, Object speed) {
-    return 'New sends use $mode mode · theoretical rate about $speed';
+    return '新しい送信は $mode モードを使用 · 理論上の速度は約 $speed';
   }
 
   @override
-  String get reading => 'Reading…';
+  String get reading => '読み取り中…';
 
   @override
-  String get chooseFile => 'Choose file';
+  String get chooseFile => 'ファイルを選択';
 
   @override
-  String get sampleVideo => 'Send the built-in test video';
+  String get sampleVideo => '内蔵のテスト動画を送信';
 
   @override
-  String get encodedPayloadTooLarge =>
-      'The encoded file is larger than the optical transfer limit.';
+  String get encodedPayloadTooLarge => 'エンコード後のファイルが光転送の上限を超えています。';
 
   @override
   String modeBadge(Object mode) {
-    return '$mode mode';
+    return '$mode モード';
   }
 
   @override
-  String get broadcasting => 'Broadcasting the changing visual code';
+  String get broadcasting => '変化するビジュアルコードを送信中';
 
   @override
-  String get pausedPlayback => 'Playback paused';
+  String get pausedPlayback => '再生を一時停止しました';
 
   @override
-  String get cameraAim => 'Aim the other device\'s camera at this white area';
+  String get cameraAim => '別の端末のカメラをこの白い領域に向けてください';
 
   @override
   String passAndFrames(Object frames, Object pass) {
-    return 'Pass $pass · $frames frames sent';
+    return 'パス $pass · $frames フレーム送信済み';
   }
 
   @override
   String runningTime(Object duration) {
-    return 'Running $duration';
+    return '稼働時間 $duration';
   }
 
   @override
   String theoreticalRate(Object speed) {
-    return 'Theoretical rate $speed';
+    return '理論速度 $speed';
   }
 
   @override
   String currentRate(Object speed) {
-    return 'Current rate $speed';
+    return '現在の速度 $speed';
   }
 
   @override
-  String get resume => 'Resume';
+  String get resume => '再開';
 
   @override
-  String get pause => 'Pause';
+  String get pause => '一時停止';
 
   @override
-  String get endTransfer => 'End transfer';
+  String get endTransfer => '転送を終了';
 
   @override
-  String get sendAnother => 'Send another file';
+  String get sendAnother => '別のファイルを送信';
 
   @override
-  String get chooseOtherFile => 'Choose another file';
+  String get chooseOtherFile => '別のファイルを選択';
 
   @override
   String fileTooLarge(Object maxSize) {
-    return 'Files must be no larger than $maxSize.';
+    return 'ファイルは $maxSize 以下にしてください。';
   }
 
   @override
-  String get cannotReadFile => 'OneSend could not read this file.';
+  String get cannotReadFile => 'OneSend はこのファイルを読み取れませんでした。';
 
   @override
-  String get sampleVideoEmpty => 'The built-in test video is unavailable.';
+  String get sampleVideoEmpty => '内蔵のテスト動画を利用できません。';
 
   @override
   String sampleVideoTooLarge(Object maxSize) {
-    return 'The built-in test video is larger than $maxSize.';
+    return '内蔵のテスト動画が $maxSize を超えています。';
   }
 
   @override
-  String get genericTransferError => 'Transfer could not start. Try again.';
+  String get genericTransferError => '転送を開始できませんでした。もう一度お試しください。';
 
   @override
-  String get scanReceive => 'Scan to receive';
+  String get scanReceive => 'スキャンして受信';
 
   @override
-  String get torch => 'Torch';
+  String get torch => 'ライト';
 
   @override
-  String get checkingAndSaving => 'Verifying and saving…';
+  String get checkingAndSaving => '検証して保存中…';
 
   @override
-  String get pausedKeepProgress =>
-      'Paused. Tap resume to keep the current progress.';
+  String get pausedKeepProgress => '一時停止中です。現在の進行状況を保持するには「再開」をタップしてください。';
 
   @override
-  String get lookingForSender => 'Looking for a sender…';
+  String get lookingForSender => '送信側を探しています…';
 
   @override
   String lockedModeCollecting(Object mode) {
-    return 'Locked to $mode mode · collecting visual codes';
+    return '$mode モードに固定 · ビジュアルコードを収集中';
   }
 
   @override
-  String get scanInstruction =>
-      'Keep the visual code fully inside the frame and hold the device steady.';
+  String get scanInstruction => 'ビジュアルコード全体をフレーム内に収め、端末を動かさないでください。';
 
   @override
   String get desktopCameraInstruction =>
-      'Desktop camera decoding uses screenshots, so it is slower than mobile.';
+      'デスクトップのカメラによるデコードはスクリーンショットを使うため、モバイルより遅くなります。';
 
   @override
-  String get verifying => 'Verifying…';
+  String get verifying => '検証中…';
 
   @override
-  String get paused => 'Paused';
+  String get paused => '一時停止中';
 
   @override
-  String get waitingFirstFrame => 'Waiting for the first frame';
+  String get waitingFirstFrame => '最初のフレームを待っています';
 
   @override
   String fountainProgress(Object frames) {
-    return '$frames frames · Fountain recovery';
+    return '$frames フレーム · Fountain 復元';
   }
 
   @override
   String blockProgress(Object blocks, Object frames, Object solved) {
-    return '$frames frames · $solved/$blocks blocks';
+    return '$frames フレーム · $solved/$blocks ブロック';
   }
 
   @override
@@ -446,190 +450,338 @@ class AppLocalizationsJa extends AppLocalizations {
   }
 
   @override
-  String get resumeScan => 'Resume scan';
+  String get resumeScan => 'スキャンを再開';
 
   @override
-  String get pauseScan => 'Pause scan';
+  String get pauseScan => 'スキャンを一時停止';
 
   @override
-  String get restart => 'Restart';
+  String get restart => '再起動';
 
   @override
-  String get receivedComplete => 'Received';
+  String get receivedComplete => '受信済み';
 
   @override
-  String get verifiedNotSaved =>
-      'The file was verified, but could not be saved yet.';
+  String get verifiedNotSaved => 'ファイルは検証されましたが、まだ保存できませんでした。';
 
   @override
-  String get verifiedSaved => 'The file was verified and saved on this device.';
+  String get verifiedSaved => 'ファイルを検証し、この端末に保存しました。';
 
   @override
-  String get retrySave => 'Retry save';
+  String get retrySave => '保存を再試行';
 
   @override
-  String get continueReceiving => 'Receive another';
+  String get continueReceiving => 'もう一つ受信';
 
   @override
   String recordWriteError(Object error) {
-    return 'The file was saved, but its history record could not be written: $error';
+    return 'ファイルは保存されましたが、履歴レコードを書き込めませんでした：$error';
   }
 
   @override
   String saveFailed(Object error) {
-    return 'Save failed: $error';
+    return '保存に失敗しました：$error';
   }
 
   @override
-  String get fileActions => 'File actions';
+  String get fileActions => 'ファイル操作';
 
   @override
-  String get saveLocation => 'Saved location';
+  String get saveLocation => '保存先';
 
   @override
-  String get unrecordedLocation => 'No saved location was recorded.';
+  String get unrecordedLocation => '保存先は記録されていません。';
 
   @override
-  String get fileMissing =>
-      'The file is missing; it may have been moved or deleted.';
+  String get fileMissing => 'ファイルがありません。移動または削除された可能性があります。';
 
   @override
   String savedTo(Object path) {
-    return 'Saved to: $path';
+    return '保存先：$path';
   }
 
   @override
   String iosSavedLocation(Object name) {
-    return 'Files > On My iPhone/iPad > OneSend > Received > $name';
+    return 'ファイル > この iPhone/iPad 内 > OneSend > 受信済み > $name';
   }
 
   @override
   String androidSavedLocation(Object name) {
-    return 'Saved in app storage: $name. Use Save a copy to choose a visible folder.';
+    return 'アプリのストレージに保存：$name。「コピーを保存」で表示できるフォルダを選択できます。';
   }
 
   @override
   String copyExported(Object name) {
-    return 'Copy exported: $name (the system file picker chose the location)';
+    return 'コピーを書き出しました：$name（システムのファイルピッカーで保存先を選択）';
   }
 
   @override
   String copyExportedDesktop(Object path) {
-    return 'Copy exported to: $path';
+    return 'コピーを書き出しました：$path';
   }
 
   @override
-  String get fileOperationError => 'File operation failed. Try again.';
+  String get fileOperationError => 'ファイル操作に失敗しました。もう一度お試しください。';
 
   @override
-  String get fileNotFound => 'The file does not exist.';
+  String get fileNotFound => 'ファイルが存在しません。';
 
   @override
-  String get fileAccessDenied =>
-      'You do not have permission to access this file.';
+  String get fileAccessDenied => 'このファイルにアクセスする権限がありません。';
 
   @override
-  String get operationCancelled => 'Operation cancelled.';
+  String get operationCancelled => '操作をキャンセルしました。';
 
   @override
-  String get unsupportedOperation =>
-      'This operation is not supported on the current device.';
+  String get unsupportedOperation => '現在の端末ではこの操作に対応していません。';
 
   @override
-  String get openFileError => 'The system could not open this file.';
+  String get openFileError => 'システムがこのファイルを開けませんでした。';
 
   @override
-  String get shareFileError => 'Could not share this file. Try again.';
+  String get shareFileError => 'このファイルを共有できませんでした。もう一度お試しください。';
 
   @override
-  String get revealFileError =>
-      'Could not reveal the file in its folder. Try again.';
+  String get revealFileError => 'フォルダ内でファイルを表示できませんでした。もう一度お試しください。';
 
   @override
-  String get saveFileError => 'Could not export the file. Try again.';
+  String get saveFileError => 'ファイルを書き出せませんでした。もう一度お試しください。';
 
   @override
-  String get locationPathUnknown => 'The saved location is unknown.';
+  String get locationPathUnknown => '保存先が不明です。';
 
   @override
-  String get updateAppDescription =>
-      'Offline file transfer between a screen and a camera.';
+  String get updateAppDescription => '画面とカメラの間で行うオフラインファイル転送';
 
   @override
-  String get currentVersion => 'Current version';
+  String get currentVersion => '現在のバージョン';
 
   @override
-  String get automaticChecks => 'Check for updates automatically';
+  String get automaticChecks => '更新を自動的に確認';
 
   @override
   String get automaticChecksSubtitle =>
-      'Check quietly once a day and notify you only when a new version is found.';
+      '1 日に 1 回静かに確認し、新しいバージョンが見つかったときだけ通知します。';
 
   @override
-  String get downloadPage => 'Download page';
+  String get downloadPage => 'ダウンロードページ';
 
   @override
-  String get checking => 'Checking…';
+  String get checking => '確認中…';
 
   @override
-  String get checkForUpdates => 'Check for updates';
+  String get checkForUpdates => '更新を確認';
 
   @override
   String updateAvailable(Object version) {
-    return 'OneSend $version is available';
+    return 'OneSend $version を利用できます';
   }
 
   @override
-  String get releaseNotes => 'What\'s new';
+  String get releaseNotes => '更新内容';
 
   @override
-  String get downloading => 'Downloading and verifying…';
+  String get downloading => 'ダウンロードして検証中…';
 
   @override
   String downloadingPercent(Object percent) {
-    return 'Downloading and verifying $percent%';
+    return '$percent% をダウンロードして検証中…';
   }
 
   @override
-  String get viewRelease => 'View release page';
+  String get viewRelease => 'リリースページを表示';
 
   @override
-  String get later => 'Later';
+  String get later => '後で';
 
   @override
-  String get downloadUpdate => 'Download update';
+  String get downloadUpdate => '更新をダウンロード';
 
   @override
-  String get latestVersion => 'You already have the latest version.';
+  String get latestVersion => '最新バージョンを使用中です。';
 
   @override
-  String get updateCheckWindowOpened => 'The update check window is open.';
+  String get updateCheckWindowOpened => '更新確認ウィンドウが開いています。';
 
   @override
-  String get unsupportedUpdate =>
-      'In-app updates are not supported on this platform.';
+  String get unsupportedUpdate => 'このプラットフォームではアプリ内更新に対応していません。';
 
   @override
-  String get updateCheckFailed =>
-      'Could not check for updates. Try again later.';
+  String get updateCheckFailed => '更新を確認できませんでした。後でもう一度お試しください。';
 
   @override
-  String get automaticUpdateError =>
-      'Could not change automatic update settings.';
+  String get automaticUpdateError => '自動更新設定を変更できませんでした。';
 
   @override
-  String get downloadPageError => 'Could not open the download page.';
+  String get downloadPageError => 'ダウンロードページを開けませんでした。';
 
   @override
-  String get releasePageError => 'Could not open the release page.';
+  String get releasePageError => 'リリースページを開けませんでした。';
 
   @override
-  String get downloadError =>
-      'The update package could not be downloaded. Try again later.';
+  String get downloadError => '更新パッケージをダウンロードできませんでした。後でもう一度お試しください。';
+
+  @override
+  String get cimbarSendTitle => 'CIMBAR 高速送信';
+
+  @override
+  String get cimbarReceiveTitle => 'CIMBAR 高速受信';
+
+  @override
+  String get cimbarUnsupported => '実験的な CIMBAR 転送は Android と iOS のみで利用できます。';
+
+  @override
+  String get cimbarLoading => '実験エンジンを読み込み中…';
+
+  @override
+  String get cimbarPageReadySend => '実験エンジンを読み込みました。ファイルを選択してください。';
+
+  @override
+  String get cimbarPageReadyReceive => '実験エンジンを読み込みました。開始をタップしてカメラへのアクセスを求めます。';
+
+  @override
+  String get cimbarEngineReady => '実験エンジンの準備完了 · モード B';
+
+  @override
+  String get cimbarPreparingFile => 'ファイルを準備中…';
+
+  @override
+  String get cimbarPaused => '再生を一時停止中';
+
+  @override
+  String get cimbarPlaying => '再生中';
+
+  @override
+  String get cimbarBroadcasting => 'ファイルの準備完了。ビジュアルコードを表示中';
+
+  @override
+  String get cimbarDecoderReady => 'デコーダーの準備完了。CIMBAR を探しています。';
+
+  @override
+  String get cimbarDecoderReadyStart => 'デコーダーの準備完了。開始をタップしてカメラへのアクセスを求めます。';
+
+  @override
+  String get cimbarCameraStarted => 'カメラを開始しました。CIMBAR を探しています。';
+
+  @override
+  String get cimbarDecoding => '上流 worker でデコード中';
+
+  @override
+  String get cimbarFileHeaderReceived => 'ファイルヘッダーを検証しました。チャンクを受信中です。';
+
+  @override
+  String get cimbarReceiving => '検証済みバイトを受信中';
+
+  @override
+  String get cimbarRecoveredSaving => 'ファイルを完全に復元しました。保存中…';
+
+  @override
+  String get cimbarRecoveredNotSaved => 'ファイルを完全に復元しましたが、まだ保存されていません。';
+
+  @override
+  String get cimbarReceiveComplete => '受信完了';
+
+  @override
+  String get cimbarLoadFailed => '読み込みに失敗しました。もう一度お試しください。';
+
+  @override
+  String get cimbarTransferFailed => 'CIMBAR 転送に失敗しました。もう一度お試しください。';
+
+  @override
+  String get cimbarReloading => '実験エンジンを再読み込み中…';
+
+  @override
+  String get cimbarRequestingCamera => 'カメラへのアクセスを求めています…';
+
+  @override
+  String cimbarFileInfo(Object name, Object size) {
+    return 'ファイル：$name · $size';
+  }
+
+  @override
+  String get cimbarSendRate => '上流参考値：106 KB/s · モード B';
+
+  @override
+  String cimbarReceiveRate(Object speed) {
+    return '上流参考値：106 KB/s · 今回の受信実測値：$speed KB/s';
+  }
+
+  @override
+  String cimbarReceiveProgress(
+    Object expected,
+    Object received,
+    Object seconds,
+  ) {
+    return '復元済み $received / $expected · $seconds 秒';
+  }
+
+  @override
+  String cimbarReceiveProgressNoTotal(Object received, Object seconds) {
+    return '復元済み $received · $seconds 秒';
+  }
+
+  @override
+  String get cimbarStartReceive => '受信を開始（カメラを要求）';
+
+  @override
+  String cimbarFileTooLarge(Object maxSize) {
+    return 'モバイル CIMBAR ファイルは $maxSize 以下にしてください。';
+  }
+
+  @override
+  String get cimbarPageLoadError => 'オフライン CIMBAR ページを読み込めませんでした。もう一度お試しください。';
+
+  @override
+  String get cimbarBridgeError => 'CIMBAR 転送が無効なイベントを送信しました。もう一度お試しください。';
+
+  @override
+  String get cimbarEngineError => 'CIMBAR エンジンを利用できません。もう一度お試しください。';
+
+  @override
+  String get cimbarCameraError => 'カメラへのアクセスまたはデコードに失敗しました。権限を確認してもう一度お試しください。';
+
+  @override
+  String get cimbarSendError => 'CIMBAR 送信側でファイルを準備できませんでした。もう一度お試しください。';
+
+  @override
+  String get cimbarReceiveError => 'CIMBAR 受信側でファイルをデコードできませんでした。もう一度お試しください。';
+
+  @override
+  String get cimbarVerificationError => '受信ファイルを検証できませんでした。もう一度お試しください。';
+
+  @override
+  String get cimbarSaveError => '復元したファイルを保存できませんでした。もう一度お試しください。';
+
+  @override
+  String get cimbarHistoryError => 'ファイルは保存されましたが、転送履歴を記録できませんでした。';
+
+  @override
+  String get cimbarAllFiles => 'すべてのファイル';
+
+  @override
+  String get cimbarSelectedFileName => 'selected.bin';
+
+  @override
+  String get cimbarReceivedFileName => 'received.bin';
+
+  @override
+  String cimbarBytes(Object value) {
+    return '$value B';
+  }
+
+  @override
+  String cimbarKibibytes(Object value) {
+    return '$value KiB';
+  }
+
+  @override
+  String cimbarMebibytes(Object value) {
+    return '$value MiB';
+  }
 
   @override
   String durationHoursMinutes(Object hours, Object minutes) {
-    return '${hours}h ${minutes}m';
+    return '$hours時間 $minutes分';
   }
 
   @override

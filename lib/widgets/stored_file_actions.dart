@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../app.dart';
+import '../l10n/generated/app_localizations.dart';
 import '../services/file_service.dart';
 
 /// A small, reusable action panel for a file that has already been stored.
@@ -28,7 +29,7 @@ class StoredFileActions extends StatefulWidget {
   /// Checks whether the stored path still points to a file.
   final Future<bool> Function(String) pathExists;
 
-  /// Called when “另存副本” returns the exported copy.
+  /// Called when Save a copy returns the exported copy.
   final ValueChanged<StoredTransfer>? onSaved;
 
   @override
@@ -40,6 +41,7 @@ class _StoredFileActionsState extends State<StoredFileActions> {
   bool _busy = false;
   bool? _exists;
   String? _message;
+  bool _messageIsError = false;
 
   bool get _desktop => widget.isDesktop ?? _isDesktopPlatform();
 
@@ -74,53 +76,82 @@ class _StoredFileActionsState extends State<StoredFileActions> {
   }
 
   Future<void> _open() async {
+    final l10n = AppLocalizations.of(context)!;
     await _run(() async {
       await openStoredFile(_file);
       return null;
-    });
+    }, errorMessage: l10n.openFileError);
   }
 
   Future<void> _share() async {
+    final l10n = AppLocalizations.of(context)!;
     await _run(() async {
       await shareStoredFile(_file);
       return null;
-    });
+    }, errorMessage: l10n.shareFileError);
   }
 
   Future<void> _saveCopy() async {
-    await _run(() => saveStoredFileAs(_file));
+    final l10n = AppLocalizations.of(context)!;
+    await _run(
+      () => saveStoredFileAs(_file),
+      successMessageBuilder: (exported) => _desktop
+          ? l10n.copyExportedDesktop(exported.path)
+          : l10n.copyExported(exported.name),
+      errorMessage: l10n.saveFileError,
+    );
   }
 
   Future<void> _reveal() async {
+    final l10n = AppLocalizations.of(context)!;
     await _run(() async {
       await revealStoredFile(_file);
       return null;
-    });
+    }, errorMessage: l10n.revealFileError);
   }
 
   Future<void> _run(
     Future<StoredTransfer?> Function() operation, {
     String? successMessage,
+    String Function(StoredTransfer exported)? successMessageBuilder,
+    String? errorMessage,
   }) async {
     if (_busy) return;
     setState(() {
       _busy = true;
       _message = null;
+      _messageIsError = false;
     });
     try {
       final exported = await operation();
       if (!mounted) return;
       if (exported != null) {
-        setState(
-          () => _message = successMessage ?? exported.locationDescription,
-        );
+        final l10n = AppLocalizations.of(context)!;
+        setState(() {
+          _message =
+              successMessageBuilder?.call(exported) ??
+              successMessage ??
+              _localizedLocation(l10n, exported);
+          _messageIsError = false;
+        });
         widget.onSaved?.call(exported);
       } else if (successMessage != null) {
-        setState(() => _message = successMessage);
+        setState(() {
+          _message = successMessage;
+          _messageIsError = false;
+        });
       }
     } catch (error) {
       if (mounted) {
-        setState(() => _message = friendlyFileOperationError(error));
+        final l10n = AppLocalizations.of(context)!;
+        setState(() {
+          _message = localizedTransferError(
+            context,
+            error,
+            fallback: errorMessage ?? l10n.fileOperationError,
+          );
+          _messageIsError = true;
+        });
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -129,11 +160,11 @@ class _StoredFileActionsState extends State<StoredFileActions> {
 
   @override
   Widget build(BuildContext context) {
-    final path = _file.path.trim();
-    final location = path.isEmpty ? '未记录保存路径。' : _file.locationDescription;
+    final l10n = AppLocalizations.of(context)!;
+    final location = _localizedLocation(l10n, _file);
     return Semantics(
       container: true,
-      label: '文件操作',
+      label: l10n.fileActions,
       child: Container(
         key: const ValueKey<String>('stored-file-actions'),
         width: double.infinity,
@@ -146,8 +177,8 @@ class _StoredFileActionsState extends State<StoredFileActions> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              '保存位置',
+            Text(
+              l10n.saveLocation,
               style: TextStyle(color: oneSendInk, fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 6),
@@ -157,8 +188,8 @@ class _StoredFileActionsState extends State<StoredFileActions> {
             ),
             if (_exists == false) ...[
               const SizedBox(height: 6),
-              const Text(
-                '文件不存在，可能已被移动或删除。',
+              Text(
+                l10n.fileMissing,
                 style: TextStyle(color: Color(0xffa32820), height: 1.4),
               ),
             ],
@@ -171,26 +202,26 @@ class _StoredFileActionsState extends State<StoredFileActions> {
                   key: const ValueKey<String>('stored-file-open'),
                   onPressed: _busy || _exists != true ? null : _open,
                   icon: const Icon(Icons.open_in_new_rounded, size: 18),
-                  label: const Text('打开'),
+                  label: Text(l10n.openFile),
                 ),
                 OutlinedButton.icon(
                   key: const ValueKey<String>('stored-file-share'),
                   onPressed: _busy || _exists != true ? null : _share,
                   icon: const Icon(Icons.ios_share_rounded, size: 18),
-                  label: const Text('分享/转发'),
+                  label: Text(l10n.shareFile),
                 ),
                 FilledButton.icon(
                   key: const ValueKey<String>('stored-file-save-as'),
                   onPressed: _busy || _exists != true ? null : _saveCopy,
                   icon: const Icon(Icons.save_alt_rounded, size: 18),
-                  label: const Text('另存副本'),
+                  label: Text(l10n.saveCopy),
                 ),
                 if (_desktop)
                   OutlinedButton.icon(
                     key: const ValueKey<String>('stored-file-reveal'),
                     onPressed: _busy || _exists != true ? null : _reveal,
                     icon: const Icon(Icons.folder_open_rounded, size: 18),
-                    label: const Text('在文件夹中显示'),
+                    label: Text(l10n.revealInFolder),
                   ),
               ],
             ),
@@ -203,10 +234,7 @@ class _StoredFileActionsState extends State<StoredFileActions> {
               Text(
                 _message!,
                 style: TextStyle(
-                  color:
-                      _message!.contains('失败') ||
-                          _message!.contains('不存在') ||
-                          _message!.contains('无法')
+                  color: _messageIsError
                       ? Theme.of(context).colorScheme.error
                       : oneSendMuted,
                 ),
@@ -216,6 +244,27 @@ class _StoredFileActionsState extends State<StoredFileActions> {
         ),
       ),
     );
+  }
+
+  String _localizedLocation(AppLocalizations l10n, StoredTransfer file) {
+    final path = file.path.trim();
+    if (path.isEmpty) return l10n.unrecordedLocation;
+
+    if (_desktop) return l10n.savedTo(path);
+    if (!kIsWeb) {
+      switch (defaultTargetPlatform) {
+        case TargetPlatform.iOS:
+          return l10n.iosSavedLocation(file.name);
+        case TargetPlatform.android:
+          return l10n.androidSavedLocation(file.name);
+        case TargetPlatform.fuchsia:
+        case TargetPlatform.linux:
+        case TargetPlatform.macOS:
+        case TargetPlatform.windows:
+          break;
+      }
+    }
+    return l10n.savedTo(path);
   }
 }
 

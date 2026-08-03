@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="data:," />
+    <title>libcimbar WASM RGBA pixel loopback</title>
+    <style>
+      body { font: 14px/1.5 monospace; margin: 24px; }
+      canvas { width: 512px; max-width: 100%; border: 1px solid #ccc; }
+      pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+    </style>
+  </head>
+  <body>
+    <h1>libcimbar WASM RGBA pixel loopback</h1>
+    <p>This is a camera-free in-browser pixel loopback. It is not an optical-speed benchmark.</p>
+    <canvas id="sender" width="1024" height="1024"></canvas>
+    <canvas id="capture" width="1024" height="1024" hidden></canvas>
+    <pre id="result" data-status="starting">STARTING</pre>
+
+    <script type="module">
+      const result = document.querySelector("#result");
+      const senderCanvas = document.querySelector("#sender");
+      const captureCanvas = document.querySelector("#capture");
+      const captureContext = captureCanvas.getContext("2d", { willReadFrequently: true });
+      const sourceBytes = crypto.getRandomValues(new Uint8Array(2048));
+      const sourceName = "cimbar-loopback-random.bin";
+      const maxRuntimeMs = 90_000;
+
+      let candidates = 0;
+      let dropped = 0;
+      let rgbaFrames = 0;
+      let decodedFrames = 0;
+      let inFlight = false;
+      let finished = false;
+      let senderReadyResolve;
+      let receiverReadyResolve;
+
+      const senderReady = new Promise((resolve) => { senderReadyResolve = resolve; });
+      const receiverReady = new Promise((resolve) => { receiverReadyResolve = resolve; });
+      const sender = new Worker("/cimbar/node_modules/cimbar-send-bootstrap.js", {
+        name: "cimbar-loopback-sender",
+        type: "classic",
+      });
+      const receiver = new Worker("/cimbar/node_modules/cimbar-receive-worker.js", {
+        name: "cimbar-loopback-receiver",
+        type: "classic",
+      });
+
+      window.__cimbarLoopback = {
+        status: "starting",
+        cameraFree: true,
+        sourceBytes: sourceBytes.length,
+      };
+
+      function render(status, detail) {
+        window.__cimbarLoopback = {
+          ...window.__cimbarLoopback,
+          status,
+          candidates,
+          dropped,
+          rgbaFrames,
+          decodedFrames,
+          ...detail,
+        };
+        result.dataset.status = status;
+        result.textContent = `${status.toUpperCase()}\n${JSON.stringify(window.__cimbarLoopback, null, 2)}`;
+      }
+
+      function stopWorkers() {
+        sender.postMessage({ type: "stop" });
+        sender.terminate();
+        receiver.terminate();
+      }
+
+      function fail(error) {
+        if (finished) return;
+        finished = true;
+        stopWorkers();
+        render("fail", { error: error instanceof Error ? error.message : String(error) });
+      }
+
+      async function digest(bytes) {
+        const hash = await crypto.subtle.digest("SHA-256", bytes);
+        return Array.from(new Uint8Array(hash), (value) => value.toString(16).padStart(2, "0")).join("");
+      }
+
+      async function finish(receivedBuffer) {
+        const receivedBytes = new Uint8Array(receivedBuffer);
+        if (receivedBytes.length !== sourceBytes.length) {
+          throw new Error(`length mismatch: ${receivedBytes.length} !== ${sourceBytes.length}`);
+        }
+        for (let index = 0; index < sourceBytes.length; index += 1) {
+          if (receivedBytes[index] !== sourceBytes[index]) {
+            throw new Error(`byte mismatch at ${index}: ${receivedBytes[index]} !== ${sourceBytes[index]}`);
+          }
+        }
+        const [sourceSha256, receivedSha256] = await Promise.all([
+          digest(sourceBytes),
+          digest(receivedBytes),
+        ]);
+        if (sourceSha256 !== receivedSha256) throw new Error("SHA-256 mismatch");
+
+        finished = true;
+        stopWorkers();
+        render("pass", {
+          filename: sourceName,
+          bytesCompared: sourceBytes.length,
+          sourceSha256,
+          receivedSha256,
+          comparison: "byte-for-byte and SHA-256",
+          transport: "RGBA pixels, no camera",
+        });
+      }
+
+      async function captureRgba() {
+        if (finished || inFlight) return;
+        candidates += 1;
+
+        // Drop the first candidate, then every fifth, so every run exercises
+        // deterministic loss before fountain recovery succeeds.
+        if (candidates === 1 || candidates % 5 === 0) {
+          dropped += 1;
+          render("running", {});
+          return;
+        }
+
+        inFlight = true;
+        const width = senderCanvas.width;
+        const height = senderCanvas.height;
+        captureCanvas.width = width;
+        captureCanvas.height = height;
+        captureContext.drawImage(senderCanvas, 0, 0, width, height);
+        const image = captureContext.getImageData(0, 0, width, height);
+        rgbaFrames += 1;
+        receiver.postMessage(
+          { type: "frame", pixels: image.data.buffer, width, height, format: "RGBA" },
+          [image.data.buffer],
+        );
+        render("running", {});
+      }
+
+      sender.onmessage = (event) => {
+        const data = event.data || {};
+        if (data.fun === "startWasm" && data.args?.[0] === true) {
+          senderReadyResolve();
+          return;
+        }
+        if (data.type === "error") {
+          fail(new Error(data.message || "sender worker error"));
+          return;
+        }
+        // The sender clock runs above the configured render cadence. Sampling
+        // every fourth callback captures one stable rendered bitmap at a time.
+        if (data.type === "frame" && data.count % 4 === 0) void captureRgba().catch(fail);
+      };
+
+      receiver.onmessage = (event) => {
+        const data = event.data || {};
+        if (data.type === "ready") {
+          receiverReadyResolve();
+          return;
+        }
+        if (data.frameDone) inFlight = false;
+        if (data.type === "frame" && data.result === "decoded") decodedFrames += 1;
+        if (data.type === "complete") {
+          inFlight = false;
+          void finish(data.bytes).catch(fail);
+          return;
+        }
+        if (data.type === "error") fail(new Error(data.message || "receiver worker error"));
+      };
+
+      sender.onerror = (event) => fail(new Error(event.message || "sender load error"));
+      receiver.onerror = (event) => fail(new Error(event.message || "receiver load error"));
+
+      try {
+        if (!senderCanvas.transferControlToOffscreen) throw new Error("OffscreenCanvas unavailable");
+        if (!captureContext) throw new Error("2D RGBA capture unavailable");
+        const offscreen = senderCanvas.transferControlToOffscreen();
+        sender.postMessage({ fun: "init_window", args: [offscreen] }, [offscreen]);
+        await Promise.all([senderReady, receiverReady]);
+        sender.postMessage({ fun: "setMode", args: [68] });
+        sender.postMessage({ fun: "setFPS", args: [15] });
+        sender.postMessage({
+          type: "load",
+          file: new File([sourceBytes], sourceName, { type: "application/octet-stream" }),
+        });
+        render("running", {});
+        setTimeout(() => fail(new Error(`timeout after ${maxRuntimeMs}ms`)), maxRuntimeMs);
+      } catch (error) {
+        fail(error);
+      }
+    </script>
+  </body>
+</html>

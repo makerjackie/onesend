@@ -4,13 +4,13 @@ Last updated / 最后更新: 2026-08-03
 
 ## 中文
 
-OneSend（扫传）通过屏幕上持续变化的二维码和另一台设备的摄像头进行纯视觉、
+OneSend（扫传）通过屏幕上持续变化的视觉码和另一台设备的摄像头进行纯视觉、
 离线优先的文件传输。文件传输本身不经过互联网、局域网或服务器。
 
 ### 在你的设备上处理的数据
 
-- 你选择发送的文件会在本机读取，并在本机编码为二维码帧。
-- 接收端的摄像头画面只在本机用于扫描和校验二维码，不会上传相机画面。
+- 你选择发送的文件会在本机读取，并在本机编码为 QR 或实验性 CIMBAR 视觉帧。
+- 接收端的摄像头画面只在本机用于扫描和校验视觉帧，不会上传相机画面。
 - 接收完成并通过 CRC/完整性校验后，文件会自动保存到本机的 OneSend 接收目录，
   应用会显示保存位置，并提供打开、分享、另存和桌面端文件管理器定位操作。
 - 最近传输历史（文件名、大小、方向、状态、时间和本地路径）保存在设备本地，
@@ -36,7 +36,7 @@ OneSend 不包含账号系统、分析服务、广告 SDK、云端存储、远�
 
 ### 安全边界
 
-OneSend 不是加密工具。能看到完整二维码流的人或摄像头可能重建文件；传输敏感资料时，
+OneSend 不是加密工具。能看到完整视觉码流的人或摄像头可能重建文件；传输敏感资料时，
 请控制屏幕与摄像头的物理可见范围，或先使用你信任的加密工具。内置的 H.264/AAC 测试片
 只是可随 MIT 项目再分发的原创普通文件，不是音频传输功能，也不是 Rickroll 或商业 MV。
 
@@ -47,13 +47,13 @@ OneSend 不是加密工具。能看到完整二维码流的人或摄像头可能
 ## English
 
 OneSend (扫传) performs purely visual, offline-first file transfer through continuously
-changing QR codes on a screen and a camera on another device. The file-transfer path itself
+changing visual codes on a screen and a camera on another device. The file-transfer path itself
 does not use the Internet, a local network, or a server.
 
 ### Data processed on your devices
 
-- A file you choose to send is read locally and encoded into QR frames locally.
-- The receiving camera view is processed locally to scan and verify QR frames; camera frames
+- A file you choose to send is read locally and encoded into QR or experimental CIMBAR visual frames.
+- The receiving camera view is processed locally to scan and verify visual frames; camera frames
   are not uploaded.
 - After reception and CRC/integrity verification, the file is saved automatically in the
   local OneSend received directory. OneSend shows the saved location and provides open,
@@ -87,7 +87,7 @@ stream, or camera frames through OneSend.
 
 ### Security boundary
 
-OneSend is not an encryption tool. Anyone who can see the complete QR stream may be able to
+OneSend is not an encryption tool. Anyone who can see the complete visual-code stream may be able to
 reconstruct the file. Limit the physical visibility of the screen and camera, or encrypt
 sensitive material with a tool you trust first. The included H.264/AAC test clip is an
 original ordinary file that may be redistributed with the MIT project; it is not an audio-

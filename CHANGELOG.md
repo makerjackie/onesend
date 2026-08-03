@@ -1,5 +1,29 @@
 # Changelog
 
+## 1.5.0 - 2026-08-04
+
+### 中文
+
+- 保持稳定 QR Fast 为默认算法；新增 Turbo QR 实验档，协议估算有效吞吐约 56 KB/s，并保留可靠兼容档。
+- 新增基于 libcimbar v0.6.7c Mode B 的 CIMBAR 彩色视觉码实验：Android/iOS App 与 `onesend.01mvp.com/cimbar` 可使用；上游参考基准约 106 KB/s，不作为 OneSend 真机实测保证。
+- 为 CIMBAR 文件增加版本化 CRC32 完整性信封；校验失败的文件不会保存或下载。
+- 补齐 CIMBAR 完成后的保存位置、打开、分享/转发和另存副本操作，并在完成、错误、重试或退出时关闭摄像头与 worker。
+- 增加真实 libcimbar WASM 编码→RGBA 帧→解码的无相机回环测试，包含确定性丢帧和逐字节/SHA-256 比对；该测试不代表真实光学速度。
+- 网站主页面、全局样式、图标和 Logo 保持不变，只新增实验页和次级入口。
+- 移动端继续只申请 CAMERA；不声明互联网、局域网、麦克风、相册、蓝牙或定位权限。桌面自动更新的网络边界保持不变。
+- 完整翻译并自动检测简体中文、繁體中文、English、日本語、한국어、Español、Français、Deutsch 和 Português。
+
+### English
+
+- Kept stable QR Fast as the default; added experimental Turbo QR at about 56 KB/s protocol-estimated useful throughput and retained the Reliable compatibility profile.
+- Added an experimental libcimbar v0.6.7c Mode B color visual-code path for Android/iOS and `onesend.01mvp.com/cimbar`. The upstream reference is about 106 KB/s and is not presented as a measured OneSend guarantee.
+- Added a versioned CRC32 integrity envelope for CIMBAR files; failed verification prevents saving or downloading.
+- Added saved-location, open, share/forward, and save-a-copy actions after CIMBAR reception, and closes camera/workers on completion, error, retry, or exit.
+- Added a real libcimbar WASM encode→RGBA-frame→decode loopback with deterministic frame loss and byte/SHA-256 comparison. This is camera-free and is not a physical optical speed result.
+- Preserved the website home page, global styling, icon, and logo; only an experimental route and secondary entry were added.
+- Mobile continues to request CAMERA only, with no Internet, local-network, microphone, photo-library, Bluetooth, or location permission. Desktop updater network boundaries are unchanged.
+- Completed automatic-detection translations for Simplified Chinese, Traditional Chinese, English, Japanese, Korean, Spanish, French, German, and Portuguese.
+
 ## 1.4.0 - 2026-08-03 / 已发布
 
 ### 中文

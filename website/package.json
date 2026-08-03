@@ -1,9 +1,9 @@
 {
   "name": "onesend-site",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "private": true,
   "engines": {
-    "node": ">=22.13.0"
+    "node": ">=24.0.0"
   },
   "scripts": {
     "dev": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext dev",
