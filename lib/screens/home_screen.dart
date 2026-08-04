@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../app.dart';
@@ -13,7 +12,6 @@ import '../widgets/file_tile.dart';
 import '../widgets/stored_file_actions.dart';
 import '../widgets/update_ui.dart';
 import 'about_screen.dart';
-import 'cimbar_transfer_screen.dart';
 import 'receive_screen.dart';
 import 'send_screen.dart';
 import 'settings_screen.dart';
@@ -65,20 +63,12 @@ class _HomeScreenState extends State<HomeScreen> {
     await showOneSendUpdateDialog(context, widget.updates);
   }
 
-  Future<void> _handleMenuAction(_HomeMenuAction action) async {
-    switch (action) {
-      case _HomeMenuAction.settings:
-        await _open(
-          SettingsScreen(settings: _settings, updates: widget.updates),
-        );
-        break;
-      case _HomeMenuAction.about:
-        await _open(const AboutScreen());
-        break;
-      case _HomeMenuAction.clearHistory:
-        await _clearHistory();
-        break;
-    }
+  Future<void> _openSettings() async {
+    await _open(SettingsScreen(settings: _settings, updates: widget.updates));
+  }
+
+  Future<void> _openAbout() async {
+    await _open(const AboutScreen());
   }
 
   @override
@@ -120,33 +110,15 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  bool get _supportsCimbar =>
-      !kIsWeb &&
-      (defaultTargetPlatform == TargetPlatform.android ||
-          defaultTargetPlatform == TargetPlatform.iOS);
-
-  bool get _useCimbar =>
-      _supportsCimbar &&
-      _settings.transferAlgorithm == TransferAlgorithm.cimbar;
-
+  /// Always open the shared send/receive routes. Transfer mode (QR profiles
+  /// and experimental CIMBAR color codes) is switched inside those screens so
+  /// users never jump into a separate experiment window.
   Widget _sendRoute() {
-    if (_useCimbar) {
-      return CimbarTransferScreen(
-        direction: CimbarDirection.send,
-        store: widget.store,
-      );
-    }
     return SendScreen(store: widget.store, settings: _settings);
   }
 
   Widget _receiveRoute() {
-    if (_useCimbar) {
-      return CimbarTransferScreen(
-        direction: CimbarDirection.receive,
-        store: widget.store,
-      );
-    }
-    return ReceiveScreen(store: widget.store);
+    return ReceiveScreen(store: widget.store, settings: _settings);
   }
 
   @override
@@ -167,37 +139,24 @@ class _HomeScreenState extends State<HomeScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const BrandMark(),
-                          PopupMenuButton<_HomeMenuAction>(
-                            tooltip: l10n.more,
-                            icon: const Icon(Icons.more_horiz_rounded),
-                            onSelected: _handleMenuAction,
-                            itemBuilder: (context) => [
-                              PopupMenuItem(
-                                value: _HomeMenuAction.settings,
-                                child: _MenuRow(
-                                  icon: Icons.tune_rounded,
-                                  label: l10n.settings,
-                                ),
-                              ),
-                              PopupMenuItem(
-                                value: _HomeMenuAction.about,
-                                child: _MenuRow(
-                                  icon: Icons.info_outline_rounded,
-                                  label: l10n.about,
-                                ),
-                              ),
-                              if (records.isNotEmpty)
-                                PopupMenuItem(
-                                  value: _HomeMenuAction.clearHistory,
-                                  child: _MenuRow(
-                                    icon: Icons.delete_outline_rounded,
-                                    label: l10n.clearHistory,
-                                  ),
-                                ),
-                            ],
+                          const Expanded(
+                            child: Align(
+                              alignment: Alignment.centerLeft,
+                              child: BrandMark(),
+                            ),
+                          ),
+                          IconButton(
+                            key: const ValueKey<String>('home-settings'),
+                            tooltip: l10n.settings,
+                            onPressed: _openSettings,
+                            icon: const Icon(Icons.settings_outlined),
+                          ),
+                          IconButton(
+                            key: const ValueKey<String>('home-about'),
+                            tooltip: l10n.about,
+                            onPressed: _openAbout,
+                            icon: const Icon(Icons.info_outline_rounded),
                           ),
                         ],
                       ),
@@ -254,17 +213,25 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       const SizedBox(height: 42),
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            l10n.recentTransfers,
-                            style: Theme.of(context).textTheme.titleLarge,
+                          Expanded(
+                            child: Text(
+                              l10n.recentTransfers,
+                              style: Theme.of(context).textTheme.titleLarge,
+                            ),
                           ),
-                          if (records.isNotEmpty)
+                          if (records.isNotEmpty) ...[
                             Text(
                               l10n.recordCount(records.length),
                               style: Theme.of(context).textTheme.bodyMedium,
                             ),
+                            const SizedBox(width: 8),
+                            TextButton(
+                              key: const ValueKey<String>('home-clear-history'),
+                              onPressed: _clearHistory,
+                              child: Text(l10n.clearHistory),
+                            ),
+                          ],
                         ],
                       ),
                       const SizedBox(height: 12),
@@ -305,22 +272,6 @@ class _HomeScreenState extends State<HomeScreen> {
           },
         ),
       ),
-    );
-  }
-}
-
-enum _HomeMenuAction { settings, about, clearHistory }
-
-class _MenuRow extends StatelessWidget {
-  const _MenuRow({required this.icon, required this.label});
-
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [Icon(icon, size: 20), const SizedBox(width: 12), Text(label)],
     );
   }
 }

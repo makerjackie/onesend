@@ -11,22 +11,27 @@ import '../core/envelope.dart';
 import '../core/optical_transfer.dart';
 import '../core/transfer_codec.dart';
 import '../l10n/generated/app_localizations.dart';
+import '../services/app_settings.dart';
 import '../services/file_service.dart';
 import '../services/transfer_store.dart';
 import '../widgets/desktop_camera_receiver.dart';
 import '../widgets/file_tile.dart';
 import '../widgets/stored_file_actions.dart';
+import '../widgets/transfer_mode_selector.dart';
+import 'cimbar_transfer_screen.dart';
 
 class ReceiveScreen extends StatefulWidget {
-  const ReceiveScreen({required this.store, super.key});
+  const ReceiveScreen({required this.store, this.settings, super.key});
 
   final TransferStore store;
+  final AppSettings? settings;
 
   @override
   State<ReceiveScreen> createState() => _ReceiveScreenState();
 }
 
-class _ReceiveScreenState extends State<ReceiveScreen> {
+class _ReceiveScreenState extends State<ReceiveScreen>
+    with WidgetsBindingObserver {
   final OpticalReceiver _receiver = OpticalReceiver();
   final MobileScannerController _mobileController = MobileScannerController(
     autoStart: true,
@@ -43,21 +48,152 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
   bool _completed = false;
   bool _processing = false;
   bool _saving = false;
+  DateTime? _receiveStartedAt;
+  Timer? _speedTicker;
+  late TransferAlgorithm _algorithm;
+  late TransferMode _mode;
 
   bool get _usesMobileScanner =>
       Platform.isAndroid || Platform.isIOS || Platform.isMacOS;
 
+  bool get _usesCimbar => _algorithm == TransferAlgorithm.cimbar;
+
   @override
   void initState() {
     super.initState();
-    unawaited(_enableWakelock());
+    _algorithm =
+        widget.settings?.transferAlgorithm ??
+        AppSettings.defaultTransferAlgorithm;
+    _mode = widget.settings?.defaultMode ?? AppSettings.defaultTransferMode;
+    WidgetsBinding.instance.addObserver(this);
+    if (!_usesCimbar) unawaited(_enableWakelock());
+    if (_algorithm == TransferAlgorithm.cimbar && _usesMobileScanner) {
+      unawaited(_mobileController.stop());
+    }
+    _speedTicker = Timer.periodic(const Duration(milliseconds: 400), (_) {
+      if (!mounted || _completed || _snapshot == null || _paused) return;
+      setState(() {});
+    });
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _speedTicker?.cancel();
     unawaited(_disposeMobileController());
     unawaited(_disableWakelock());
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.inactive &&
+        state != AppLifecycleState.paused &&
+        state != AppLifecycleState.detached &&
+        state != AppLifecycleState.hidden) {
+      return;
+    }
+    unawaited(_pauseForLifecycle());
+  }
+
+  Future<void> _pauseForLifecycle() async {
+    if (_completed || _processing || _paused) return;
+    _paused = true;
+    if (_usesMobileScanner) {
+      try {
+        await _mobileController.stop();
+      } catch (_) {}
+    }
+    await _disableWakelock();
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _selectQrMode(TransferMode mode) async {
+    if (_processing || _completed) return;
+    if (_algorithm == TransferAlgorithm.qr && _mode == mode) return;
+    setState(() {
+      _algorithm = TransferAlgorithm.qr;
+      _mode = mode;
+      _snapshot = null;
+      _error = null;
+      _receiveStartedAt = null;
+      _paused = false;
+    });
+    if (_usesMobileScanner) {
+      try {
+        await _mobileController.start();
+      } catch (_) {}
+    }
+    final settings = widget.settings;
+    if (settings == null) return;
+    try {
+      await settings.setDefaultAlgorithm(TransferAlgorithm.qr);
+      await settings.setDefaultMode(mode);
+    } catch (_) {}
+  }
+
+  Future<void> _selectCimbar() async {
+    if (_processing || _completed) return;
+    if (_algorithm == TransferAlgorithm.cimbar) return;
+    if (_usesMobileScanner) {
+      try {
+        await _mobileController.stop();
+      } catch (_) {}
+    }
+    setState(() {
+      _algorithm = TransferAlgorithm.cimbar;
+      _snapshot = null;
+      _error = null;
+      _receiveStartedAt = null;
+      _paused = false;
+    });
+    final settings = widget.settings;
+    if (settings == null) return;
+    try {
+      await settings.setDefaultAlgorithm(TransferAlgorithm.cimbar);
+    } catch (_) {}
+  }
+
+  int _approxReceivedBytes(ReceiverSnapshot snapshot) {
+    if (snapshot.totalLength <= 0) return 0;
+    if (snapshot.usesRatelessFountain) {
+      return (snapshot.progress * snapshot.totalLength).round().clamp(
+        0,
+        snapshot.totalLength,
+      );
+    }
+    final fromBlocks = snapshot.solvedBlocks * snapshot.blockLength;
+    return fromBlocks.clamp(0, snapshot.totalLength);
+  }
+
+  double _currentReceiveBytesPerSecond() {
+    final snapshot = _snapshot;
+    final startedAt = _receiveStartedAt;
+    if (snapshot == null || startedAt == null) return 0;
+    final elapsed = DateTime.now().difference(startedAt).inMilliseconds;
+    if (elapsed <= 0) return 0;
+    return _approxReceivedBytes(snapshot) * 1000 / elapsed;
+  }
+
+  Widget _buildModeChips({required bool enabled}) {
+    return TransferModeSelector(
+      algorithm: _algorithm,
+      mode: _mode,
+      enabled: enabled,
+      showQrProfiles: false,
+      keyPrefix: 'receive-mode',
+      onQrModeSelected: (mode) => unawaited(_selectQrMode(mode)),
+      onCimbarSelected: () => unawaited(_selectCimbar()),
+    );
+  }
+
+  void _onMobileDetectError(Object error, StackTrace stackTrace) {
+    if (error is! MobileScannerException || !mounted) return;
+    setState(() {
+      _paused = true;
+      _error = AppLocalizations.of(context)!.cimbarCameraError;
+    });
+    unawaited(_disableWakelock());
   }
 
   void _onMobileCapture(BarcodeCapture capture) {
@@ -91,6 +227,7 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
     setState(() {
       _snapshot = event.snapshot;
       _error = event.error;
+      _receiveStartedAt ??= DateTime.now();
     });
     if (event.error != null) {
       setState(() => _processing = true);
@@ -130,7 +267,7 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
   /// can be retried without asking the sender to replay the whole transfer.
   Future<void> _saveDecodedFile() async {
     final file = _receivedFile;
-    if (file == null || _saving && _storedFile != null) return;
+    if (file == null || _saving || _storedFile != null) return;
     if (mounted) {
       setState(() {
         _completed = true;
@@ -163,7 +300,9 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
       } catch (error) {
         if (mounted) {
           setState(
-            () => _error = '文件已保存，但记录未写入：${_friendlyReceiveError(error)}',
+            () => _error = AppLocalizations.of(
+              context,
+            )!.recordWriteError(_friendlyReceiveError(error)),
           );
         }
       }
@@ -179,7 +318,9 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
         _completed = true;
         _processing = false;
         _saving = false;
-        _error = '保存失败：${_friendlyReceiveError(error)}';
+        _error = AppLocalizations.of(
+          context,
+        )!.saveFailed(_friendlyReceiveError(error));
       });
     }
   }
@@ -190,6 +331,7 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
   }
 
   Future<void> _recoverFromFailure(String message) async {
+    final stableMessage = _friendlyReceiveError(message);
     if (_usesMobileScanner) {
       try {
         await _mobileController.stop();
@@ -204,7 +346,8 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
       _completed = false;
       _processing = false;
       _saving = false;
-      _error = message;
+      _error = stableMessage;
+      _receiveStartedAt = null;
     });
     try {
       await _enableWakelock();
@@ -258,6 +401,7 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
       _processing = false;
       _saving = false;
       _paused = false;
+      _receiveStartedAt = null;
     });
     await _enableWakelock();
     if (_usesMobileScanner) {
@@ -269,10 +413,32 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
     }
   }
 
-  String _friendlyReceiveError(Object error) => error
-      .toString()
-      .replaceFirst('FormatException: ', '')
-      .replaceFirst('Bad state: ', '');
+  String _friendlyReceiveError(Object error) {
+    final l10n = AppLocalizations.of(context)!;
+    final raw = error
+        .toString()
+        .replaceFirst('FormatException: ', '')
+        .replaceFirst('Bad state: ', '')
+        .replaceFirst('StateError: ', '');
+    final lower = raw.toLowerCase();
+    if (lower.contains('camera') ||
+        lower.contains('permission') ||
+        raw.contains('相机') ||
+        raw.contains('权限')) {
+      return l10n.cimbarCameraError;
+    }
+    if (lower.contains('checksum') ||
+        lower.contains('crc') ||
+        lower.contains('verify') ||
+        raw.contains('校验')) {
+      return l10n.cimbarVerificationError;
+    }
+    return localizedTransferError(
+      context,
+      error,
+      fallback: l10n.genericTransferError,
+    );
+  }
 
   Future<void> _toggleTorch() async {
     try {
@@ -309,11 +475,41 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    if (_usesCimbar && !_completed) {
+      return Scaffold(
+        appBar: AppBar(title: Text(l10n.scanReceive)),
+        body: SafeArea(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [_buildModeChips(enabled: !_processing)],
+                ),
+              ),
+              const Divider(height: 1),
+              Expanded(
+                child: CimbarTransferScreen(
+                  key: const ValueKey<String>('receive-cimbar-panel'),
+                  direction: CimbarDirection.receive,
+                  store: widget.store,
+                  embedded: true,
+                  autoStartReceive: true,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: Text(l10n.scanReceive),
         actions: [
-          if (_usesMobileScanner)
+          if (_usesMobileScanner && !_usesCimbar)
             IconButton(
               tooltip: l10n.torch,
               onPressed: _completed || _processing ? null : _toggleTorch,
@@ -329,6 +525,7 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
     final l10n = AppLocalizations.of(context)!;
     final snapshot = _snapshot;
     final progress = snapshot?.progress;
+    final currentRate = _currentReceiveBytesPerSecond();
     final status = _processing
         ? l10n.checkingAndSaving
         : _paused
@@ -350,6 +547,13 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
               constraints: const BoxConstraints(maxWidth: 760),
               child: Column(
                 children: [
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: _buildModeChips(
+                      enabled: !_processing && snapshot == null,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
                   SizedBox(
                     height: cameraHeight,
                     width: double.infinity,
@@ -396,6 +600,7 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
                     child: Padding(
                       padding: const EdgeInsets.all(20),
                       child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           LinearProgressIndicator(
                             minHeight: 8,
@@ -404,20 +609,47 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
                             color: oneSendInk,
                           ),
                           const SizedBox(height: 12),
+                          Text(
+                            l10n.currentRate(formatTransferSpeed(currentRate)),
+                            style: const TextStyle(
+                              color: oneSendInk,
+                              fontSize: 20,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          if (snapshot?.mode != null) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              l10n.theoreticalRate(
+                                formatTransferSpeed(
+                                  snapshot!.mode!.usefulBytesPerSecond,
+                                ),
+                              ),
+                              style: const TextStyle(
+                                color: oneSendMuted,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                          const SizedBox(height: 10),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text(
-                                snapshot == null
-                                    ? l10n.waitingFirstFrame
-                                    : snapshot.usesRatelessFountain
-                                    ? l10n.fountainProgress(snapshot.framesNew)
-                                    : l10n.blockProgress(
-                                        snapshot.blockCount,
-                                        snapshot.framesNew,
-                                        snapshot.solvedBlocks,
-                                      ),
-                                style: Theme.of(context).textTheme.bodySmall,
+                              Expanded(
+                                child: Text(
+                                  snapshot == null
+                                      ? l10n.waitingFirstFrame
+                                      : snapshot.usesRatelessFountain
+                                      ? l10n.fountainProgress(
+                                          snapshot.framesNew,
+                                        )
+                                      : l10n.blockProgress(
+                                          snapshot.blockCount,
+                                          snapshot.framesNew,
+                                          snapshot.solvedBlocks,
+                                        ),
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                ),
                               ),
                               if (snapshot != null)
                                 Text(
@@ -446,15 +678,18 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
                     spacing: 10,
                     runSpacing: 10,
                     children: [
-                      OutlinedButton.icon(
-                        onPressed: _processing ? null : _togglePause,
-                        icon: Icon(
-                          _paused
-                              ? Icons.play_arrow_rounded
-                              : Icons.pause_rounded,
+                      if (_paused || snapshot != null)
+                        OutlinedButton.icon(
+                          onPressed: _processing ? null : _togglePause,
+                          icon: Icon(
+                            _paused
+                                ? Icons.play_arrow_rounded
+                                : Icons.pause_rounded,
+                          ),
+                          label: Text(
+                            _paused ? l10n.resumeScan : l10n.pauseScan,
+                          ),
                         ),
-                        label: Text(_paused ? l10n.resumeScan : l10n.pauseScan),
-                      ),
                       FilledButton.icon(
                         onPressed: _processing ? null : _reset,
                         icon: const Icon(Icons.refresh_rounded),
@@ -477,6 +712,20 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
         controller: _mobileController,
         fit: BoxFit.cover,
         onDetect: _onMobileCapture,
+        onDetectError: _onMobileDetectError,
+        errorBuilder: (context, _) => ColoredBox(
+          color: oneSendInk,
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Text(
+                AppLocalizations.of(context)!.cimbarCameraError,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.white),
+              ),
+            ),
+          ),
+        ),
       );
     }
     return DesktopCameraReceiver(

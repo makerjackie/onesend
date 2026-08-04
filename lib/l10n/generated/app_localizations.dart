@@ -145,14 +145,20 @@ abstract class AppLocalizations {
   /// No description provided for @modeTurboQr.
   ///
   /// In en, this message translates to:
-  /// **'Turbo QR (experimental)'**
+  /// **'Turbo QR'**
   String get modeTurboQr;
 
   /// No description provided for @modeCimbar.
   ///
   /// In en, this message translates to:
-  /// **'CIMBAR color visual code (experimental)'**
+  /// **'Color code'**
   String get modeCimbar;
+
+  /// No description provided for @modeQr.
+  ///
+  /// In en, this message translates to:
+  /// **'QR code'**
+  String get modeQr;
 
   /// No description provided for @compatibilityMode.
   ///
@@ -373,13 +379,13 @@ abstract class AppLocalizations {
   /// No description provided for @settingsIntroTitle.
   ///
   /// In en, this message translates to:
-  /// **'Tune the next transfer to your device.'**
+  /// **'App settings'**
   String get settingsIntroTitle;
 
   /// No description provided for @settingsIntroBody.
   ///
   /// In en, this message translates to:
-  /// **'The default mode is used for new sends.'**
+  /// **'Choose transfer mode on the send screen.'**
   String get settingsIntroBody;
 
   /// No description provided for @transportSection.
@@ -615,6 +621,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'New sends use {mode} mode · theoretical rate about {speed}'**
   String newTransferStatus(Object mode, Object speed);
+
+  /// No description provided for @transferModeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Transfer mode'**
+  String get transferModeLabel;
+
+  /// No description provided for @dropFilesHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Or drag and drop a file here'**
+  String get dropFilesHint;
+
+  /// No description provided for @dropFilesActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Drop to send'**
+  String get dropFilesActive;
 
   /// No description provided for @reading.
   ///

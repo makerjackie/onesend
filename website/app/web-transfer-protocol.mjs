@@ -4,7 +4,8 @@ const FRAME_CHECKSUM_LENGTH = 4;
 const MAX_OPTICAL_PAYLOAD_BYTES = 72 * 1024 * 1024;
 const MAX_OPTICAL_BLOCKS = 110000;
 const MIN_OPTICAL_BLOCK_LENGTH = 64;
-const MAX_OPTICAL_BLOCK_LENGTH = 2048;
+// Turbo mode uses 2921-byte blocks (Flutter interop). Must be >= 2921.
+const MAX_OPTICAL_BLOCK_LENGTH = 4096;
 const MAX_RATELESS_FOUNTAIN_BLOCKS = 8192;
 const MAX_TRANSFER_FILE_BYTES = 64 * 1024 * 1024;
 const MAX_TRANSFER_ENVELOPE_BYTES = 72 * 1024 * 1024;
@@ -29,19 +30,26 @@ const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
 export const TRANSFER_MODES = {
+  reliable: {
+    id: 0,
+    label: "Reliable",
+    blockLength: 720,
+    frameIntervalMs: 125,
+    errorCorrectionLevel: "M",
+  },
   fast: {
     id: 2,
-    label: "High-speed",
+    label: "Fast",
     blockLength: 1700,
     frameIntervalMs: 1000 / 24,
     errorCorrectionLevel: "L",
   },
-  reliable: {
-    id: 0,
-    label: "Compatibility",
-    blockLength: 720,
-    frameIntervalMs: 125,
-    errorCorrectionLevel: "M",
+  turbo: {
+    id: 3,
+    label: "Turbo",
+    blockLength: 2921,
+    frameIntervalMs: 1000 / 24,
+    errorCorrectionLevel: "L",
   },
 };
 
@@ -276,9 +284,25 @@ export function parseFrame(value) {
  * payload. A rawBytes fallback is kept for decoders that expose payload bytes
  * there, but it must be a valid OneSend frame before it reaches the receiver.
  */
+function latin1TextToBytes(text) {
+  if (typeof text !== "string" || text.length === 0) return null;
+  const bytes = new Uint8Array(text.length);
+  for (let index = 0; index < text.length; index += 1) {
+    const code = text.charCodeAt(index);
+    // ISO-8859-1 / Latin-1 only. Multi-byte chars mean the decoder mangled binary.
+    if (code > 0xff) return null;
+    bytes[index] = code;
+  }
+  return bytes;
+}
+
 export function extractScannerFrame(result) {
   const metadata = result?.getResultMetadata?.();
-  const byteSegments = metadata?.get?.(2);
+  // ZXing ResultMetadataType.BYTE_SEGMENTS === 2 (also accept string key).
+  const byteSegments =
+    metadata?.get?.(2) ??
+    metadata?.get?.("BYTE_SEGMENTS") ??
+    metadata?.get?.("2");
   if (Array.isArray(byteSegments)) {
     const segments = byteSegments.filter(
       (segment) => segment instanceof Uint8Array || segment instanceof Uint8ClampedArray,
@@ -294,6 +318,13 @@ export function extractScannerFrame(result) {
       }
       if (payload.length > 0) return payload;
     }
+  }
+
+  // Some mobile WebViews only expose getText(). With CHARACTER_SET=ISO-8859-1
+  // the string is a 1:1 Latin-1 map of the byte payload.
+  if (typeof result?.getText === "function") {
+    const fromText = latin1TextToBytes(result.getText());
+    if (fromText && parseFrame(fromText)) return fromText;
   }
 
   const rawBytes = result?.getRawBytes?.();
@@ -319,7 +350,8 @@ export class OpticalSender {
     this.payloadChecksum = crc32(this.payload);
     this.blockCount = Math.max(1, Math.ceil(this.payload.length / this.mode.blockLength));
     this.usesRatelessFountain =
-      mode === "fast" && this.blockCount <= MAX_RATELESS_FOUNTAIN_BLOCKS;
+      (mode === "fast" || mode === "turbo") &&
+      this.blockCount <= MAX_RATELESS_FOUNTAIN_BLOCKS;
     this.systematicFrames = !this.usesRatelessFountain;
     this.encoder = new LTEncoder({
       payload: this.payload,
@@ -510,19 +542,32 @@ class LTDecoder {
   }
 }
 
+function isRatelessProfile(profileId, blockCount) {
+  return (
+    (profileId === TRANSFER_MODES.fast.id ||
+      profileId === TRANSFER_MODES.turbo.id) &&
+    blockCount <= MAX_RATELESS_FOUNTAIN_BLOCKS
+  );
+}
+
 function snapshotFor(header, decoderState) {
   const mode = Object.entries(TRANSFER_MODES).find(([, value]) =>
     value.id === header.profileId && value.blockLength === header.blockLength,
   )?.[0] ?? "unknown";
-  const usesRateless =
-    header.protocolVersion >= CURRENT_PROTOCOL_VERSION &&
-    header.profileId === TRANSFER_MODES.fast.id &&
-    decoderState.blockCount <= MAX_RATELESS_FOUNTAIN_BLOCKS;
-  const progress = decoderState.blockCount === 0
-    ? 0
-    : usesRateless
-      ? Math.min(0.95, decoderState.framesNew / (decoderState.blockCount * 1.25))
-      : Math.min(1, decoderState.solvedCount / decoderState.blockCount);
+  const usesRateless = isRatelessProfile(header.profileId, decoderState.blockCount);
+  let progress = 0;
+  if (decoderState.blockCount === 0) {
+    progress = 0;
+  } else if (decoderState.isComplete) {
+    progress = 1;
+  } else if (usesRateless) {
+    progress = Math.min(
+      0.95,
+      decoderState.framesNew / (decoderState.blockCount * 1.25),
+    );
+  } else {
+    progress = Math.min(1, decoderState.solvedCount / decoderState.blockCount);
+  }
   return {
     protocolVersion: header.protocolVersion,
     profileId: header.profileId,
@@ -572,7 +617,11 @@ export class OpticalReceiver {
         blockLength: header.blockLength,
         sessionId: header.sessionId,
         totalLength: header.totalLength,
-        systematicFrames: !(header.profileId === TRANSFER_MODES.fast.id && header.blockCount <= MAX_RATELESS_FOUNTAIN_BLOCKS),
+        // Must match sender: fast + turbo use rateless fountain (non-systematic).
+        systematicFrames: !isRatelessProfile(
+          header.profileId,
+          header.blockCount,
+        ),
       });
       this.delivered = false;
     } else if (!matchesConfiguration(this.configuration, header)) {

@@ -7,6 +7,50 @@ import styles from "./cimbar.module.css";
 const SEND_WORKER_URL = "/cimbar/node_modules/cimbar-send-bootstrap.js";
 const RECEIVE_WORKER_URL = "/cimbar/node_modules/cimbar-receive-worker.js";
 const MAX_INPUT_BYTES = 32 * 1024 * 1024;
+/**
+ * Mode Bm (67) — libcimbar's compact config for broader camera reliability.
+ * ~70% of mode B peak speed, but far fewer empty optical frames in practice.
+ * Encode + decode must use the same mode.
+ */
+const CIMBAR_MODE = 67;
+const CIMBAR_MODE_LABEL = "Bm";
+/**
+ * Optical display rate. Color cells need long dwell on LCD for phone cameras;
+ * 3 fps is much more reliable than 8–15 for real scans (upstream default is 15).
+ * Theoretical KB/s drops; empty-frame rate drops far more.
+ */
+const CIMBAR_DISPLAY_FPS = 3;
+/** Cap camera samples so transitional video frames do not dominate empty stats. */
+const RECEIVE_CAPTURE_INTERVAL_MS = 120;
+/**
+ * Bitmap size == CSS size (1:1). CSS-downscaling color cells is the same
+ * class of bug that made web QR unscannable. Prefer large on-screen cells.
+ */
+function resolveCimbarCanvasSize() {
+  if (typeof window === "undefined") return 720;
+  const limit = Math.min(window.innerWidth * 0.92, window.innerHeight * 0.58);
+  return Math.max(640, Math.min(1024, Math.floor(limit)));
+}
+
+function guessMimeFromName(name: string, fallback = "application/octet-stream") {
+  const lower = name.toLowerCase();
+  if (lower.endsWith(".png")) return "image/png";
+  if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
+  if (lower.endsWith(".gif")) return "image/gif";
+  if (lower.endsWith(".webp")) return "image/webp";
+  if (lower.endsWith(".svg")) return "image/svg+xml";
+  if (lower.endsWith(".mp4")) return "video/mp4";
+  if (lower.endsWith(".webm")) return "video/webm";
+  if (lower.endsWith(".mp3")) return "audio/mpeg";
+  if (lower.endsWith(".wav")) return "audio/wav";
+  if (lower.endsWith(".pdf")) return "application/pdf";
+  if (lower.endsWith(".json")) return "application/json";
+  if (lower.endsWith(".txt") || lower.endsWith(".md") || lower.endsWith(".csv")) {
+    return "text/plain";
+  }
+  if (lower.endsWith(".html") || lower.endsWith(".htm")) return "text/html";
+  return fallback;
+}
 
 type View = "send" | "receive";
 type SenderState = "idle" | "loading" | "sending" | "stopped" | "error";
@@ -52,10 +96,21 @@ function safeFilename(name: string) {
   return cleaned || "cimbar-file.bin";
 }
 
+function resolvedMime(file: ReceivedFile) {
+  const mime = (file.mimeType || "").toLowerCase();
+  if (mime && mime !== "application/octet-stream") return mime;
+  return guessMimeFromName(file.name, mime || "application/octet-stream");
+}
+
+function fileBlob(file: ReceivedFile) {
+  const copy = new Uint8Array(file.bytes.byteLength);
+  copy.set(file.bytes);
+  return new Blob([copy], { type: resolvedMime(file) });
+}
+
 function downloadFile(file: ReceivedFile) {
   if (file.verified !== true) return;
-  const bytes = file.bytes.slice().buffer as ArrayBuffer;
-  const url = URL.createObjectURL(new Blob([bytes], { type: file.mimeType }));
+  const url = URL.createObjectURL(fileBlob(file));
   const anchor = document.createElement("a");
   anchor.href = url;
   anchor.download = file.name;
@@ -63,7 +118,40 @@ function downloadFile(file: ReceivedFile) {
   document.body.appendChild(anchor);
   anchor.click();
   anchor.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
+  window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
+function isViewableMime(mime: string) {
+  return (
+    mime.startsWith("image/") ||
+    mime.startsWith("video/") ||
+    mime.startsWith("audio/") ||
+    mime.startsWith("text/") ||
+    mime === "application/pdf" ||
+    mime === "application/json"
+  );
+}
+
+/** Open viewable types in a new tab; fall back to download for others. */
+function openReceivedInBrowser(file: ReceivedFile) {
+  if (file.verified !== true) return;
+  const mime = resolvedMime(file);
+  const url = URL.createObjectURL(fileBlob(file));
+  if (isViewableMime(mime)) {
+    // Prefer <a target=_blank> — slightly less likely to be blocked than window.open
+    // after an async worker completion callback.
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.target = "_blank";
+    anchor.rel = "noopener noreferrer";
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 180_000);
+    return;
+  }
+  downloadFile(file);
+  window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
 async function sha256(bytes: Uint8Array) {
@@ -86,19 +174,47 @@ function tabClass(active: boolean) {
   return `${styles.viewTab}${active ? ` ${styles.viewTabActive}` : ""}`;
 }
 
-export function CimbarTransfer() {
-  const [view, setView] = useState<View>("send");
+type CimbarTransferProps = {
+  /** When set, only this direction is shown (for embedding in the main web transfer UI). */
+  direction?: View;
+  /** Hide local send/receive tabs; parent already owns navigation. */
+  embedded?: boolean;
+};
+
+export function CimbarTransfer({
+  direction,
+  embedded = false,
+}: CimbarTransferProps = {}) {
+  const [view, setView] = useState<View>(direction ?? "send");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [senderState, setSenderState] = useState<SenderState>("idle");
   const [senderFrames, setSenderFrames] = useState(0);
   const [senderError, setSenderError] = useState<string | null>(null);
   const [receiverState, setReceiverState] = useState<ReceiverState>("idle");
-  const [receiverFrames, setReceiverFrames] = useState(0);
   const [decodedFrames, setDecodedFrames] = useState(0);
   const [receiverProgress, setReceiverProgress] = useState(0);
   const [receiverError, setReceiverError] = useState<string | null>(null);
   const [receivedFile, setReceivedFile] = useState<ReceivedFile | null>(null);
   const [verification, setVerification] = useState<string | null>(null);
+  const [canvasSize] = useState(() => resolveCimbarCanvasSize());
+  const [scanStats, setScanStats] = useState({ noData: 0, decoded: 0 });
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!direction || direction === view) return;
+    if (direction === "send") {
+      stopReceiverResources();
+      window.setTimeout(() => {
+        setReceiverState((current) => (current === "complete" ? current : "idle"));
+        setView(direction);
+      }, 0);
+    } else {
+      stopSender();
+      window.setTimeout(() => setView(direction), 0);
+    }
+    // Intentionally only re-run when the parent direction changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [direction]);
 
   const senderCanvasRef = useRef<HTMLCanvasElement>(null);
   const senderWorkerRef = useRef<Worker | null>(null);
@@ -113,6 +229,34 @@ export function CimbarTransfer() {
   const receiverFramesInFlightRef = useRef(0);
   const receiverTimerRef = useRef<number | null>(null);
   const cameraStreamRef = useRef<MediaStream | null>(null);
+  const lastCaptureAtRef = useRef(0);
+  const previewUrlRef = useRef<string | null>(null);
+
+  function revokePreviewUrl() {
+    if (previewUrlRef.current) {
+      URL.revokeObjectURL(previewUrlRef.current);
+      previewUrlRef.current = null;
+    }
+    setPreviewUrl(null);
+  }
+
+  function presentReceivedFile(file: ReceivedFile) {
+    setReceivedFile(file);
+    setReceiverProgress(1);
+    setReceiverState("complete");
+    revokePreviewUrl();
+    if (isViewableMime(resolvedMime(file))) {
+      const url = URL.createObjectURL(fileBlob(file));
+      previewUrlRef.current = url;
+      setPreviewUrl(url);
+    }
+    // Best-effort auto open; popup blockers may still require the button.
+    try {
+      openReceivedInBrowser(file);
+    } catch {
+      // Button remains available.
+    }
+  }
 
   function stopReceiverResources() {
     receiverActiveRef.current = false;
@@ -137,6 +281,7 @@ export function CimbarTransfer() {
     return () => {
       senderWorkerRef.current?.terminate();
       stopReceiverResources();
+      revokePreviewUrl();
     };
   }, []);
 
@@ -174,7 +319,9 @@ export function CimbarTransfer() {
     worker.onmessage = (event: MessageEvent) => {
       const data = event.data || {};
       if (data.type === "frame") {
-        setSenderFrames(Number(data.count) || 0);
+        // Count is already throttled in the worker; still avoid layout thrash.
+        const next = Number(data.count) || 0;
+        setSenderFrames((prev) => (prev === next ? prev : next));
         return;
       }
       if (data.type === "error") {
@@ -190,8 +337,8 @@ export function CimbarTransfer() {
           setSenderError("本地 WASM 编码器未能启动。");
           return;
         }
-        worker.postMessage({ fun: "setMode", args: [68] });
-        worker.postMessage({ fun: "setFPS", args: [15] });
+        worker.postMessage({ fun: "setMode", args: [CIMBAR_MODE] });
+        worker.postMessage({ fun: "setFPS", args: [CIMBAR_DISPLAY_FPS] });
         if (pendingFileRef.current) postSenderFile(pendingFileRef.current);
       }
     };
@@ -278,21 +425,12 @@ export function CimbarTransfer() {
   }
 
   function scheduleVideoFrame() {
-    const video = receiverVideoRef.current;
-    if (!receiverActiveRef.current || !video) return;
-
-    const videoWithCallback = video as HTMLVideoElement & {
-      requestVideoFrameCallback?: (callback: () => void) => number;
-    };
-    if (typeof videoWithCallback.requestVideoFrameCallback === "function") {
-      videoWithCallback.requestVideoFrameCallback(() => {
-        void sendVideoFrame();
-      });
-    } else {
-      receiverTimerRef.current = window.setTimeout(() => {
-        void sendVideoFrame();
-      }, 1000 / 15);
-    }
+    if (!receiverActiveRef.current) return;
+    // Prefer a paced timer over raw camera FPS. Full-rate rVFC (~24–30 Hz)
+    // samples transitional LCD frames and inflates empty-frame counts to ~90%.
+    receiverTimerRef.current = window.setTimeout(() => {
+      void sendVideoFrame();
+    }, RECEIVE_CAPTURE_INTERVAL_MS);
   }
 
   async function sendVideoFrame() {
@@ -301,10 +439,20 @@ export function CimbarTransfer() {
     if (!receiverActiveRef.current || !video || !worker) return;
 
     try {
-      if (receiverFramesInFlightRef.current < 2 && receiverWorkerReadyRef.current) {
+      const now = performance.now();
+      const dwellOk = now - lastCaptureAtRef.current >= RECEIVE_CAPTURE_INTERVAL_MS;
+      // Only one decode in flight — backlog of stale frames wastes CPU and
+      // reports empty results from mid-transition captures.
+      if (
+        dwellOk &&
+        receiverFramesInFlightRef.current < 1 &&
+        receiverWorkerReadyRef.current &&
+        video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA
+      ) {
+        lastCaptureAtRef.current = now;
         const captured = await captureVideoFrame(video);
+        if (!receiverActiveRef.current) return;
         receiverFramesInFlightRef.current += 1;
-        setReceiverFrames((count) => count + 1);
         worker.postMessage(
           { type: "frame", ...captured },
           [captured.pixels],
@@ -328,13 +476,15 @@ export function CimbarTransfer() {
     }
 
     stopReceiverResources();
+    revokePreviewUrl();
     setReceiverState("starting");
     setReceiverError(null);
     setReceivedFile(null);
     setVerification(null);
-    setReceiverFrames(0);
     setDecodedFrames(0);
     setReceiverProgress(0);
+    setScanStats({ noData: 0, decoded: 0 });
+    lastCaptureAtRef.current = 0;
 
     const worker = new Worker(RECEIVE_WORKER_URL, {
       name: "onesend-cimbar-receiver",
@@ -358,6 +508,15 @@ export function CimbarTransfer() {
         if (data.type === "frame") {
           if (data.result === "decoded") {
             setDecodedFrames((count) => count + 1);
+            setScanStats((stats) => ({
+              ...stats,
+              decoded: stats.decoded + 1,
+            }));
+          } else if (data.result === "no-data") {
+            setScanStats((stats) => ({
+              ...stats,
+              noData: stats.noData + 1,
+            }));
           }
           if (typeof data.progress === "number") {
             setReceiverProgress(data.progress);
@@ -373,19 +532,18 @@ export function CimbarTransfer() {
           }
           const bytes = new Uint8Array(data.bytes);
           const name = safeFilename(String(data.name || "cimbar-file.bin"));
-          const mimeType = typeof data.mimeType === "string" && data.mimeType
-            ? data.mimeType
-            : "application/octet-stream";
+          const rawMime =
+            typeof data.mimeType === "string" && data.mimeType
+              ? data.mimeType
+              : "application/octet-stream";
           const file = {
             name,
             bytes,
-            mimeType,
+            mimeType: guessMimeFromName(name, rawMime),
             verified: true,
           } satisfies ReceivedFile;
           stopReceiverResources();
-          setReceivedFile(file);
-          setReceiverProgress(1);
-          setReceiverState("complete");
+          presentReceivedFile(file);
           void sha256(bytes)
             .then((digest) => {
               setVerification(
@@ -413,12 +571,27 @@ export function CimbarTransfer() {
         audio: false,
         video: {
           facingMode: { ideal: "environment" },
+          // 720p is enough for mode Bm cells and is easier for autofocus.
           width: { ideal: 1280 },
           height: { ideal: 720 },
-          frameRate: { ideal: 15, max: 15 },
+          frameRate: { ideal: 30, max: 30 },
         },
       });
       const [stream] = await Promise.all([streamPromise, workerReady]);
+      const track = stream.getVideoTracks()[0];
+      if (track) {
+        try {
+          await track.applyConstraints({
+            advanced: [
+              { focusMode: "continuous" },
+              { exposureMode: "continuous" },
+              { whiteBalanceMode: "continuous" },
+            ] as unknown as MediaTrackConstraintSet[],
+          });
+        } catch {
+          // Constraints are best-effort; many browsers reject unknown keys.
+        }
+      }
       const video = receiverVideoRef.current;
       if (!video) throw new Error("相机预览还没有准备好。");
       cameraStreamRef.current = stream;
@@ -441,41 +614,44 @@ export function CimbarTransfer() {
 
   function receiveAgain() {
     stopReceiverResources();
+    revokePreviewUrl();
     setReceivedFile(null);
     setVerification(null);
     setReceiverProgress(0);
-    setReceiverFrames(0);
     setDecodedFrames(0);
     setReceiverError(null);
     setReceiverState("idle");
   }
 
   const receiverActive = receiverState === "starting" || receiverState === "receiving";
+  const showTabs = !embedded && !direction;
 
   return (
-    <div className={styles.lab}>
-      <div className={styles.viewTabs} role="tablist" aria-label="彩色高速视图">
-        <button
-          className={tabClass(view === "send")}
-          type="button"
-          role="tab"
-          aria-selected={view === "send"}
-          onClick={() => changeView("send")}
-        >
-          发送
-          <small>显示动态 cimbar</small>
-        </button>
-        <button
-          className={tabClass(view === "receive")}
-          type="button"
-          role="tab"
-          aria-selected={view === "receive"}
-          onClick={() => changeView("receive")}
-        >
-          接收
-          <small>点击后开启 camera</small>
-        </button>
-      </div>
+    <div className={`${styles.lab}${embedded ? ` ${styles.labEmbedded}` : ""}`}>
+      {showTabs && (
+        <div className={styles.viewTabs} role="tablist" aria-label="彩色高速视图">
+          <button
+            className={tabClass(view === "send")}
+            type="button"
+            role="tab"
+            aria-selected={view === "send"}
+            onClick={() => changeView("send")}
+          >
+            发送
+            <small>显示动态 cimbar</small>
+          </button>
+          <button
+            className={tabClass(view === "receive")}
+            type="button"
+            role="tab"
+            aria-selected={view === "receive"}
+            onClick={() => changeView("receive")}
+          >
+            接收
+            <small>点击后开启 camera</small>
+          </button>
+        </div>
+      )}
 
       <div className={styles.panelStack}>
         <article
@@ -489,7 +665,7 @@ export function CimbarTransfer() {
               <span className="mono-label">SENDER / MODE B</span>
               <h3>把文件变成彩色高速流。</h3>
             </div>
-            <span className={styles.liveBadge}>≈ 106 KB/s</span>
+            <span className={styles.liveBadge}>MODE {CIMBAR_MODE_LABEL}</span>
           </div>
           <label className={styles.filePicker} htmlFor="cimbar-file">
             <span className={styles.filePickerMark} aria-hidden="true">＋</span>
@@ -512,16 +688,17 @@ export function CimbarTransfer() {
             <canvas
               ref={senderCanvasRef}
               className={styles.codeCanvas}
-              width={1024}
-              height={1024}
+              width={canvasSize}
+              height={canvasSize}
+              style={{ width: canvasSize, height: canvasSize }}
               role="img"
               aria-label="动态 cimbar 彩色视觉码"
             />
             {!selectedFile && <span className={styles.codePlaceholder}>等待本地文件</span>}
           </div>
           <div className={styles.metrics} aria-live="polite">
-            <span><small>模式</small><strong>B</strong></span>
-            <span><small>参考速度</small><strong>≈ 106 KB/s</strong></span>
+            <span><small>模式</small><strong>{CIMBAR_MODE_LABEL}</strong></span>
+            <span><small>显示</small><strong>{canvasSize}px · {CIMBAR_DISPLAY_FPS}fps</strong></span>
             <span><small>已输出</small><strong>{senderFrames} 帧</strong></span>
           </div>
           <div className={styles.actions}>
@@ -544,10 +721,10 @@ export function CimbarTransfer() {
             {senderState === "loading"
               ? "正在准备本地 WASM 编码器…"
               : senderState === "sending"
-                ? "正在显示动态 cimbar；让接收设备对准此区域。"
+                ? `正在播放彩色码（${CIMBAR_DISPLAY_FPS}fps · 模式 ${CIMBAR_MODE_LABEL}）。码尽量占满取景框，屏幕调最亮，另一端选「彩色视觉码」。`
                 : senderState === "stopped"
                   ? "已停止显示；可以继续当前文件。"
-                  : senderError || "选择文件后，浏览器会在本地开始编码。"}
+                  : senderError || "选择文件后，浏览器会在本地开始编码并自动播放。"}
           </p>
         </article>
 
@@ -586,14 +763,25 @@ export function CimbarTransfer() {
           </div>
           <canvas ref={captureCanvasRef} className={styles.captureCanvas} aria-hidden="true" />
           <div className={styles.metrics} aria-live="polite">
-            <span><small>模式</small><strong>B</strong></span>
+            <span><small>模式</small><strong>{CIMBAR_MODE_LABEL}</strong></span>
             <span><small>恢复</small><strong>{Math.round(receiverProgress * 100)}%</strong></span>
-            <span><small>扫描帧</small><strong>{receiverFrames}</strong></span>
+            <span>
+              <small>有效/空</small>
+              <strong>
+                {scanStats.decoded}/{scanStats.noData}
+                {scanStats.decoded + scanStats.noData > 0
+                  ? ` · ${Math.round(
+                      (100 * scanStats.decoded) /
+                        (scanStats.decoded + scanStats.noData),
+                    )}%`
+                  : ""}
+              </strong>
+            </span>
           </div>
           <div className={styles.actions}>
             {!receiverActive && receiverState !== "complete" && (
               <button className="button button-primary" type="button" onClick={startReceiver}>
-                开启 camera <span aria-hidden="true">↗</span>
+                开启摄像头 <span aria-hidden="true">↗</span>
               </button>
             )}
             {receiverActive && (
@@ -602,9 +790,22 @@ export function CimbarTransfer() {
               </button>
             )}
             {receivedFile && (
-              <button className="button button-primary" type="button" onClick={() => downloadFile(receivedFile)}>
-                下载已校验文件 <span aria-hidden="true">↓</span>
-              </button>
+              <>
+                <button
+                  className="button button-primary"
+                  type="button"
+                  onClick={() => openReceivedInBrowser(receivedFile)}
+                >
+                  在浏览器中打开
+                </button>
+                <button
+                  className="button button-secondary"
+                  type="button"
+                  onClick={() => downloadFile(receivedFile)}
+                >
+                  下载
+                </button>
+              </>
             )}
             {receiverState === "complete" && (
               <button className="button button-secondary" type="button" onClick={receiveAgain}>
@@ -614,17 +815,51 @@ export function CimbarTransfer() {
           </div>
           <p className={styles.status} aria-live="polite">
             {receiverState === "starting"
-              ? "正在请求 camera 并加载本地解码 worker…"
+              ? "正在请求摄像头并加载本地解码 worker…"
               : receiverState === "receiving"
-                ? `正在本地恢复 fountain 帧 · 已识别 ${decodedFrames} 帧`
+                ? scanStats.decoded > 0
+                  ? `正在恢复 · 有效 ${decodedFrames} · 空 ${scanStats.noData} · ${Math.round(receiverProgress * 100)}%`
+                  : `扫描中 · 空 ${scanStats.noData}。码需占满框、屏幕调最亮、两端都选「彩色视觉码」、稳定对准。`
                 : receiverState === "complete" && receivedFile
-                  ? `接收完成 · ${receivedFile.name}`
-                  : receiverError || "只有点击“开启 camera”后，浏览器才会请求相机权限。"}
+                  ? `接收完成 · ${receivedFile.name} · 可在浏览器中打开`
+                  : receiverError || "点击「开启摄像头」后对准发送端。两端都必须选彩色视觉码。"}
           </p>
           {receivedFile && receiverState === "complete" && (
             <div className={styles.receivedFile}>
               <strong>{receivedFile.name}</strong>
               <span>{formatBytes(receivedFile.bytes.length)} · {verification || "正在计算 SHA-256…"}</span>
+              {previewUrl && resolvedMime(receivedFile).startsWith("image/") && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={previewUrl}
+                  alt={receivedFile.name}
+                  className={styles.inlinePreview}
+                />
+              )}
+              {previewUrl && resolvedMime(receivedFile).startsWith("video/") && (
+                <video
+                  src={previewUrl}
+                  className={styles.inlinePreview}
+                  controls
+                  playsInline
+                />
+              )}
+              <div className={styles.actions} style={{ marginTop: 10 }}>
+                <button
+                  className="button button-primary"
+                  type="button"
+                  onClick={() => openReceivedInBrowser(receivedFile)}
+                >
+                  在浏览器中打开
+                </button>
+                <button
+                  className="button button-secondary"
+                  type="button"
+                  onClick={() => downloadFile(receivedFile)}
+                >
+                  下载
+                </button>
+              </div>
             </div>
           )}
         </article>

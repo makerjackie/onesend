@@ -6,7 +6,7 @@ import 'fountain.dart';
 import 'protocol.dart';
 
 const int maxOpticalPayloadBytes = 72 * 1024 * 1024;
-const int maxOpticalBlocks = 110000;
+const int maxOpticalBlocks = maxFountainBlockCount;
 const int minOpticalBlockLength = 64;
 // QR V40-L carries at most 2953 byte-mode bytes. The v2 frame spends 28
 // bytes on its header and 4 bytes on its per-frame CRC, leaving 2921 bytes
@@ -16,6 +16,7 @@ const int opticalFrameOverheadBytes = frameHeaderLength + frameChecksumLength;
 const int maxOpticalFrameLength =
     maxOpticalBlockLength + opticalFrameOverheadBytes;
 const int maxRatelessFountainBlocks = 8192;
+const Duration opticalReceiverDefaultSessionIdleTimeout = Duration(seconds: 15);
 
 enum TransferMode {
   reliable(
@@ -103,6 +104,27 @@ class OpticalSender {
     this.onError,
   }) : blockLength = blockLength ?? mode.blockLength,
        frameInterval = frameInterval ?? mode.frameInterval {
+    if (payload.isEmpty || payload.length > maxOpticalPayloadBytes) {
+      throw ArgumentError.value(
+        payload.length,
+        'payload',
+        'must be between 1 byte and 72 MiB',
+      );
+    }
+    if (this.blockLength != mode.blockLength) {
+      throw ArgumentError.value(
+        this.blockLength,
+        'blockLength',
+        'must match the selected transfer mode profile',
+      );
+    }
+    if (this.frameInterval <= Duration.zero) {
+      throw ArgumentError.value(
+        this.frameInterval,
+        'frameInterval',
+        'must be positive',
+      );
+    }
     sessionId = math.Random.secure().nextInt(0xffffffff) + 1;
     payloadChecksum = crc32(payload);
     final expectedBlockCount = math.max(
@@ -275,9 +297,25 @@ class ReceiverEvent {
 }
 
 class OpticalReceiver {
+  OpticalReceiver({
+    this.sessionIdleTimeout = opticalReceiverDefaultSessionIdleTimeout,
+    DateTime Function()? clock,
+  }) : _clock = clock ?? DateTime.now {
+    if (sessionIdleTimeout <= Duration.zero) {
+      throw ArgumentError.value(
+        sessionIdleTimeout,
+        'sessionIdleTimeout',
+        'must be positive',
+      );
+    }
+  }
+
+  final Duration sessionIdleTimeout;
+  final DateTime Function() _clock;
   LTDecoder? _decoder;
   FrameHeader? _configuration;
   DateTime? _startedAt;
+  DateTime? _lastFrameAt;
   bool _delivered = false;
 
   ReceiverSnapshot? get snapshot {
@@ -319,6 +357,16 @@ class OpticalReceiver {
         header.protocolVersion >= currentProtocolVersion &&
         (mode?.usesRatelessFountainFor(header.blockCount) ?? false);
 
+    final now = _clock();
+    final configuration = _configuration;
+    if (configuration != null && !configuration.matches(header)) {
+      // A camera can keep an old session locked forever after a sender has
+      // disappeared. Retain the protection against live cross-talk, but allow
+      // a new sender to take over after a genuine idle period.
+      if (!_isSessionIdle(now)) return null;
+      reset();
+    }
+
     if (_decoder == null) {
       _configuration = header;
       _decoder = LTDecoder(
@@ -329,16 +377,14 @@ class OpticalReceiver {
         protocolVersion: header.protocolVersion,
         systematicFrames: !usesRatelessFountain,
       );
-      _startedAt = DateTime.now();
+      _startedAt = now;
+      _lastFrameAt = now;
       _delivered = false;
-    } else if (!_configuration!.matches(header)) {
-      // Do not let a different QR session destroy an in-progress transfer.
-      // The user can explicitly restart when they want to switch senders.
-      return null;
     }
 
     final decoder = _decoder!;
     decoder.addFrame(header.sequence, parsed.block);
+    _lastFrameAt = now;
     final current = snapshot!;
     if (!decoder.isComplete || _delivered) {
       return ReceiverEvent(snapshot: current);
@@ -360,6 +406,13 @@ class OpticalReceiver {
     _decoder = null;
     _configuration = null;
     _startedAt = null;
+    _lastFrameAt = null;
     _delivered = false;
+  }
+
+  bool _isSessionIdle(DateTime now) {
+    final lastFrameAt = _lastFrameAt;
+    return lastFrameAt != null &&
+        now.difference(lastFrameAt) >= sessionIdleTimeout;
   }
 }

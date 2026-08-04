@@ -239,6 +239,19 @@ class _AboutHeader extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Image.asset(
+              'assets/brand/onesend-icon-1024.png',
+              width: 56,
+              height: 56,
+              filterQuality: FilterQuality.medium,
+              errorBuilder: (context, error, stackTrace) {
+                return const SizedBox.shrink();
+              },
+            ),
+          ),
+          const SizedBox(height: 16),
           const Text(
             'OneSend',
             style: TextStyle(

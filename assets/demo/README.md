@@ -1,27 +1,35 @@
 # OneSend optical test video
 
-onesend-optical-test.mp4 is a tiny, repeatable fixture for testing OneSend's
-optical file-transfer path. It is intentionally high-contrast black and white:
-the frame is made from a white outline, solid panels, and moving geometric
-blocks so that it remains easy to inspect during repeated runs.
+`onesend-optical-test.mp4` is the **shared built-in sample** used for quick
+end-to-end optical transfer tests across:
 
-The clip is an original, copyright-safe alternative to using a music video or
-an internet test clip. It contains no downloaded footage, no Bad Apple video,
-and no commercial song or MV. The visual is generated from primitive shapes and
-the audio is a short synthesized oscillator tone. The fixture may therefore be
-distributed with this MIT-licensed project.
+- the Flutter app send flow (`一键发送内置测试视频`)
+- the website web-transfer sender (`测试视频`)
 
-Current generated media:
+Both surfaces load the same bytes so users get one consistent demo clip.
 
-- 10.0 seconds, 320×180 pixels, 12 fps
-- H.264 Baseline video, yuv420p
-- Mono AAC audio at 8 kHz
-- Smaller than 500 KB; exact ffprobe output is recorded in ffprobe.txt
+## Current fixture
 
-Regenerate the asset from the repository root with:
+- Source: user-provided WeChat sample
+  (`…/msg/video/2026-08/901777534adb47f2ab88e4cd1f7e8c68.mp4`)
+- H.264 + AAC, about 5 seconds, 426×240, ~122 KB
+- SHA-256: `5dfda9d9a8474807525aba5381bac1fce1cf4ef3b94f2b4247ca5a23dbd4fad0`
+- Exact probe output is recorded in `ffprobe.txt`
 
-    bash tool/generate_demo_video.sh
+## Loader
 
-The loader API is in lib/services/sample_file_service.dart. It returns this
-file as a PickedTransfer with the clear filename onesend-optical-test.mp4 and
-MIME type video/mp4.
+- App: `lib/services/sample_file_service.dart` → `assets/demo/onesend-optical-test.mp4`
+- Website: `website/public/onesend-optical-test.mp4`
+
+## Replacing
+
+```bash
+cp /path/to/sample.mp4 assets/demo/onesend-optical-test.mp4
+cp assets/demo/onesend-optical-test.mp4 website/public/onesend-optical-test.mp4
+ffprobe -v error -show_format -show_streams assets/demo/onesend-optical-test.mp4 \
+  > assets/demo/ffprobe.txt
+# then rebuild the macOS/iOS app so the asset is rebundled
+```
+
+Do **not** use `tool/generate_demo_video.sh` for production demos unless you
+explicitly want a synthetic fallback.

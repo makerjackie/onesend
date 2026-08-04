@@ -6,6 +6,7 @@ import FlutterMacOS
 import Foundation
 
 import camera_desktop
+import desktop_drop
 import file_selector_macos
 import mobile_scanner
 import onesend_macos_updater
@@ -18,6 +19,7 @@ import webview_flutter_wkwebview
 
 func RegisterGeneratedPlugins(registry: FlutterPluginRegistry) {
   CameraDesktopPlugin.register(with: registry.registrar(forPlugin: "CameraDesktopPlugin"))
+  DesktopDropPlugin.register(with: registry.registrar(forPlugin: "DesktopDropPlugin"))
   FileSelectorPlugin.register(with: registry.registrar(forPlugin: "FileSelectorPlugin"))
   MobileScannerPlugin.register(with: registry.registrar(forPlugin: "MobileScannerPlugin"))
   OneSendMacosUpdaterPlugin.register(with: registry.registrar(forPlugin: "OneSendMacosUpdaterPlugin"))

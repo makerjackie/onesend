@@ -32,7 +32,7 @@ void main() {
     expect(find.text('扫描接收'), findsOneWidget);
   });
 
-  testWidgets('new sends use fast by default without mode or FPS controls', (
+  testWidgets('new sends expose transfer mode chips without FPS copy', (
     WidgetTester tester,
   ) async {
     final settings = AppSettings(initialLocaleTag: 'zh-Hans');
@@ -44,12 +44,27 @@ void main() {
     await tester.tap(find.text('发送文件'));
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('快速'), findsOneWidget);
+    expect(find.text('传输模式'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey<String>('send-mode-fast')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey<String>('send-mode-reliable')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey<String>('send-mode-turbo')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey<String>('send-mode-cimbar')),
+      findsOneWidget,
+    );
     expect(find.byType(SegmentedButton<TransferMode>), findsNothing);
     expect(find.textContaining('FPS'), findsNothing);
     expect(find.textContaining('帧/秒'), findsNothing);
-    expect(find.textContaining('理论码流'), findsOneWidget);
-    expect(find.textContaining('KB/s'), findsOneWidget);
+    expect(find.textContaining('新传输默认使用'), findsNothing);
   });
 
   testWidgets('picking a file starts the send flow without unsendable state', (
@@ -109,7 +124,7 @@ void main() {
     );
 
     expect(find.text(sampleVideoFileName), findsOneWidget);
-    expect(find.textContaining('27.9 KB'), findsOneWidget);
+    expect(find.textContaining('122.5 KB'), findsOneWidget);
     expect(find.byType(OpticalQr), findsOneWidget);
     expect(find.textContaining('Invalid argument'), findsNothing);
   });
@@ -136,13 +151,15 @@ void main() {
         ),
       );
 
-      await tester.tap(find.byIcon(Icons.more_horiz_rounded));
-      await tester.pumpAndSettle();
-      expect(find.text('设置'), findsOneWidget);
-      expect(find.text('关于 OneSend'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey<String>('home-settings')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const ValueKey<String>('home-about')), findsOneWidget);
+      expect(find.byIcon(Icons.more_horiz_rounded), findsNothing);
       expect(find.text('检查更新'), findsNothing);
 
-      await tester.tap(find.text('设置'));
+      await tester.tap(find.byKey(const ValueKey<String>('home-settings')));
       await tester.pumpAndSettle();
       expect(find.text('自动更新'), findsOneWidget);
       final updateEntry = find.byKey(
@@ -161,9 +178,7 @@ void main() {
 
       await tester.tap(find.byType(BackButton));
       await tester.pumpAndSettle();
-      await tester.tap(find.byIcon(Icons.more_horiz_rounded));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('关于 OneSend'));
+      await tester.tap(find.byKey(const ValueKey<String>('home-about')));
       await tester.pumpAndSettle();
       expect(find.text('实验性离线视觉传输'), findsOneWidget);
     } finally {

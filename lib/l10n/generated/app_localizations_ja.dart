@@ -30,6 +30,9 @@ class AppLocalizationsJa extends AppLocalizations {
   String get modeCimbar => 'CIMBAR カラービジュアルコード（実験的）';
 
   @override
+  String get modeQr => 'QR code';
+
+  @override
   String get compatibilityMode => '互換性';
 
   @override
@@ -317,6 +320,15 @@ class AppLocalizationsJa extends AppLocalizations {
   String newTransferStatus(Object mode, Object speed) {
     return '新しい送信は $mode モードを使用 · 理論上の速度は約 $speed';
   }
+
+  @override
+  String get transferModeLabel => 'Transfer mode';
+
+  @override
+  String get dropFilesHint => 'Or drag and drop a file here';
+
+  @override
+  String get dropFilesActive => 'Drop to send';
 
   @override
   String get reading => '読み取り中…';

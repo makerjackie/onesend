@@ -4,7 +4,7 @@ OneSend uses the bundle identifier `com.makerjackie.onesend`.
 
 ## Current version / 当前版本
 
-OneSend 1.5.0 (build 13) is the current release candidate. This checklist does not assert any
+OneSend 1.5.0 (build 18) is the current release candidate. This checklist does not assert any
 TestFlight processing, Beta App Review, or external tester availability status; check
 App Store Connect for the live status.
 
@@ -19,15 +19,33 @@ App Store Connect for the live status.
 ## Local archive and upload
 
 ```bash
-flutter pub get
-flutter build ipa \
-  --release \
-  --build-name 1.5.0 \
-  --build-number 13 \
-  --export-method app-store
+asc xcode archive \
+  --workspace "ios/Runner.xcworkspace" \
+  --scheme "Runner" \
+  --configuration Release \
+  --clean \
+  --archive-path "build/ios-testflight-1.5.0-18/OneSend.xcarchive" \
+  --xcodebuild-flag=-destination \
+  --xcodebuild-flag=generic/platform=iOS \
+  --xcodebuild-flag=-allowProvisioningUpdates \
+  --xcodebuild-flag=FLUTTER_BUILD_NAME=1.5.0 \
+  --xcodebuild-flag=FLUTTER_BUILD_NUMBER=18 \
+  --output json
+
+asc xcode export \
+  --archive-path "build/ios-testflight-1.5.0-18/OneSend.xcarchive" \
+  --ipa-path "build/ios-testflight-1.5.0-18/OneSend.ipa" \
+  --xcodebuild-flag=-allowProvisioningUpdates \
+  --output json
+
+asc builds upload \
+  --app "6797040758" \
+  --ipa "build/ios-testflight-1.5.0-18/OneSend.ipa" \
+  --wait \
+  --output json
 ```
 
-Upload the generated IPA from `build/ios/ipa/` with Transporter or App Store Connect. The archive must use the registered bundle identifier and an App Store distribution profile.
+The archive must use the registered bundle identifier and an App Store distribution profile.
 
 ## TestFlight external beta
 

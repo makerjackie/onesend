@@ -29,6 +29,15 @@ const worker = {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
 
+    // With assets.run_worker_first, Cloudflare never auto-serves static files.
+    // vinext only signals ASSETS for public/ files (icon.png, etc.). Vite's
+    // content-hashed client bundles live under /assets/* and would otherwise
+    // fall through to the RSC router and 404 — unstyled SSR HTML looks like
+    // "乱码". Serve them directly from the ASSETS binding.
+    if (url.pathname.startsWith("/assets/")) {
+      return env.ASSETS.fetch(request);
+    }
+
     if (url.pathname === "/_vinext/image") {
       const allowedWidths = [...DEFAULT_DEVICE_SIZES, ...DEFAULT_IMAGE_SIZES];
       return handleImageOptimization(request, {
