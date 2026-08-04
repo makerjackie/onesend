@@ -83,7 +83,11 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const ValueKey<String>('home-receive')));
-    await tester.pumpAndSettle();
+    // A live camera surface intentionally keeps scheduling frames, especially
+    // on Linux desktop. Advance the route animation without waiting for a
+    // continuously running preview to become idle.
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
     expect(find.byType(ReceiveScreen), findsOneWidget);
   });
 }
