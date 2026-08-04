@@ -704,6 +704,30 @@ body:has(.transfer-page) {
   background: var(--lime);
 }
 
+.web-mode-options-compact button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  text-align: left;
+}
+
+.web-mode-option-label {
+  font-weight: 700;
+}
+
+.web-mode-option-detail {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.web-mode-options-compact button.is-selected .web-mode-option-detail {
+  color: var(--ink);
+  opacity: 0.72;
+}
+
 .web-mode-primary button:disabled {
   opacity: 0.55;
   cursor: not-allowed;

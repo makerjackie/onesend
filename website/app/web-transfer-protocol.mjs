@@ -32,21 +32,21 @@ const decoder = new TextDecoder();
 export const TRANSFER_MODES = {
   reliable: {
     id: 0,
-    label: "Reliable",
+    label: "Compatible",
     blockLength: 720,
     frameIntervalMs: 125,
     errorCorrectionLevel: "M",
   },
   fast: {
     id: 2,
-    label: "Fast",
+    label: "Standard",
     blockLength: 1700,
     frameIntervalMs: 1000 / 24,
     errorCorrectionLevel: "L",
   },
   turbo: {
     id: 3,
-    label: "Turbo",
+    label: "Fast",
     blockLength: 2921,
     frameIntervalMs: 1000 / 24,
     errorCorrectionLevel: "L",

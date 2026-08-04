@@ -18,16 +18,16 @@ class AppLocalizationsFr extends AppLocalizations {
   String get language => 'Langue';
 
   @override
-  String get modeFast => 'Rapide';
+  String get modeFast => 'Standard (recommandé)';
 
   @override
-  String get modeReliable => 'Fiable';
+  String get modeReliable => 'Compatible';
 
   @override
-  String get modeTurboQr => 'Turbo QR (expérimental)';
+  String get modeTurboQr => 'Rapide';
 
   @override
-  String get modeCimbar => 'Code visuel couleur CIMBAR (expérimental)';
+  String get modeCimbar => 'Couleur (expérimental)';
 
   @override
   String get modeQr => 'Code QR';
@@ -230,7 +230,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get algorithmDescription =>
-      'Choisissez un profil QR ou le code visuel couleur CIMBAR expérimental. Le mode de réception QR est indiqué par chaque image.';
+      'Laissez Standard pour un usage quotidien. Dans les réglages : Compatible, Rapide ou Couleur expérimentale.';
 
   @override
   String theoreticalSpeed(Object speed) {
@@ -239,22 +239,22 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String fastModeDescription(Object speed) {
-    return '$speed ; rapide et stable dans une configuration fixe avec un écran lumineux.';
+    return '$speed ; valeur par défaut pour la plupart des téléphones et un écran lumineux.';
   }
 
   @override
   String reliableModeDescription(Object speed) {
-    return '$speed ; compatibilité fiable grâce à une meilleure marge de correction d’erreurs, mais plus lent.';
+    return '$speed ; plus lent mais plus stable en faible lumière ou si la mise au point est difficile.';
   }
 
   @override
   String turboModeDescription(Object speed) {
-    return '$speed ; profil QR expérimental à haute capacité, avec une marge de scan réduite.';
+    return '$speed ; plus rapide, avec des exigences plus fortes de mise au point, d’exposition et d’appareil.';
   }
 
   @override
   String get cimbarModeDescription =>
-      'Référence de débit montant : environ 106 KB/s ; code visuel couleur expérimental sur Android et iOS.';
+      'Code couleur expérimental ; pic plus élevé, les deux côtés doivent correspondre, conditions plus exigeantes.';
 
   @override
   String get modeSaveError =>

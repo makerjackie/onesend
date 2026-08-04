@@ -18,16 +18,16 @@ class AppLocalizationsJa extends AppLocalizations {
   String get language => '言語';
 
   @override
-  String get modeFast => '高速';
+  String get modeFast => '標準（推奨）';
 
   @override
-  String get modeReliable => '安定';
+  String get modeReliable => '互換';
 
   @override
-  String get modeTurboQr => 'Turbo QR（実験的）';
+  String get modeTurboQr => '高速';
 
   @override
-  String get modeCimbar => 'CIMBAR カラービジュアルコード（実験的）';
+  String get modeCimbar => 'カラー（実験）';
 
   @override
   String get modeQr => 'QR コード';
@@ -222,8 +222,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get defaultTransferAlgorithm => 'デフォルトの転送アルゴリズム';
 
   @override
-  String get algorithmDescription =>
-      'QR プロファイルまたは実験的な CIMBAR カラービジュアルコードを選択します。QR 受信モードは各フレームに記述されています。';
+  String get algorithmDescription => '日常は「標準」のまま。設定で互換・高速・実験カラーに変更できます。';
 
   @override
   String theoreticalSpeed(Object speed) {
@@ -232,22 +231,21 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String fastModeDescription(Object speed) {
-    return '$speed；安定した環境と明るい画面に適した、高速で安定したモード。';
+    return '$speed；多くの端末と明るい画面向けの日常デフォルト。';
   }
 
   @override
   String reliableModeDescription(Object speed) {
-    return '$speed；エラー訂正の余裕が大きく互換性に優れますが、低速です。';
+    return '$speed；暗い場所やピントが合いにくいときの、より安定した低速モード。';
   }
 
   @override
   String turboModeDescription(Object speed) {
-    return '$speed；実験的な大容量 QR プロファイル。スキャンの余裕は小さくなります。';
+    return '$speed；より高速。ピント・露出・端末への要求は高めです。';
   }
 
   @override
-  String get cimbarModeDescription =>
-      '上流方向の基準値は約 106 KB/s。Android と iOS で使える実験的なカラービジュアルコードです。';
+  String get cimbarModeDescription => '実験的カラーコード。ピークは高いが、双方でカラーを選び、条件が厳しいです。';
 
   @override
   String get modeSaveError => 'デフォルトの転送設定を保存できませんでした。もう一度お試しください。';

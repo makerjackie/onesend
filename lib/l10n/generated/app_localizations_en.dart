@@ -18,16 +18,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get language => 'Language';
 
   @override
-  String get modeFast => 'Fast';
+  String get modeFast => 'Standard (Recommended)';
 
   @override
-  String get modeReliable => 'Reliable';
+  String get modeReliable => 'Compatible';
 
   @override
-  String get modeTurboQr => 'Turbo QR';
+  String get modeTurboQr => 'Fast';
 
   @override
-  String get modeCimbar => 'Color code';
+  String get modeCimbar => 'Color (Experimental)';
 
   @override
   String get modeQr => 'QR code';
@@ -228,7 +228,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get algorithmDescription =>
-      'Choose a QR profile or the experimental CIMBAR color visual code. QR receive mode is described by each frame.';
+      'Leave Standard selected for daily use. Switch to Compatible, Fast, or experimental Color in settings.';
 
   @override
   String theoreticalSpeed(Object speed) {
@@ -237,22 +237,22 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String fastModeDescription(Object speed) {
-    return '$speed; stable and fast for a steady setup and bright screen.';
+    return '$speed; daily default for most phones and a bright screen.';
   }
 
   @override
   String reliableModeDescription(Object speed) {
-    return '$speed; reliable compatibility with more error-correction headroom, but slower.';
+    return '$speed; slower but steadier when light is poor or focus is hard.';
   }
 
   @override
   String turboModeDescription(Object speed) {
-    return '$speed; experimental high-capacity QR profile with less scanning headroom.';
+    return '$speed; faster, with tighter focus, exposure, and device demands.';
   }
 
   @override
   String get cimbarModeDescription =>
-      'About 106 KB/s upstream reference; experimental color visual code on Android and iOS.';
+      'Experimental color code; higher peak speed, both sides must match, tougher conditions.';
 
   @override
   String get modeSaveError =>

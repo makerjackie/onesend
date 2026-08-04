@@ -971,7 +971,7 @@ export function CimbarTransfer({
   return (
     <div className={`web-cimbar-shell${embedded ? " is-embedded" : ""}`}>
       {showTabs && (
-        <div className="web-role-tabs web-role-tabs-compact" role="tablist" aria-label="彩色视觉码">
+        <div className="web-role-tabs web-role-tabs-compact" role="tablist" aria-label="彩色（实验）">
           <button
             type="button"
             role="tab"
@@ -1086,7 +1086,7 @@ export function CimbarTransfer({
                 </span>
               </div>
               <p className="web-stage-note web-cimbar-hint">
-                参考峰值来自理想条件；另一台也要选「彩色视觉码」，屏幕调最亮。
+                参考峰值来自理想条件；另一台也要选「彩色（实验）」，屏幕调最亮。
               </p>
             </section>
           </div>
@@ -1110,7 +1110,7 @@ export function CimbarTransfer({
                   imageRendering: "pixelated",
                 }}
                 role="img"
-                aria-label="彩色视觉码"
+                aria-label="彩色（实验）"
               />
               {!selectedFile && (
                 <span className="web-code-placeholder">准备中…</span>

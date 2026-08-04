@@ -1131,7 +1131,7 @@ class ReceiveScreenState extends State<ReceiveScreen>
               maxHeight: constraints.maxHeight,
             ),
             child: Card(
-              child: Padding(
+              child: SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,

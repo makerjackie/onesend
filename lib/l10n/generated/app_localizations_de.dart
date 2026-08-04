@@ -18,16 +18,16 @@ class AppLocalizationsDe extends AppLocalizations {
   String get language => 'Sprache';
 
   @override
-  String get modeFast => 'Schnell';
+  String get modeFast => 'Standard (empfohlen)';
 
   @override
-  String get modeReliable => 'Zuverlässig';
+  String get modeReliable => 'Kompatibel';
 
   @override
-  String get modeTurboQr => 'Turbo QR (experimentell)';
+  String get modeTurboQr => 'Schnell';
 
   @override
-  String get modeCimbar => 'CIMBAR-Farbcode (experimentell)';
+  String get modeCimbar => 'Farbe (experimentell)';
 
   @override
   String get modeQr => 'QR-Code';
@@ -232,7 +232,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get algorithmDescription =>
-      'Wähle ein QR-Profil oder den experimentellen CIMBAR-Farbcode. Der QR-Empfangsmodus ist in jedem Einzelbild angegeben.';
+      'Standard für den Alltag belassen. In den Einstellungen: Kompatibel, Schnell oder experimentelle Farbe.';
 
   @override
   String theoreticalSpeed(Object speed) {
@@ -241,22 +241,22 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String fastModeDescription(Object speed) {
-    return '$speed; stabil und schnell bei ruhiger Haltung und hellem Bildschirm.';
+    return '$speed; Alltag-Standard für die meisten Handys und helle Bildschirme.';
   }
 
   @override
   String reliableModeDescription(Object speed) {
-    return '$speed; zuverlässig, kompatibel und mit mehr Spielraum für Fehlerkorrektur, aber langsamer.';
+    return '$speed; langsamer, aber stabiler bei schlechtem Licht oder schwierigem Fokus.';
   }
 
   @override
   String turboModeDescription(Object speed) {
-    return '$speed; experimentelles QR-Profil mit hoher Kapazität und weniger Spielraum beim Scannen.';
+    return '$speed; schneller, braucht bessere Fokussierung, Belichtung und Geräte.';
   }
 
   @override
   String get cimbarModeDescription =>
-      'Etwa 106 KB/s als Senderichtwert; experimenteller Farbcode auf Android und iOS.';
+      'Experimenteller Farbcode; höhere Spitze, beide Seiten müssen passen, höhere Anforderungen.';
 
   @override
   String get modeSaveError =>

@@ -78,7 +78,7 @@ test("cimbar copy and camera behavior stay local and opt-in", () => {
 
   // Old /cimbar bookmarks redirect into the main web-transfer mode switcher.
   assert.match(page, /redirect\("\/#web-transfer"\)/);
-  assert.match(webTransfer, /彩色视觉码/);
+  assert.match(webTransfer, /彩色（实验）/);
   assert.match(client, /选择文件/);
   assert.match(client, /测试视频/);
   assert.match(client, /开始发送/);

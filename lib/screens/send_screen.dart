@@ -508,23 +508,34 @@ class _SendScreenState extends State<SendScreen>
     final currentRate = _currentBytesPerSecond();
     final scheme = Theme.of(context).colorScheme;
 
-    Widget qrStage(double qrSize, {required bool compact}) {
+    Widget qrStage({required bool compact}) {
       return Card(
+        clipBehavior: Clip.hardEdge,
         child: Padding(
           padding: EdgeInsets.all(compact ? 12 : 16),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            mainAxisSize: MainAxisSize.min,
             children: [
-              SizedBox.square(
-                dimension: qrSize,
-                child: _frame == null
-                    ? const Center(child: CircularProgressIndicator())
-                    : OpticalQr(
-                        bytes: _frame!,
-                        size: qrSize,
-                        robust: _mode == TransferMode.reliable,
+              Expanded(
+                child: LayoutBuilder(
+                  builder: (context, box) {
+                    final qrSize = math.max(
+                      96.0,
+                      math.min(box.maxWidth, box.maxHeight),
+                    );
+                    return Center(
+                      child: SizedBox.square(
+                        dimension: qrSize,
+                        child: _frame == null
+                            ? const Center(child: CircularProgressIndicator())
+                            : OpticalQr(
+                                bytes: _frame!,
+                                size: qrSize,
+                                robust: _mode == TransferMode.reliable,
+                              ),
                       ),
+                    );
+                  },
+                ),
               ),
               SizedBox(height: compact ? 8 : 12),
               Container(
@@ -539,6 +550,8 @@ class _SendScreenState extends State<SendScreen>
                 ),
                 child: Text(
                   l10n.modeBadge(_localizedModeLabel(l10n, _mode)),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     color: oneSendInk,
                     fontSize: 12,
@@ -668,10 +681,6 @@ class _SendScreenState extends State<SendScreen>
       builder: (context, constraints) {
         final workbench = constraints.maxWidth >= oneSendWorkbenchBreakpoint;
         if (workbench) {
-          final qrSize = math.min(
-            400.0,
-            math.max(220.0, constraints.maxHeight - 100),
-          );
           return Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
             child: Row(
@@ -687,7 +696,7 @@ class _SendScreenState extends State<SendScreen>
                 const SizedBox(width: 16),
                 Expanded(
                   flex: 6,
-                  child: Center(child: qrStage(qrSize, compact: false)),
+                  child: qrStage(compact: false),
                 ),
               ],
             ),
@@ -695,17 +704,12 @@ class _SendScreenState extends State<SendScreen>
         }
 
         // Phone: pin controls to bottom, QR fills remaining height — no scroll.
-        const bottomReserve = 196.0;
-        final qrSize = math.min(
-          constraints.maxWidth - 32,
-          math.max(140.0, constraints.maxHeight - bottomReserve),
-        );
         return Padding(
           padding: const EdgeInsets.fromLTRB(16, 6, 16, 10),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Expanded(child: Center(child: qrStage(qrSize, compact: true))),
+              Expanded(child: qrStage(compact: true)),
               const SizedBox(height: 8),
               controlPanel(dense: true),
             ],

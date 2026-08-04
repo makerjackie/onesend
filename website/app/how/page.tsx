@@ -37,7 +37,7 @@ export default function HowPage() {
           <article>
             <span className="step-number">02</span>
             <h3>持续显示</h3>
-            <p>按所选模式生成快速 / 可靠 / Turbo QR 或彩色视觉码流。</p>
+            <p>按所选模式生成标准 / 兼容 / 快速二维码或彩色码流。</p>
           </article>
           <article>
             <span className="step-number">03</span>
@@ -50,20 +50,20 @@ export default function HowPage() {
           <h2>传输模式</h2>
           <ul>
             <li>
-              <strong>快速</strong> — 默认 QR，更高吞吐
+              <strong>标准（推荐）</strong> — 日常默认，约 33 KB/s
             </li>
             <li>
-              <strong>可靠</strong> — 更强纠错，更稳
+              <strong>兼容</strong> — 更稳更慢，约 4.7 KB/s
             </li>
             <li>
-              <strong>Turbo QR</strong> — 更高密度 QR
+              <strong>快速</strong> — 更快，约 56 KB/s，对设备要求更高
             </li>
             <li>
-              <strong>彩色视觉码</strong> — libcimbar 彩色实验模式
+              <strong>彩色（实验）</strong> — 峰值更高，两端都要选彩色
             </li>
           </ul>
           <p className="how-note">
-            两端请选同一模式。彩色视觉码与 QR 互不兼容。
+            两端请选同一模式。彩色与二维码互不兼容。什么都不改时使用标准。
           </p>
         </div>
 

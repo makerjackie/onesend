@@ -101,15 +101,15 @@ export const webTransferCopy: WebTransferCopy = {
   modeSettings: "传输模式设置",
   qr: "二维码",
   qrAdvanced: "二维码档位",
-  autoFast: "快速",
-  fast: "快速",
-  reliable: "可靠",
-  turbo: "Turbo",
-  color: "彩色视觉码",
-  fastDetail: "",
-  reliableDetail: "",
-  turboDetail: "",
-  colorDetail: "",
+  autoFast: "标准（推荐）",
+  fast: "标准（推荐）",
+  reliable: "兼容",
+  turbo: "快速",
+  color: "彩色（实验）",
+  fastDetail: "约 33 KB/s · 日常默认",
+  reliableDetail: "约 4.7 KB/s · 更稳更慢",
+  turboDetail: "约 56 KB/s · 对设备要求更高",
+  colorDetail: "峰值更高 · 两端都要选彩色",
   modeSwitchHint: "可随时切换模式；发送中切换会按新模式立刻重发。",
   displayCode: "开始发送",
   pause: "暂停",
@@ -891,10 +891,14 @@ export function WebTransfer({
         : mode === "turbo"
           ? copy.turbo
           : copy.fast;
-    const qrProfiles: { id: QrModeChoice; label: string }[] = [
-      { id: "fast", label: copy.fast },
-      { id: "reliable", label: copy.reliable },
-      { id: "turbo", label: copy.turbo },
+    const qrProfiles: {
+      id: QrModeChoice;
+      label: string;
+      detail: string;
+    }[] = [
+      { id: "fast", label: copy.fast, detail: copy.fastDetail },
+      { id: "reliable", label: copy.reliable, detail: copy.reliableDetail },
+      { id: "turbo", label: copy.turbo, detail: copy.turboDetail },
     ];
     return (
       <div className="web-mode-switcher">
@@ -919,6 +923,7 @@ export function WebTransfer({
             className={family === "cimbar" ? "is-selected" : ""}
             aria-pressed={family === "cimbar"}
             disabled={modeBusy}
+            title={copy.colorDetail}
             onClick={() => handleModeChange("cimbar")}
           >
             {copy.color}
@@ -943,12 +948,16 @@ export function WebTransfer({
                   type="button"
                   aria-pressed={mode === option.id}
                   disabled={modeBusy}
+                  title={option.detail}
                   onClick={() => {
                     handleModeChange(option.id);
                     modeMenuRef.current?.removeAttribute("open");
                   }}
                 >
-                  {option.label}
+                  <span className="web-mode-option-label">{option.label}</span>
+                  {option.detail ? (
+                    <span className="web-mode-option-detail">{option.detail}</span>
+                  ) : null}
                 </button>
               ))}
             </div>
@@ -1166,7 +1175,7 @@ export function WebTransfer({
             ) {
               lastDecodeMissRef.current = now;
               setScanHint(
-                "还没扫到有效帧。请把发送码放满取景框、屏幕调亮；优先用「可靠」模式。",
+                "还没扫到有效帧。请把发送码放满取景框、屏幕调亮；优先用「兼容」模式。",
               );
             }
           } finally {
@@ -1581,7 +1590,7 @@ export function WebTransfer({
         <div className="web-transfer-notes web-transfer-notes-compact">
           <p>
             <strong>{copy.localNote}</strong>
-            {usesCimbar ? " 当前：彩色视觉码。" : ""}
+            {usesCimbar ? " 当前：彩色（实验）。" : ""}
           </p>
         </div>
       </div>

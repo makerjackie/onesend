@@ -133,25 +133,25 @@ abstract class AppLocalizations {
   /// No description provided for @modeFast.
   ///
   /// In en, this message translates to:
-  /// **'Fast'**
+  /// **'Standard (Recommended)'**
   String get modeFast;
 
   /// No description provided for @modeReliable.
   ///
   /// In en, this message translates to:
-  /// **'Reliable'**
+  /// **'Compatible'**
   String get modeReliable;
 
   /// No description provided for @modeTurboQr.
   ///
   /// In en, this message translates to:
-  /// **'Turbo QR'**
+  /// **'Fast'**
   String get modeTurboQr;
 
   /// No description provided for @modeCimbar.
   ///
   /// In en, this message translates to:
-  /// **'Color code'**
+  /// **'Color (Experimental)'**
   String get modeCimbar;
 
   /// No description provided for @modeQr.
@@ -469,7 +469,7 @@ abstract class AppLocalizations {
   /// No description provided for @algorithmDescription.
   ///
   /// In en, this message translates to:
-  /// **'Choose a QR profile or the experimental CIMBAR color visual code. QR receive mode is described by each frame.'**
+  /// **'Leave Standard selected for daily use. Switch to Compatible, Fast, or experimental Color in settings.'**
   String get algorithmDescription;
 
   /// No description provided for @theoreticalSpeed.
@@ -481,25 +481,25 @@ abstract class AppLocalizations {
   /// No description provided for @fastModeDescription.
   ///
   /// In en, this message translates to:
-  /// **'{speed}; stable and fast for a steady setup and bright screen.'**
+  /// **'{speed}; daily default for most phones and a bright screen.'**
   String fastModeDescription(Object speed);
 
   /// No description provided for @reliableModeDescription.
   ///
   /// In en, this message translates to:
-  /// **'{speed}; reliable compatibility with more error-correction headroom, but slower.'**
+  /// **'{speed}; slower but steadier when light is poor or focus is hard.'**
   String reliableModeDescription(Object speed);
 
   /// No description provided for @turboModeDescription.
   ///
   /// In en, this message translates to:
-  /// **'{speed}; experimental high-capacity QR profile with less scanning headroom.'**
+  /// **'{speed}; faster, with tighter focus, exposure, and device demands.'**
   String turboModeDescription(Object speed);
 
   /// No description provided for @cimbarModeDescription.
   ///
   /// In en, this message translates to:
-  /// **'About 106 KB/s upstream reference; experimental color visual code on Android and iOS.'**
+  /// **'Experimental color code; higher peak speed, both sides must match, tougher conditions.'**
   String get cimbarModeDescription;
 
   /// No description provided for @modeSaveError.

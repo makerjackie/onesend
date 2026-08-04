@@ -21,19 +21,19 @@ const Duration opticalReceiverDefaultSessionIdleTimeout = Duration(seconds: 15);
 enum TransferMode {
   reliable(
     id: 0,
-    label: '可靠',
+    label: '兼容',
     blockLength: 720,
     frameInterval: Duration(milliseconds: 125),
   ),
   fast(
     id: 2,
-    label: '快速',
+    label: '标准',
     blockLength: 1700,
     frameInterval: Duration(microseconds: 41667),
   ),
   turbo(
     id: 3,
-    label: 'Turbo',
+    label: '快速',
     blockLength: 2921,
     frameInterval: Duration(microseconds: 41667),
   );

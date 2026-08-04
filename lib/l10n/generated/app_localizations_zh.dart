@@ -18,16 +18,16 @@ class AppLocalizationsZh extends AppLocalizations {
   String get language => '语言';
 
   @override
-  String get modeFast => '快速';
+  String get modeFast => '标准（推荐）';
 
   @override
-  String get modeReliable => '可靠';
+  String get modeReliable => '兼容';
 
   @override
-  String get modeTurboQr => 'Turbo QR';
+  String get modeTurboQr => '快速';
 
   @override
-  String get modeCimbar => '彩色视觉码';
+  String get modeCimbar => '彩色（实验）';
 
   @override
   String get modeQr => '二维码';
@@ -216,8 +216,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get defaultTransferAlgorithm => '默认传输算法';
 
   @override
-  String get algorithmDescription =>
-      '可选择二维码配置或实验性的 CIMBAR 彩色视觉码。二维码接收模式会由每帧自描述。';
+  String get algorithmDescription => '默认「标准」即可日常使用。可在设置中改为兼容、快速，或实验性彩色。';
 
   @override
   String theoreticalSpeed(Object speed) {
@@ -226,22 +225,21 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String fastModeDescription(Object speed) {
-    return '$speed；稳定快速，适合固定设备和明亮屏幕。';
+    return '$speed；日常默认，适合大多数手机和明亮屏幕。';
   }
 
   @override
   String reliableModeDescription(Object speed) {
-    return '$speed；可靠兼容，纠错余量更大，但传输更慢。';
+    return '$speed；更稳更慢，光线差或难对焦时使用。';
   }
 
   @override
   String turboModeDescription(Object speed) {
-    return '$speed；实验性高容量二维码配置，扫描余量更小。';
+    return '$speed；更快，对对焦、曝光和设备要求更高。';
   }
 
   @override
-  String get cimbarModeDescription =>
-      '上游基准约 106 KB/s；Android 和 iOS 上可用的实验性彩色视觉码。';
+  String get cimbarModeDescription => '实验性彩色码；峰值更高，两端都要选彩色，条件要求高。';
 
   @override
   String get modeSaveError => '无法保存默认传输设置，请稍后重试。';
@@ -852,16 +850,16 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get language => '语言';
 
   @override
-  String get modeFast => '快速';
+  String get modeFast => '标准（推荐）';
 
   @override
-  String get modeReliable => '可靠';
+  String get modeReliable => '兼容';
 
   @override
-  String get modeTurboQr => 'Turbo QR';
+  String get modeTurboQr => '快速';
 
   @override
-  String get modeCimbar => '彩色视觉码';
+  String get modeCimbar => '彩色（实验）';
 
   @override
   String get modeQr => '二维码';
@@ -1050,8 +1048,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get defaultTransferAlgorithm => '默认传输算法';
 
   @override
-  String get algorithmDescription =>
-      '可选择二维码配置或实验性的 CIMBAR 彩色视觉码。二维码接收模式会由每帧自描述。';
+  String get algorithmDescription => '默认「标准」即可日常使用。可在设置中改为兼容、快速，或实验性彩色。';
 
   @override
   String theoreticalSpeed(Object speed) {
@@ -1060,22 +1057,21 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String fastModeDescription(Object speed) {
-    return '$speed；稳定快速，适合固定设备和明亮屏幕。';
+    return '$speed；日常默认，适合大多数手机和明亮屏幕。';
   }
 
   @override
   String reliableModeDescription(Object speed) {
-    return '$speed；可靠兼容，纠错余量更大，但传输更慢。';
+    return '$speed；更稳更慢，光线差或难对焦时使用。';
   }
 
   @override
   String turboModeDescription(Object speed) {
-    return '$speed；实验性高容量二维码配置，扫描余量更小。';
+    return '$speed；更快，对对焦、曝光和设备要求更高。';
   }
 
   @override
-  String get cimbarModeDescription =>
-      '上游基准约 106 KB/s；Android 和 iOS 上可用的实验性彩色视觉码。';
+  String get cimbarModeDescription => '实验性彩色码；峰值更高，两端都要选彩色，条件要求高。';
 
   @override
   String get modeSaveError => '无法保存默认传输设置，请稍后重试。';
@@ -1686,16 +1682,16 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get language => '語言';
 
   @override
-  String get modeFast => '快速';
+  String get modeFast => '標準（推薦）';
 
   @override
-  String get modeReliable => '可靠';
+  String get modeReliable => '相容';
 
   @override
-  String get modeTurboQr => 'Turbo QR';
+  String get modeTurboQr => '快速';
 
   @override
-  String get modeCimbar => '彩色視覺碼';
+  String get modeCimbar => '彩色（實驗）';
 
   @override
   String get modeQr => '二維碼';
@@ -1889,8 +1885,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get defaultTransferAlgorithm => '預設傳輸演算法';
 
   @override
-  String get algorithmDescription =>
-      '選擇 QR 設定或實驗性的 CIMBAR 彩色視覺碼。QR 接收模式會在每個影格中自我描述。';
+  String get algorithmDescription => '預設「標準」即可日常使用。可在設定中改為相容、快速，或實驗性彩色。';
 
   @override
   String theoreticalSpeed(Object speed) {
@@ -1899,22 +1894,21 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String fastModeDescription(Object speed) {
-    return '$speed；穩定快速，適合固定裝置和明亮螢幕。';
+    return '$speed；日常預設，適合大多數手機和明亮螢幕。';
   }
 
   @override
   String reliableModeDescription(Object speed) {
-    return '$speed；可靠且相容性高，錯誤修正餘量更大，但傳輸較慢。';
+    return '$speed；更穩更慢，光線差或難對焦時使用。';
   }
 
   @override
   String turboModeDescription(Object speed) {
-    return '$speed；實驗性高容量 QR 設定，掃描餘量較小。';
+    return '$speed；更快，對對焦、曝光和裝置要求更高。';
   }
 
   @override
-  String get cimbarModeDescription =>
-      '上游基準約 106 KB/s；Android 和 iOS 上可用的實驗性彩色視覺碼。';
+  String get cimbarModeDescription => '實驗性彩色碼；峰值更高，兩端都要選彩色，條件要求高。';
 
   @override
   String get modeSaveError => '無法儲存預設傳輸設定，請稍後再試。';

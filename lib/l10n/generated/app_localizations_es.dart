@@ -18,16 +18,16 @@ class AppLocalizationsEs extends AppLocalizations {
   String get language => 'Idioma';
 
   @override
-  String get modeFast => 'Rápido';
+  String get modeFast => 'Estándar (recomendado)';
 
   @override
-  String get modeReliable => 'Fiable';
+  String get modeReliable => 'Compatible';
 
   @override
-  String get modeTurboQr => 'Turbo QR (experimental)';
+  String get modeTurboQr => 'Rápido';
 
   @override
-  String get modeCimbar => 'Código visual de color CIMBAR (experimental)';
+  String get modeCimbar => 'Color (experimental)';
 
   @override
   String get modeQr => 'Código QR';
@@ -232,7 +232,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get algorithmDescription =>
-      'Elige un perfil QR o el código visual de color CIMBAR experimental. El modo de recepción QR se describe en cada fotograma.';
+      'Deje Estándar para el uso diario. En ajustes: Compatible, Rápido o Color experimental.';
 
   @override
   String theoreticalSpeed(Object speed) {
@@ -241,22 +241,22 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String fastModeDescription(Object speed) {
-    return '$speed; estable y rápido con una configuración fija y una pantalla brillante.';
+    return '$speed; predeterminado diario para la mayoría de teléfonos y pantallas brillantes.';
   }
 
   @override
   String reliableModeDescription(Object speed) {
-    return '$speed; compatibilidad fiable con mayor margen de corrección de errores, pero más lento.';
+    return '$speed; más lento pero más estable con poca luz o enfoque difícil.';
   }
 
   @override
   String turboModeDescription(Object speed) {
-    return '$speed; perfil QR experimental de alta capacidad con menos margen para el escaneo.';
+    return '$speed; más rápido, con mayores exigencias de enfoque, exposición y dispositivo.';
   }
 
   @override
   String get cimbarModeDescription =>
-      'Referencia de subida de unos 106 KB/s; código visual de color experimental para Android e iOS.';
+      'Código de color experimental; pico más alto, ambos lados deben coincidir, condiciones más exigentes.';
 
   @override
   String get modeSaveError =>

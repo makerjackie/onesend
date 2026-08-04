@@ -8,9 +8,9 @@ import '../services/file_service.dart';
 
 /// A compact, shared mode entry used by send, receive, and settings.
 ///
-/// Default surface is two peers: QR (stable default Fast) and color code.
-/// Set [showQrProfiles] for settings so Reliable / Fast / Turbo stay available
-/// as advanced QR profiles without cluttering the main transfer path.
+/// Default surface is two peers: QR (stable default Standard) and color.
+/// Set [showQrProfiles] for settings so Compatible / Standard / Fast stay
+/// available as QR profiles without cluttering the main transfer path.
 class TransferModeSelector extends StatelessWidget {
   const TransferModeSelector({
     required this.algorithm,

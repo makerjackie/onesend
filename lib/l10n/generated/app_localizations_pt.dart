@@ -18,16 +18,16 @@ class AppLocalizationsPt extends AppLocalizations {
   String get language => 'Idioma';
 
   @override
-  String get modeFast => 'Rápido';
+  String get modeFast => 'Padrão (recomendado)';
 
   @override
-  String get modeReliable => 'Confiável';
+  String get modeReliable => 'Compatível';
 
   @override
-  String get modeTurboQr => 'Turbo QR (experimental)';
+  String get modeTurboQr => 'Rápido';
 
   @override
-  String get modeCimbar => 'Código visual colorido CIMBAR (experimental)';
+  String get modeCimbar => 'Cor (experimental)';
 
   @override
   String get modeQr => 'Código QR';
@@ -230,7 +230,7 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get algorithmDescription =>
-      'Escolha um perfil QR ou o código visual colorido CIMBAR experimental. O modo de recebimento QR é descrito em cada quadro.';
+      'Deixe Padrão no uso diário. Em ajustes: Compatível, Rápido ou Cor experimental.';
 
   @override
   String theoreticalSpeed(Object speed) {
@@ -239,22 +239,22 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String fastModeDescription(Object speed) {
-    return '$speed; rápido e estável em um ambiente estável e uma tela brilhante.';
+    return '$speed; padrão diário para a maioria dos telefones e telas brilhantes.';
   }
 
   @override
   String reliableModeDescription(Object speed) {
-    return '$speed; com mais compatibilidade e margem para correção de erros, mas mais lento.';
+    return '$speed; mais lento, mas mais estável com pouca luz ou foco difícil.';
   }
 
   @override
   String turboModeDescription(Object speed) {
-    return '$speed; perfil QR experimental de alta capacidade, com menos margem para leitura.';
+    return '$speed; mais rápido, com exigências maiores de foco, exposição e dispositivo.';
   }
 
   @override
   String get cimbarModeDescription =>
-      'Referência de envio de cerca de 106 KB/s; código visual colorido experimental no Android e iOS.';
+      'Código colorido experimental; pico mais alto, ambos os lados devem combinar, condições mais exigentes.';
 
   @override
   String get modeSaveError =>
