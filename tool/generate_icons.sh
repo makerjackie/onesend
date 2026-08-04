@@ -2,7 +2,10 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SOURCE="$ROOT_DIR/assets/brand/onesend-transfer-mark.svg"
+SOURCE_RELATIVE="assets/brand/onesend-transfer-mark.svg"
+SOURCE="$ROOT_DIR/$SOURCE_RELATIVE"
+MANIFEST_RELATIVE="assets/brand/generated-assets.sha256"
+MANIFEST="$ROOT_DIR/$MANIFEST_RELATIVE"
 MODE="generate"
 
 usage() {
@@ -10,8 +13,8 @@ usage() {
 Usage: tool/generate_icons.sh [--check]
 
 Without arguments, render all checked-in OneSend icon assets from the canonical
-transfer-mark SVG. With --check, render into a temporary directory and compare
-the result with the checked-in assets without changing the repository.
+transfer-mark SVG and refresh the committed SHA-256 manifest. With --check,
+verify the committed files against that manifest without rendering any images.
 EOF
 }
 
@@ -35,24 +38,6 @@ if (( $# != 0 )); then
   usage >&2
   exit 2
 fi
-
-if [[ ! -f "$SOURCE" ]]; then
-  echo "Missing canonical brand source: $SOURCE" >&2
-  exit 1
-fi
-
-MAGICK_BIN="$(command -v magick 2>/dev/null || true)"
-if [[ -z "$MAGICK_BIN" || ! -x "$MAGICK_BIN" ]]; then
-  echo "ImageMagick's 'magick' command is required to generate brand assets." >&2
-  exit 1
-fi
-if ! "$MAGICK_BIN" -version >/dev/null 2>&1; then
-  echo "ImageMagick's 'magick' command is not executable: $MAGICK_BIN" >&2
-  exit 1
-fi
-
-TMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/onesend-icons.XXXXXX")"
-trap 'rm -rf "$TMP_DIR"' EXIT
 
 render_svg() {
   local size="$1"
@@ -156,65 +141,138 @@ CHECK_FILES=(
   windows/runner/resources/app_icon.ico
 )
 
-pixel_signature_manifest() {
-  local image="$1"
+EXPECTED_FILES=("$SOURCE_RELATIVE" "${CHECK_FILES[@]}")
 
-  # Normalize decoded frames before hashing so container encoding, compression,
-  # and metadata differences do not look like visual drift. The frame index and
-  # dimensions make multi-frame ICO comparisons explicit and order-sensitive.
-  "$MAGICK_BIN" "$image" -alpha on -colorspace sRGB -depth 8 \
-    -format '%p|%w|%h|%#\n' info:
+HASH_COMMAND=()
+if SHASUM_BIN="$(command -v shasum 2>/dev/null)"; then
+  HASH_COMMAND=("$SHASUM_BIN" -a 256)
+elif SHA256SUM_BIN="$(command -v sha256sum 2>/dev/null)"; then
+  HASH_COMMAND=("$SHA256SUM_BIN")
+else
+  echo "A SHA-256 tool is required (preferably shasum, or sha256sum)." >&2
+  exit 1
+fi
+
+sha256_file() {
+  local file="$1"
+  local digest
+  local output
+
+  if ! output="$("${HASH_COMMAND[@]}" "$file")"; then
+    return 1
+  fi
+  digest="${output%% *}"
+  if [[ ${#digest} -ne 64 || "$digest" == *[!0-9a-f]* ]]; then
+    echo "Unexpected SHA-256 output for: $file" >&2
+    return 1
+  fi
+  printf '%s\n' "$digest"
 }
 
-print_signature_manifest() {
-  local label="$1"
-  local manifest="$2"
-  local line
+is_expected_file() {
+  local candidate="$1"
+  local expected
 
-  echo "  $label frame signatures:" >&2
-  while IFS= read -r line; do
-    echo "    $line" >&2
-  done <<< "$manifest"
+  for expected in "${EXPECTED_FILES[@]}"; do
+    if [[ "$candidate" == "$expected" ]]; then
+      return 0
+    fi
+  done
+  return 1
 }
 
-check_outputs() {
-  local expected_root="$1"
-  local actual_root="$2"
-  local expected_signatures
-  local actual_signatures
+write_manifest() {
+  local digest
+  local file
   local relative
+  local temporary_manifest="$TMP_DIR/generated-assets.sha256"
+
+  : > "$temporary_manifest"
+  for relative in "${EXPECTED_FILES[@]}"; do
+    file="$ROOT_DIR/$relative"
+    if [[ ! -f "$file" ]]; then
+      echo "Cannot write manifest; expected file is missing: $relative" >&2
+      return 1
+    fi
+    if ! digest="$(sha256_file "$file")"; then
+      echo "Cannot hash brand asset: $relative" >&2
+      return 1
+    fi
+    printf '%s  %s\n' "$digest" "$relative" >> "$temporary_manifest"
+  done
+
+  cp "$temporary_manifest" "$MANIFEST"
+}
+
+check_manifest() {
+  local actual_hash
+  local expected
+  local expected_hash
+  local file
+  local line
+  local line_number=0
+  local relative
+  local seen_files=$'\n'
   local failed=0
 
-  for relative in "${CHECK_FILES[@]}"; do
-    if [[ ! -f "$actual_root/$relative" ]]; then
-      echo "Missing brand asset: $relative" >&2
+  for expected in "${EXPECTED_FILES[@]}"; do
+    if [[ ! -f "$ROOT_DIR/$expected" ]]; then
+      echo "Missing expected brand asset: $expected" >&2
+      failed=1
+    fi
+  done
+
+  if [[ ! -f "$MANIFEST" ]]; then
+    echo "Missing brand asset manifest: $MANIFEST_RELATIVE" >&2
+    return 1
+  fi
+
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    ((line_number += 1))
+    expected_hash="${line%%  *}"
+    relative="${line#*  }"
+
+    if [[ "$expected_hash" == "$line" || "$relative" == "$line" || \
+      "$line" != "$expected_hash  $relative" || ${#expected_hash} -ne 64 || \
+      "$expected_hash" == *[!0-9a-f]* || -z "$relative" ]]; then
+      echo "Malformed manifest entry at $MANIFEST_RELATIVE:$line_number" >&2
       failed=1
       continue
     fi
 
-    if [[ "$relative" == "website/public/favicon.svg" ]]; then
-      if ! cmp -s "$expected_root/$relative" "$actual_root/$relative"; then
-        echo "Brand asset byte drift: $relative (must match the canonical SVG)" >&2
-        failed=1
-      fi
-      continue
-    fi
-
-    if ! expected_signatures="$(pixel_signature_manifest "$expected_root/$relative")"; then
-      echo "Failed to decode generated brand asset: $relative" >&2
-      failed=1
-      continue
-    fi
-    if ! actual_signatures="$(pixel_signature_manifest "$actual_root/$relative")"; then
-      echo "Failed to decode checked-in brand asset: $relative" >&2
+    if ! is_expected_file "$relative"; then
+      echo "Unexpected path in brand asset manifest: $relative" >&2
       failed=1
       continue
     fi
 
-    if [[ "$expected_signatures" != "$actual_signatures" ]]; then
-      echo "Brand asset pixel drift: $relative" >&2
-      print_signature_manifest "expected" "$expected_signatures"
-      print_signature_manifest "checked-in" "$actual_signatures"
+    if [[ "$seen_files" == *$'\n'"$relative"$'\n'* ]]; then
+      echo "Duplicate path in brand asset manifest: $relative" >&2
+      failed=1
+      continue
+    fi
+    seen_files+="$relative"$'\n'
+
+    file="$ROOT_DIR/$relative"
+    if [[ ! -f "$file" ]]; then
+      continue
+    fi
+    if ! actual_hash="$(sha256_file "$file")"; then
+      echo "Failed to hash brand asset: $relative" >&2
+      failed=1
+      continue
+    fi
+    if [[ "$actual_hash" != "$expected_hash" ]]; then
+      echo "Brand asset hash drift: $relative" >&2
+      echo "  manifest: $expected_hash" >&2
+      echo "  current:  $actual_hash" >&2
+      failed=1
+    fi
+  done < "$MANIFEST"
+
+  for expected in "${EXPECTED_FILES[@]}"; do
+    if [[ "$seen_files" != *$'\n'"$expected"$'\n'* ]]; then
+      echo "Missing path from brand asset manifest: $expected" >&2
       failed=1
     fi
   done
@@ -223,11 +281,28 @@ check_outputs() {
 }
 
 if [[ "$MODE" == "check" ]]; then
-  EXPECTED_ROOT="$TMP_DIR/expected"
-  build_assets "$EXPECTED_ROOT"
-  check_outputs "$EXPECTED_ROOT" "$ROOT_DIR"
-  echo "Brand assets are up to date and match $SOURCE"
+  check_manifest
+  echo "Brand asset manifest is complete and all hashes match."
 else
+  if [[ ! -f "$SOURCE" ]]; then
+    echo "Missing canonical brand source: $SOURCE" >&2
+    exit 1
+  fi
+
+  MAGICK_BIN="$(command -v magick 2>/dev/null || true)"
+  if [[ -z "$MAGICK_BIN" || ! -x "$MAGICK_BIN" ]]; then
+    echo "ImageMagick's 'magick' command is required to generate brand assets." >&2
+    exit 1
+  fi
+  if ! "$MAGICK_BIN" -version >/dev/null 2>&1; then
+    echo "ImageMagick's 'magick' command is not executable: $MAGICK_BIN" >&2
+    exit 1
+  fi
+
+  TMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/onesend-icons.XXXXXX")"
+  trap 'rm -rf "$TMP_DIR"' EXIT
+
   build_assets "$ROOT_DIR"
-  echo "Generated OneSend icons from $SOURCE"
+  write_manifest
+  echo "Generated OneSend icons from $SOURCE and updated $MANIFEST_RELATIVE"
 fi

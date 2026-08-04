@@ -18,15 +18,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - name: Install ImageMagick and verify brand assets
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y imagemagick librsvg2-bin
-          if ! command -v magick >/dev/null 2>&1; then
-            sudo ln -s "$(command -v convert)" /usr/local/bin/magick
-          fi
-          magick -version
-          ./tool/generate_icons.sh --check
+      - name: Verify brand assets
+        run: ./tool/generate_icons.sh --check
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}

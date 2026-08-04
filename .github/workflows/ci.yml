@@ -14,14 +14,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
-      - name: Install ImageMagick
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y imagemagick librsvg2-bin
-          if ! command -v magick >/dev/null 2>&1; then
-            sudo ln -s "$(command -v convert)" /usr/local/bin/magick
-          fi
-          magick -version
       - name: Verify brand assets
         run: ./tool/generate_icons.sh --check
 
