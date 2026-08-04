@@ -59,14 +59,14 @@ test("desktop update feeds target the current release", () => {
   const latest = JSON.parse(text(resolve(updatesRoot, "latest.json")));
   const payload = JSON.parse(Buffer.from(latest.payload, "base64").toString("utf8"));
 
-  assert.match(appcast, /<sparkle:shortVersionString>1\.5\.0<\/sparkle:shortVersionString>/);
-  assert.match(appcast, /<sparkle:version>13<\/sparkle:version>/);
-  assert.match(appcast, /releases\/download\/v1\.5\.0\/onesend-macos-universal\.zip/);
-  assert.equal(payload.version, "1.5.0");
-  assert.equal(payload.buildNumber, 13);
-  assert.equal(payload.assets.macos.sha256, "36e645904ed9bba3e006a3e7bcbaa20456b5b3855f13db236c8b20c5cc4feae3");
-  assert.equal(payload.assets.windows.sha256, "8310afdf8f3846fa994e148067b6ae3f7fc255ef52809afc5217f67913bde398");
-  assert.equal(payload.assets.linux.sha256, "7c33c72e87d0cb0b11998e0a95231f215bbd7d7017b9f88779c1e12013be0033");
+  assert.match(appcast, /<sparkle:shortVersionString>1\.5\.1<\/sparkle:shortVersionString>/);
+  assert.match(appcast, /<sparkle:version>20<\/sparkle:version>/);
+  assert.match(appcast, /releases\/download\/v1\.5\.1\/onesend-macos-universal\.zip/);
+  assert.equal(payload.version, "1.5.1");
+  assert.equal(payload.buildNumber, 20);
+  assert.equal(payload.assets.macos.sha256, "f55ee68b5eaac5c67e53c437b9a2ce412849e08e676d638c86e02ff857d19fc1");
+  assert.equal(payload.assets.windows.sha256, "ac744219e2dc08c1ffa64bbbea59e329eb8f07ab2ecd598f4480ee32569a3002");
+  assert.equal(payload.assets.linux.sha256, "da559d4f19f5d73f22aece5cc98c91860a673450567cbca002c618fab3cf8183");
 });
 
 test("cimbar copy and camera behavior stay local and opt-in", () => {
