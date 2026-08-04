@@ -3,6 +3,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../l10n/generated/app_localizations.dart';
+import '../widgets/brand_mark.dart';
 
 const Color _aboutInk = Color(0xff10130f);
 const Color _aboutPaper = Color(0xfff5f6f0);
@@ -228,6 +229,7 @@ class _AboutHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final brandTagline = _brandTagline(l10n);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(22),
@@ -239,21 +241,10 @@ class _AboutHeader extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: Image.asset(
-              'assets/brand/onesend-icon-1024.png',
-              width: 56,
-              height: 56,
-              filterQuality: FilterQuality.medium,
-              errorBuilder: (context, error, stackTrace) {
-                return const SizedBox.shrink();
-              },
-            ),
-          ),
+          const BrandIcon(size: 56, borderRadius: 12),
           const SizedBox(height: 16),
           const Text(
-            'OneSend',
+            oneSendBrandName,
             style: TextStyle(
               color: Colors.white,
               fontSize: 36,
@@ -261,15 +252,17 @@ class _AboutHeader extends StatelessWidget {
               letterSpacing: -1.2,
             ),
           ),
-          const SizedBox(height: 2),
-          const Text(
-            '扫传',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 22,
-              fontWeight: FontWeight.w800,
+          if (brandTagline != null) ...[
+            const SizedBox(height: 2),
+            Text(
+              brandTagline,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+              ),
             ),
-          ),
+          ],
           const SizedBox(height: 16),
           Text(
             l10n.versionLabel(version),
@@ -279,6 +272,13 @@ class _AboutHeader extends StatelessWidget {
       ),
     );
   }
+}
+
+String? _brandTagline(AppLocalizations l10n) {
+  const separator = ' · ';
+  final separatorIndex = l10n.appTitle.indexOf(separator);
+  if (separatorIndex == -1) return null;
+  return l10n.appTitle.substring(separatorIndex + separator.length);
 }
 
 class _AboutPanel extends StatelessWidget {

@@ -19,20 +19,24 @@ OneSend（扫传）是一款实验性的、纯视觉的跨设备文件传输工�
 发送设备把文件编码为持续变化的视觉码并显示在屏幕上，接收设备用摄像头连续扫描，
 在本地还原并保存文件。
 
-它不需要账号、配对、服务器或文件网络传输；只需要一块屏幕和一枚摄像头。v1.5.0
-仍为实验性版本，以下内容描述当前确定的 v1.5 范围。
+它不需要账号、配对、服务器或文件网络传输；只需要一块屏幕和一枚摄像头。v1.5.1
+（build 20）仍为实验性版本，以下内容描述当前确定的 v1.5.1 范围。
 
-### v1.5 功能
+### v1.5.1 功能
 
 - 支持任意文件，单文件上限为 **64 MB**。
+- 官网与 Android、iOS、macOS、Windows、Linux 全端统一使用官方黑底白色光学标识，并增加品牌资源防漂移检查。
+- 官网结构和视觉呈现更简洁，页面之间共享品牌组件。
+- 围绕可靠 QR、快速 QR、Turbo QR 和 CIMBAR 彩色视觉码四种模式做稳定性工作；未设置时默认稳定的快速 QR，Turbo QR 与 CIMBAR 仍需显式选择并保持实验边界，可靠 QR 保留兼容/高冗余边界。
+- 修复桌面端选择任意文件时 `Invalid argument: object is unsendable` 的问题。
 - 默认使用快速模式，理论有效速度约 **33 KB/s**；在“设置”中可以改为“兼容/可靠”模式，理论有效速度约 **4.7 KB/s**。
 - 新增 **Turbo QR（实验）**，协议估算有效吞吐约 **56 KB/s**。该数字不是摄像头实测；高密度二维码对对焦、曝光和稳定性要求更高。
 - 新增 **CIMBAR 彩色视觉码（实验）**：Android / iOS App 与网站提供 Mode B 实验入口。libcimbar 上游在特定设备上的持续基准约 **106 KB/s**，这不是 OneSend 的实测保证。桌面原生 App 仍使用 QR；桌面可通过网站体验 CIMBAR。
-- 发送主界面不提供模式选择，也不显示 FPS；模式只在设置中作为之后新建发送的默认值配置。
+- 快速 QR 仍是未设置时的新建传输默认；Turbo QR 与 CIMBAR 只在显式选择后启用，可靠 QR 用于兼容性和更高冗余。
 - 快速模式使用 LT fountain 流，配合连续二维码传输，可应对漏扫、乱序、重复帧和中途加入。
 - 每帧 CRC32 与载荷/文件完整性校验会在接收端执行；校验未通过的文件不会被当作完成文件保存。
 - 发送和接收都支持暂停、继续和重新开始。
-- 接收完成后自动保存到本机并显示保存位置；可以打开、分享、另存一份，桌面端还可以在文件管理器中定位文件。
+- QR 接收会把已验证文件真实写入本地磁盘；如果写入失败，可直接重试而无需重新扫描。保存成功后显示保存位置，并提供打开、分享和另存为。
 - 最近传输历史保存在本机，可再次打开已保存的接收文件；清除历史不会删除文件本身。
 
 实际速度会受摄像头、屏幕、对焦、环境光和设备稳定性影响。视觉传输是单向的，
@@ -43,7 +47,7 @@ OneSend（扫传）是一款实验性的、纯视觉的跨设备文件传输工�
 App 内置九种语言：简体中文、繁體中文、English、日本語、한국어、Español、
 Français、Deutsch、Português。首次启动会自动检测系统语言，也可以在“设置”中手动切换。
 
-OneSend 保留现有图标和简洁界面；“关于”页面提供 GitHub
+官网与各端共享官方黑底白色光学标识和品牌资源；“关于”页面提供 GitHub
 入口，并标明 MIT 许可、MakerJackie 与 01MVP。
 
 ### 内置测试素材
@@ -65,12 +69,12 @@ OneSend 保留现有图标和简洁界面；“关于”页面提供 GitHub
 OneSend 不是加密工具：能看到完整二维码流的人或摄像头可能重建文件。传输敏感资料时，
 请控制屏幕和摄像头的物理可见范围，或先使用你信任的加密工具。
 
-v1.5 不宣称已达到 200 KB/s，也不把上游 106 KB/s 基准写成 OneSend 真机实测；音频传输仍未实现。
+v1.5.1 不宣称已达到 200 KB/s，也不把上游 106 KB/s 基准写成 OneSend 真机实测；音频传输仍未实现。
 
 ### 下载
 
 - [GitHub Releases / latest](https://github.com/makerjackie/onesend/releases/latest)：桌面版与 Android 构建产物。
-- [iOS TestFlight 公测](https://testflight.apple.com/join/n2t1KrCp)：iOS 测试版。
+- [iOS TestFlight 链接](https://testflight.apple.com/join/n2t1KrCp)：状态以 App Store Connect 为准，本页不宣称公测或审核已完成。
 
 ### 开发
 
@@ -113,11 +117,15 @@ screen. The receiving device uses its camera to scan the stream, reconstructs th
 and saves it locally.
 
 It needs no account, pairing, server, or network file transfer—only a screen and a camera.
-Version 1.5.0 remains experimental; the details below describe the v1.5 scope.
+Version 1.5.1 (build 20) remains experimental; the details below describe the current v1.5.1 scope.
 
-### v1.5 features
+### v1.5.1 features
 
 - Any file up to **64 MB** per file.
+- The official white optical mark on a black background is shared across the website and Android, iOS, macOS, Windows, and Linux, with a brand-asset drift check.
+- The website structure and presentation are simpler, with shared brand components across its pages.
+- Stability work covers four modes—Reliable QR, Fast QR, Turbo QR, and CIMBAR color visual code. Fast QR remains the stable default when unset; Turbo QR and CIMBAR require explicit selection and remain experimental, while Reliable QR retains the compatibility/high-redundancy boundary.
+- Fixed desktop selection of arbitrary files failing with `Invalid argument: object is unsendable`.
 - Fast mode is the default, with about **33 KB/s theoretical useful throughput**. The
   Settings page can switch the default for new transfers to Compatible/Reliable mode, at
   about **4.7 KB/s theoretical useful throughput**.
@@ -127,15 +135,16 @@ Version 1.5.0 remains experimental; the details below describe the v1.5 scope.
   the website. The upstream libcimbar Mode B benchmark reports about **106 KB/s** on a
   specific setup; this is not a measured OneSend guarantee. Native desktop apps retain QR,
   while desktop users can try CIMBAR on the website.
-- The main sending screen does not offer a mode selector or show FPS. The mode is configured
-  only as the default for new sends in Settings.
+- Fast QR remains the default for new transfers when unset; Turbo QR and CIMBAR are enabled
+  only by explicit selection, while Reliable QR is the compatibility/high-redundancy option.
 - Fast mode uses an LT fountain stream and continuous QR frames, tolerating missed,
   reordered, duplicate frames and joining part-way through a stream.
 - Per-frame CRC32 and payload/file integrity checks run on the receiver; a file is not
   treated as complete or saved until verification succeeds.
 - Both sending and receiving can be paused, resumed, or restarted.
-- After reception, the file is saved automatically and its location is shown. Users can
-  open, share, save a copy elsewhere, and, on desktop, reveal the file in the file manager.
+- QR reception writes the verified file to local disk. If writing fails, it can be retried
+  without rescanning; after a successful save, the location is shown and users can open,
+  share, or save as.
 - Recent transfer history is stored locally and can reopen a saved received file. Clearing
   history does not delete the file itself.
 
@@ -149,8 +158,8 @@ The app includes nine languages: Simplified Chinese, Traditional Chinese, Englis
 Korean, Spanish, French, German, and Portuguese. It detects the system language on first
 launch, and users can switch manually in Settings.
 
-OneSend retains its existing icon and minimal interface. About links to GitHub and identifies
-the MIT license, MakerJackie, and 01MVP.
+The website and all app targets share the official white optical mark on a black background.
+About links to GitHub and identifies the MIT license, MakerJackie, and 01MVP.
 
 ### Included test fixture
 
@@ -178,13 +187,14 @@ OneSend is not an encryption tool: anyone who can see the complete QR stream may
 reconstruct the file. Limit the physical visibility of the screen and camera, or encrypt
 sensitive material with a tool you trust first.
 
-Version 1.5 does not claim 200 KB/s or present the upstream 106 KB/s benchmark as a measured
+Version 1.5.1 does not claim 200 KB/s or present the upstream 106 KB/s benchmark as a measured
 OneSend result. Audio transfer is still not implemented.
 
 ### Downloads
 
 - [GitHub Releases / latest](https://github.com/makerjackie/onesend/releases/latest): desktop and Android builds.
-- [iOS TestFlight public beta](https://testflight.apple.com/join/n2t1KrCp): iOS testing.
+- [iOS TestFlight link](https://testflight.apple.com/join/n2t1KrCp): iOS testing; status is
+  subject to App Store Connect, and this page does not claim that public beta or review is complete.
 
 ### Development
 
