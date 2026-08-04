@@ -53,6 +53,16 @@ render_icon() {
     -strip "PNG24:$output"
 }
 
+# Solid paper plate used by native launch screens (no logo mark).
+render_paper_plate() {
+  local size="$1"
+  local output="$2"
+
+  mkdir -p "$(dirname "$output")"
+  "$MAGICK_BIN" -size "${size}x${size}" "xc:${APP_ICON_BACKGROUND}" \
+    -strip "PNG24:$output"
+}
+
 write_favicon_reference() {
   local output="$1"
 
@@ -107,10 +117,13 @@ build_assets() {
   write_favicon_reference "$output_root/website/public/favicon.svg"
 
   render_target_list "$output_root" "$ANDROID_TARGETS"
-  # Android launch splash mark (windowBackground bitmap).
-  render_icon 288 "$output_root/android/app/src/main/res/drawable/splash_logo.png"
   render_target_list "$output_root" "$IOS_TARGETS"
-  render_target_list "$output_root" "$IOS_LAUNCH_TARGETS"
+  # Native launch screens use a solid paper plate only (no logo). This avoids
+  # flashing a stale LaunchImage / splash bitmap before Flutter paints C3.
+  while IFS='|' read -r size relative; do
+    [[ -n "$relative" ]] || continue
+    render_paper_plate "$size" "$output_root/$relative"
+  done <<< "$IOS_LAUNCH_TARGETS"
   render_target_list "$output_root" "$MACOS_TARGETS"
   # Windows ICO contains standard shell sizes as PNG-compressed frames.
   mkdir -p "$output_root/windows/runner/resources"
@@ -123,8 +136,8 @@ ANDROID_TARGETS=$'48|android/app/src/main/res/mipmap-mdpi/ic_launcher.png\n72|an
 
 IOS_TARGETS=$'20|ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-20x20@1x.png\n40|ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-20x20@2x.png\n60|ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-20x20@3x.png\n29|ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-29x29@1x.png\n58|ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-29x29@2x.png\n87|ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-29x29@3x.png\n40|ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-40x40@1x.png\n80|ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-40x40@2x.png\n120|ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-40x40@3x.png\n120|ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-60x60@2x.png\n180|ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-60x60@3x.png\n76|ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-76x76@1x.png\n152|ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-76x76@2x.png\n167|ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-83.5x83.5@2x.png'
 
-# iOS launch splash (LaunchScreen.storyboard → LaunchImage). Previously left as
-# the legacy "1" mark; must stay in lockstep with the app icon.
+# iOS LaunchImage asset catalog entries: solid paper only (storyboard is also
+# paper-only and does not show a logo mark).
 IOS_LAUNCH_TARGETS=$'96|ios/Runner/Assets.xcassets/LaunchImage.imageset/LaunchImage.png\n192|ios/Runner/Assets.xcassets/LaunchImage.imageset/LaunchImage@2x.png\n288|ios/Runner/Assets.xcassets/LaunchImage.imageset/LaunchImage@3x.png'
 
 MACOS_TARGETS=$'16|macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_16.png\n32|macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_32.png\n64|macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_64.png\n128|macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_128.png\n256|macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_256.png\n512|macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_512.png'
@@ -138,7 +151,6 @@ CHECK_FILES=(
   android/app/src/main/res/mipmap-xhdpi/ic_launcher.png
   android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png
   android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
-  android/app/src/main/res/drawable/splash_logo.png
   ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-1024x1024@1x.png
   ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-20x20@1x.png
   ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-20x20@2x.png

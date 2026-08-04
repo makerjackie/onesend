@@ -1,10 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Launch splash: paper plate + C3 brand mark (same as app icon). -->
+<!-- Paper-only splash. No bitmap logo: avoids a native-layer flash of a
+     stale launcher mark before Flutter draws the C3 brand. -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:drawable="@color/splash_background" />
-    <item>
-        <bitmap
-            android:gravity="center"
-            android:src="@drawable/splash_logo" />
-    </item>
 </layer-list>

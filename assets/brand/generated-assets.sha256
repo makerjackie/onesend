@@ -7,7 +7,6 @@ c1a7842d942fee0a6be54e1f431b8b09a39312934f1d8f32da5bf14752ea2c14  android/app/sr
 dfdfb3935563cb51f8360c3d9bb3429f7ffedbd76f075e7e543b2790b3ad52fb  android/app/src/main/res/mipmap-xhdpi/ic_launcher.png
 ba940b74c08071c4015a74e323fc3fc73352d558059e684fc468407e44496e9b  android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png
 deec719c7a8b3d5698d9c5b18d8eb7610048d06736a7fdc56e9772d270a01e6d  android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
-688d999681f3aa073676c19b8160b9f5eb8d6f248b0f8d8ddb878fd8b22a7048  android/app/src/main/res/drawable/splash_logo.png
 851def0310ba7bdf7cfa177edd960273a443a92a3db8e3ec6a410fcc413965e7  ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-1024x1024@1x.png
 a710c0b7d53363cd258fab032323b9468a9ad76f9f38eac2a523151a014b70d8  ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-20x20@1x.png
 10033a323782921bf071e10c0fcad205e85ca7432e48db7a3beadd32c2e35dca  ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-20x20@2x.png
@@ -23,9 +22,9 @@ dc0e7434e34af22ddac045d07648dbb3e2f7273649eff9e867da16393968280a  ios/Runner/Ass
 e73111e17c367856b645eedb90230af5a723a2ca04b4bac65ca20fb5825329de  ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-76x76@1x.png
 312c515e9a262f3b47103ac4d2de98ed7e1cc22a25bc9042118944e92d67d100  ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-76x76@2x.png
 e68330ac5d95fb9693f7a90ec05fa2d293b34e6b56a942c6062e053dc7cec351  ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-83.5x83.5@2x.png
-dfdfb3935563cb51f8360c3d9bb3429f7ffedbd76f075e7e543b2790b3ad52fb  ios/Runner/Assets.xcassets/LaunchImage.imageset/LaunchImage.png
-deec719c7a8b3d5698d9c5b18d8eb7610048d06736a7fdc56e9772d270a01e6d  ios/Runner/Assets.xcassets/LaunchImage.imageset/LaunchImage@2x.png
-688d999681f3aa073676c19b8160b9f5eb8d6f248b0f8d8ddb878fd8b22a7048  ios/Runner/Assets.xcassets/LaunchImage.imageset/LaunchImage@3x.png
+5bace210eef73bed4ad527bd4e37997017b0dc2cc0ad930dea45be88c362c928  ios/Runner/Assets.xcassets/LaunchImage.imageset/LaunchImage.png
+383e8bec369caaa920b5712687da2d41ff395bfb419fd6bfcc4f782cfd2ba377  ios/Runner/Assets.xcassets/LaunchImage.imageset/LaunchImage@2x.png
+565b2f5335515dd1e3e05918577f1622661b5e0d2b2b963d5a03f49b984449af  ios/Runner/Assets.xcassets/LaunchImage.imageset/LaunchImage@3x.png
 851def0310ba7bdf7cfa177edd960273a443a92a3db8e3ec6a410fcc413965e7  macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_1024.png
 a63612b24e886a79eee40bf90d2eb30a29d924c6775abc293ef2f882f4963a30  macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_16.png
 2cbc01ba2ce83cc40eee03ecf616f4f23906e5a5493d6aeb0b78269f352b2022  macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_32.png
