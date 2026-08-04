@@ -19,14 +19,17 @@ OneSend（扫传）是一款实验性的、纯视觉的跨设备文件传输工�
 发送设备把文件编码为持续变化的视觉码并显示在屏幕上，接收设备用摄像头连续扫描，
 在本地还原并保存文件。
 
-它不需要账号、配对、服务器或文件网络传输；只需要一块屏幕和一枚摄像头。v1.5.1
-（build 20）仍为实验性版本，以下内容描述当前确定的 v1.5.1 范围。
+它不需要账号、配对、服务器或文件网络传输；只需要一块屏幕和一枚摄像头。v1.5.2
+（build 21）仍为实验性版本，以下内容描述当前确定的 v1.5.2 范围。
 
-### v1.5.1 功能
+### v1.5.2 功能
 
 - 支持任意文件，单文件上限为 **64 MB**。
-- 官网与 Android、iOS、macOS、Windows、Linux 全端统一使用官方黑底白色光学标识，并增加品牌资源防漂移检查。
-- 官网结构和视觉呈现更简洁，页面之间共享品牌组件。
+- 官网与 Android、iOS、macOS、Windows、Linux 全端统一使用“文件 + 扫描框 + 光线”标识，并增加品牌资源防漂移检查。
+- 官网拆分为首页、发送、接收和下载页面；390 × 844 的首页与接收页无需滚动，手机端扫码窗口和进度始终在首屏。
+- Flutter 手机端采用“传输 / 文件 / 设置”底部导航，设置中提供跟随系统、日间和夜间主题。
+- 修复 Android、iOS 和 Apple Vision 扫码返回字节格式不一致导致的“识别二维码但无反应”，并保留可观察诊断而不中断扫描。
+- 增加 JavaScript ↔ Dart 双向协议夹具，覆盖可靠、快速和 Turbo QR 的帧头、CRC、信封与完整恢复。
 - 围绕可靠 QR、快速 QR、Turbo QR 和 CIMBAR 彩色视觉码四种模式做稳定性工作；未设置时默认稳定的快速 QR，Turbo QR 与 CIMBAR 仍需显式选择并保持实验边界，可靠 QR 保留兼容/高冗余边界。
 - 修复桌面端选择任意文件时 `Invalid argument: object is unsendable` 的问题。
 - 默认使用快速模式，理论有效速度约 **33 KB/s**；在“设置”中可以改为“兼容/可靠”模式，理论有效速度约 **4.7 KB/s**。
@@ -47,7 +50,7 @@ OneSend（扫传）是一款实验性的、纯视觉的跨设备文件传输工�
 App 内置九种语言：简体中文、繁體中文、English、日本語、한국어、Español、
 Français、Deutsch、Português。首次启动会自动检测系统语言，也可以在“设置”中手动切换。
 
-官网与各端共享官方黑底白色光学标识和品牌资源；“关于”页面提供 GitHub
+官网与各端共享官方“文件 + 扫描框 + 光线”标识和品牌资源；“关于”页面提供 GitHub
 入口，并标明 MIT 许可、MakerJackie 与 01MVP。
 
 ### 内置测试素材
@@ -69,7 +72,7 @@ Français、Deutsch、Português。首次启动会自动检测系统语言，也
 OneSend 不是加密工具：能看到完整二维码流的人或摄像头可能重建文件。传输敏感资料时，
 请控制屏幕和摄像头的物理可见范围，或先使用你信任的加密工具。
 
-v1.5.1 不宣称已达到 200 KB/s，也不把上游 106 KB/s 基准写成 OneSend 真机实测；音频传输仍未实现。
+v1.5.2 不宣称已达到 200 KB/s，也不把上游 106 KB/s 基准写成 OneSend 真机实测；音频传输仍未实现。
 
 ### 下载
 
@@ -117,13 +120,16 @@ screen. The receiving device uses its camera to scan the stream, reconstructs th
 and saves it locally.
 
 It needs no account, pairing, server, or network file transfer—only a screen and a camera.
-Version 1.5.1 (build 20) remains experimental; the details below describe the current v1.5.1 scope.
+Version 1.5.2 (build 21) remains experimental; the details below describe the current v1.5.2 scope.
 
-### v1.5.1 features
+### v1.5.2 features
 
 - Any file up to **64 MB** per file.
-- The official white optical mark on a black background is shared across the website and Android, iOS, macOS, Windows, and Linux, with a brand-asset drift check.
-- The website structure and presentation are simpler, with shared brand components across its pages.
+- The file, scanner-frame, and light-ray mark is shared across the website and Android, iOS, macOS, Windows, and Linux, with a brand-asset drift check.
+- The website is split into focused home, send, receive, and download routes. The 390 × 844 home and receive views fit without page scrolling, keeping camera progress on the first screen.
+- Flutter mobile uses Transfer, Files, and Settings bottom navigation, with system, light, and dark themes in Settings.
+- Fixed Android, iOS, and Apple Vision scanner byte-format differences that could recognize a QR code without advancing reception; diagnostics remain visible without stopping the scanner.
+- Added bidirectional JavaScript ↔ Dart protocol fixtures covering Reliable, Fast, and Turbo QR headers, CRCs, envelopes, and complete recovery.
 - Stability work covers four modes—Reliable QR, Fast QR, Turbo QR, and CIMBAR color visual code. Fast QR remains the stable default when unset; Turbo QR and CIMBAR require explicit selection and remain experimental, while Reliable QR retains the compatibility/high-redundancy boundary.
 - Fixed desktop selection of arbitrary files failing with `Invalid argument: object is unsendable`.
 - Fast mode is the default, with about **33 KB/s theoretical useful throughput**. The
@@ -158,7 +164,7 @@ The app includes nine languages: Simplified Chinese, Traditional Chinese, Englis
 Korean, Spanish, French, German, and Portuguese. It detects the system language on first
 launch, and users can switch manually in Settings.
 
-The website and all app targets share the official white optical mark on a black background.
+The website and all app targets share the official file, scanner-frame, and light-ray mark.
 About links to GitHub and identifies the MIT license, MakerJackie, and 01MVP.
 
 ### Included test fixture
@@ -187,7 +193,7 @@ OneSend is not an encryption tool: anyone who can see the complete QR stream may
 reconstruct the file. Limit the physical visibility of the screen and camera, or encrypt
 sensitive material with a tool you trust first.
 
-Version 1.5.1 does not claim 200 KB/s or present the upstream 106 KB/s benchmark as a measured
+Version 1.5.2 does not claim 200 KB/s or present the upstream 106 KB/s benchmark as a measured
 OneSend result. Audio transfer is still not implemented.
 
 ### Downloads

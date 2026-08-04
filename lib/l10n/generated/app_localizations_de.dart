@@ -30,7 +30,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get modeCimbar => 'CIMBAR-Farbcode (experimentell)';
 
   @override
-  String get modeQr => 'QR code';
+  String get modeQr => 'QR-Code';
 
   @override
   String get compatibilityMode => 'Kompatibilität';
@@ -66,6 +66,41 @@ class AppLocalizationsDe extends AppLocalizations {
   String get about => 'Über OneSend';
 
   @override
+  String get transferTab => 'Übertragung';
+
+  @override
+  String get filesTab => 'Dateien';
+
+  @override
+  String get filesTitle => 'Dateien';
+
+  @override
+  String get filesSubtitle =>
+      'Übertragungsverlauf und empfangene Dateien verwalten.';
+
+  @override
+  String get theme => 'Darstellung';
+
+  @override
+  String get themeSubtitle => 'System, hell oder dunkel';
+
+  @override
+  String get themeSystem => 'Systemeinstellung';
+
+  @override
+  String get themeLight => 'Hell';
+
+  @override
+  String get themeDark => 'Dunkel';
+
+  @override
+  String get themeSaveError =>
+      'Die Darstellung konnte nicht gespeichert werden. Versuche es erneut.';
+
+  @override
+  String get aboutSubtitle => 'Version, Datenschutz und Open Source.';
+
+  @override
   String get clearHistory => 'Verlauf löschen';
 
   @override
@@ -95,7 +130,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get sendFile => 'Datei senden';
 
   @override
-  String get receiveFile => 'Zum Empfangen scannen';
+  String get receiveFile => 'Datei empfangen';
 
   @override
   String get sendCardDescription =>
@@ -336,13 +371,13 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
-  String get transferModeLabel => 'Transfer mode';
+  String get transferModeLabel => 'Übertragungsmodus';
 
   @override
-  String get dropFilesHint => 'Or drag and drop a file here';
+  String get dropFilesHint => 'Oder ziehe eine Datei hierher';
 
   @override
-  String get dropFilesActive => 'Drop to send';
+  String get dropFilesActive => 'Zum Senden ablegen';
 
   @override
   String get reading => 'Wird gelesen…';
@@ -452,6 +487,14 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get scanInstruction =>
       'Halte den visuellen Code vollständig im Bildausschnitt und das Gerät ruhig.';
+
+  @override
+  String get scannerBytesUnavailable =>
+      'QR-Code erkannt, aber die Kamera lieferte keine Daten. Scan läuft weiter.';
+
+  @override
+  String get scannerInvalidFrame =>
+      'Ein QR-Code ohne OneSend-Daten wurde erkannt. Scan läuft weiter.';
 
   @override
   String get desktopCameraInstruction =>

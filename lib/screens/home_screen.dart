@@ -8,13 +8,13 @@ import '../services/file_service.dart';
 import '../services/transfer_store.dart';
 import '../services/update_service.dart';
 import '../widgets/brand_mark.dart';
-import '../widgets/file_tile.dart';
 import '../widgets/stored_file_actions.dart';
 import '../widgets/update_ui.dart';
-import 'about_screen.dart';
 import 'receive_screen.dart';
 import 'send_screen.dart';
 import 'settings_screen.dart';
+
+const double oneSendWideBreakpoint = 760;
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
@@ -33,6 +33,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  int _selectedTab = 0;
   String? _presentedUpdateVersion;
   AppSettings? _fallbackSettings;
 
@@ -57,18 +58,10 @@ class _HomeScreenState extends State<HomeScreen> {
     final release = widget.updates.availableRelease;
     final releaseIdentifier = release == null
         ? null
-        : '${release.version}+${release.buildNumber}';
+        : '${release.version}|${release.publishedAt.toIso8601String()}';
     if (release == null || releaseIdentifier == _presentedUpdateVersion) return;
     _presentedUpdateVersion = releaseIdentifier;
     await showOneSendUpdateDialog(context, widget.updates);
-  }
-
-  Future<void> _openSettings() async {
-    await _open(SettingsScreen(settings: _settings, updates: widget.updates));
-  }
-
-  Future<void> _openAbout() async {
-    await _open(const AboutScreen());
   }
 
   @override
@@ -77,11 +70,24 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
+  void _selectTab(int index) {
+    if (_selectedTab == index) return;
+    setState(() => _selectedTab = index);
+  }
+
   Future<void> _open(Widget page) async {
     await Navigator.of(
       context,
     ).push<void>(MaterialPageRoute<void>(builder: (_) => page));
     if (mounted) setState(() {});
+  }
+
+  Widget _sendRoute() {
+    return SendScreen(store: widget.store, settings: _settings);
+  }
+
+  Widget _receiveRoute() {
+    return ReceiveScreen(store: widget.store, settings: _settings);
   }
 
   Future<void> _clearHistory() async {
@@ -110,169 +116,206 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  /// Always open the shared send/receive routes. Transfer mode (QR profiles
-  /// and experimental CIMBAR color codes) is switched inside those screens so
-  /// users never jump into a separate experiment window.
-  Widget _sendRoute() {
-    return SendScreen(store: widget.store, settings: _settings);
-  }
-
-  Widget _receiveRoute() {
-    return ReceiveScreen(store: widget.store, settings: _settings);
-  }
-
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final records = widget.store.records;
+    final wide = MediaQuery.sizeOf(context).width >= oneSendWideBreakpoint;
     return Scaffold(
       body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final horizontal = constraints.maxWidth >= 760;
-            return SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(24, 20, 24, 36),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 900),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+        child: Row(
+          children: [
+            if (wide) _buildNavigationRail(context, l10n),
+            Expanded(child: _buildCurrentTab(context)),
+          ],
+        ),
+      ),
+      bottomNavigationBar: wide ? null : _buildNavigationBar(l10n),
+    );
+  }
+
+  NavigationBar _buildNavigationBar(AppLocalizations l10n) {
+    return NavigationBar(
+      selectedIndex: _selectedTab,
+      onDestinationSelected: _selectTab,
+      destinations: [
+        NavigationDestination(
+          key: const ValueKey<String>('home-tab-transfer'),
+          icon: const Icon(Icons.swap_horiz_rounded),
+          selectedIcon: const Icon(Icons.swap_horiz_rounded),
+          label: l10n.transferTab,
+        ),
+        NavigationDestination(
+          key: const ValueKey<String>('home-tab-files'),
+          icon: const Icon(Icons.folder_outlined),
+          selectedIcon: const Icon(Icons.folder_rounded),
+          label: l10n.filesTab,
+        ),
+        NavigationDestination(
+          key: const ValueKey<String>('home-tab-settings'),
+          icon: const Icon(Icons.settings_outlined),
+          selectedIcon: const Icon(Icons.settings_rounded),
+          label: l10n.settings,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildNavigationRail(BuildContext context, AppLocalizations l10n) {
+    final extended = MediaQuery.sizeOf(context).width >= 1040;
+    return NavigationRail(
+      selectedIndex: _selectedTab,
+      onDestinationSelected: _selectTab,
+      extended: extended,
+      groupAlignment: -0.8,
+      leading: Padding(
+        padding: const EdgeInsets.only(bottom: 28),
+        child: const SizedBox.square(dimension: 34),
+      ),
+      destinations: [
+        NavigationRailDestination(
+          icon: const Icon(
+            Icons.swap_horiz_rounded,
+            key: ValueKey<String>('home-tab-transfer'),
+          ),
+          selectedIcon: const Icon(Icons.swap_horiz_rounded),
+          label: Text(l10n.transferTab),
+        ),
+        NavigationRailDestination(
+          icon: const Icon(
+            Icons.folder_outlined,
+            key: ValueKey<String>('home-tab-files'),
+          ),
+          selectedIcon: const Icon(Icons.folder_rounded),
+          label: Text(l10n.filesTab),
+        ),
+        NavigationRailDestination(
+          icon: const Icon(
+            Icons.settings_outlined,
+            key: ValueKey<String>('home-tab-settings'),
+          ),
+          selectedIcon: const Icon(Icons.settings_rounded),
+          label: Text(l10n.settings),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCurrentTab(BuildContext context) {
+    return switch (_selectedTab) {
+      0 => _buildTransferTab(context),
+      1 => _buildFilesTab(context),
+      _ => SettingsScreen(settings: _settings, updates: widget.updates),
+    };
+  }
+
+  Widget _buildTransferTab(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final horizontal = constraints.maxWidth >= 700;
+        return SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(24, 24, 24, 36),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 720),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildBrandMark(context),
+                  SizedBox(height: horizontal ? 88 : 64),
+                  Text(
+                    l10n.homeHeadline,
+                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      fontSize: horizontal ? 54 : 42,
+                      height: 1.04,
+                    ),
+                  ),
+                  const SizedBox(height: 28),
+                  Flex(
+                    direction: horizontal ? Axis.horizontal : Axis.vertical,
+                    crossAxisAlignment: horizontal
+                        ? CrossAxisAlignment.start
+                        : CrossAxisAlignment.stretch,
                     children: [
-                      Row(
-                        children: [
-                          const Expanded(
-                            child: Align(
-                              alignment: Alignment.centerLeft,
-                              child: BrandMark(),
-                            ),
-                          ),
-                          IconButton(
-                            key: const ValueKey<String>('home-settings'),
-                            tooltip: l10n.settings,
-                            onPressed: _openSettings,
-                            icon: const Icon(Icons.settings_outlined),
-                          ),
-                          IconButton(
-                            key: const ValueKey<String>('home-about'),
-                            tooltip: l10n.about,
-                            onPressed: _openAbout,
-                            icon: const Icon(Icons.info_outline_rounded),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 44),
-                      Text(
-                        l10n.homeHeadline,
-                        style: Theme.of(context).textTheme.headlineMedium
-                            ?.copyWith(
-                              fontSize: horizontal ? 52 : 42,
-                              height: 1.04,
-                            ),
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        l10n.homeSubtitle,
-                        style: Theme.of(
-                          context,
-                        ).textTheme.bodyLarge?.copyWith(color: oneSendMuted),
-                      ),
-                      const SizedBox(height: 34),
-                      Flex(
-                        direction: horizontal ? Axis.horizontal : Axis.vertical,
-                        crossAxisAlignment: horizontal
-                            ? CrossAxisAlignment.start
-                            : CrossAxisAlignment.stretch,
-                        children: [
-                          ExpandedIf(
-                            enabled: horizontal,
-                            child: _ActionCard(
-                              icon: Icons.north_east_rounded,
-                              eyebrow: l10n.sendEyebrow,
-                              title: l10n.sendFile,
-                              description: l10n.sendCardDescription,
-                              accent: oneSendLime,
-                              onTap: () => _open(_sendRoute()),
-                            ),
-                          ),
-                          SizedBox(
-                            width: horizontal ? 16 : 0,
-                            height: horizontal ? 0 : 16,
-                          ),
-                          ExpandedIf(
-                            enabled: horizontal,
-                            child: _ActionCard(
-                              icon: Icons.center_focus_strong_rounded,
-                              eyebrow: l10n.receiveEyebrow,
-                              title: l10n.receiveFile,
-                              description: l10n.receiveCardDescription,
-                              accent: const Color(0xffe2e5de),
-                              onTap: () => _open(_receiveRoute()),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 42),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              l10n.recentTransfers,
-                              style: Theme.of(context).textTheme.titleLarge,
-                            ),
-                          ),
-                          if (records.isNotEmpty) ...[
-                            Text(
-                              l10n.recordCount(records.length),
-                              style: Theme.of(context).textTheme.bodyMedium,
-                            ),
-                            const SizedBox(width: 8),
-                            TextButton(
-                              key: const ValueKey<String>('home-clear-history'),
-                              onPressed: _clearHistory,
-                              child: Text(l10n.clearHistory),
-                            ),
-                          ],
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      if (records.isEmpty)
-                        const _EmptyHistory()
-                      else
-                        Card(
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 18,
-                              vertical: 6,
-                            ),
-                            child: Column(
-                              children: [
-                                for (var i = 0; i < records.length; i++) ...[
-                                  _HistoryRow(record: records[i]),
-                                  if (i != records.length - 1)
-                                    const Divider(height: 1),
-                                ],
-                              ],
-                            ),
-                          ),
+                      ExpandedIf(
+                        enabled: horizontal,
+                        child: _TransferEntry(
+                          key: const ValueKey<String>('home-send'),
+                          icon: Icons.north_east_rounded,
+                          title: l10n.sendFile,
+                          description: l10n.sendCardDescription,
+                          primary: true,
+                          onTap: () => _open(_sendRoute()),
                         ),
-                      const SizedBox(height: 28),
-                      Center(
-                        child: Text(
-                          l10n.historyFooter,
-                          style: Theme.of(
-                            context,
-                          ).textTheme.bodySmall?.copyWith(color: oneSendMuted),
+                      ),
+                      SizedBox(
+                        width: horizontal ? 16 : 0,
+                        height: horizontal ? 0 : 14,
+                      ),
+                      ExpandedIf(
+                        enabled: horizontal,
+                        child: _TransferEntry(
+                          key: const ValueKey<String>('home-receive'),
+                          icon: Icons.south_west_rounded,
+                          title: l10n.receiveFile,
+                          description: l10n.receiveCardDescription,
+                          onTap: () => _open(_receiveRoute()),
                         ),
                       ),
                     ],
                   ),
-                ),
+                ],
               ),
-            );
-          },
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildFilesTab(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final records = widget.store.records;
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(24, 24, 24, 36),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 860),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _TabHeader(
+                title: l10n.filesTitle,
+                subtitle: l10n.filesSubtitle,
+                action: records.isEmpty
+                    ? null
+                    : TextButton(
+                        key: const ValueKey<String>('home-clear-history'),
+                        onPressed: _clearHistory,
+                        child: Text(l10n.clearHistory),
+                      ),
+              ),
+              const SizedBox(height: 24),
+              if (records.isEmpty)
+                const _EmptyHistory()
+              else
+                _HistoryList(records: records),
+              const SizedBox(height: 28),
+              Text(
+                l10n.historyFooter,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
+          ),
         ),
       ),
     );
+  }
+
+  Widget _buildBrandMark(BuildContext context) {
+    return Theme.of(context).brightness == Brightness.dark
+        ? const _ThemedBrandMark()
+        : const BrandMark();
   }
 }
 
@@ -287,83 +330,152 @@ class ExpandedIf extends StatelessWidget {
       enabled ? Expanded(child: child) : child;
 }
 
-class _ActionCard extends StatelessWidget {
-  const _ActionCard({
-    required this.icon,
-    required this.eyebrow,
-    required this.title,
-    required this.description,
-    required this.accent,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String eyebrow;
-  final String title;
-  final String description;
-  final Color accent;
-  final VoidCallback onTap;
+class _ThemedBrandMark extends StatelessWidget {
+  const _ThemedBrandMark();
 
   @override
   Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const BrandIcon(size: 42, borderRadius: 9),
+        const SizedBox(width: 10),
+        Text(
+          oneSendBrandName,
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.4,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _TransferEntry extends StatelessWidget {
+  const _TransferEntry({
+    required this.icon,
+    required this.title,
+    required this.description,
+    required this.onTap,
+    this.primary = false,
+    super.key,
+  });
+
+  final IconData icon;
+  final String title;
+  final String description;
+  final VoidCallback onTap;
+  final bool primary;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final background = primary
+        ? scheme.primary
+        : scheme.surfaceContainerHighest;
+    final foreground = primary ? scheme.onPrimary : scheme.onSurface;
     return Semantics(
       button: true,
       label: '$title. $description',
-      child: ExcludeSemantics(
-        child: Material(
-          color: Colors.white,
-          shape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.all(Radius.circular(6)),
-            side: BorderSide(color: oneSendInk, width: 2),
-          ),
-          child: InkWell(
-            onTap: onTap,
-            borderRadius: const BorderRadius.all(Radius.circular(4)),
-            child: Padding(
-              padding: const EdgeInsets.all(22),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: Material(
+        color: background,
+        borderRadius: const BorderRadius.all(Radius.circular(18)),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: const BorderRadius.all(Radius.circular(18)),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 18, 18, 18),
+            child: Row(
+              children: [
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: foreground.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(13),
+                    child: Icon(icon, color: foreground, size: 25),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Container(
-                        width: 52,
-                        height: 52,
-                        decoration: BoxDecoration(
-                          color: accent,
-                          border: Border.all(color: oneSendInk, width: 2),
-                          borderRadius: BorderRadius.circular(4),
+                      Text(
+                        title,
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          color: foreground,
+                          fontWeight: FontWeight.w800,
                         ),
-                        child: Icon(icon, color: oneSendInk, size: 25),
                       ),
-                      const Icon(
-                        Icons.arrow_outward_rounded,
-                        color: oneSendMuted,
+                      const SizedBox(height: 4),
+                      Text(
+                        description,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: foreground.withValues(alpha: 0.72),
+                        ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 28),
-                  Text(
-                    eyebrow,
-                    style: const TextStyle(
-                      color: oneSendMuted,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 1.5,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(title, style: Theme.of(context).textTheme.titleLarge),
-                  const SizedBox(height: 5),
-                  Text(
-                    description,
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                ],
-              ),
+                ),
+                const SizedBox(width: 8),
+                Icon(Icons.arrow_forward_rounded, color: foreground),
+              ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TabHeader extends StatelessWidget {
+  const _TabHeader({required this.title, required this.subtitle, this.action});
+
+  final String title;
+  final String subtitle;
+  final Widget? action;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: Theme.of(context).textTheme.headlineMedium),
+              const SizedBox(height: 8),
+              Text(subtitle, style: Theme.of(context).textTheme.bodyMedium),
+            ],
+          ),
+        ),
+        if (action != null) ...[const SizedBox(width: 12), action!],
+      ],
+    );
+  }
+}
+
+class _HistoryList extends StatelessWidget {
+  const _HistoryList({required this.records});
+
+  final List<TransferRecord> records;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+        child: Column(
+          children: [
+            for (var i = 0; i < records.length; i++) ...[
+              _HistoryRow(record: records[i]),
+              if (i != records.length - 1) const Divider(height: 1),
+            ],
+          ],
         ),
       ),
     );
@@ -376,21 +488,22 @@ class _EmptyHistory extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final scheme = Theme.of(context).colorScheme;
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
-        border: Border.all(color: oneSendInk, width: 2),
-        borderRadius: BorderRadius.circular(4),
+        color: scheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(18),
       ),
       child: Row(
         children: [
-          Icon(Icons.wb_sunny_outlined, color: oneSendMuted),
-          SizedBox(width: 12),
+          Icon(Icons.folder_open_outlined, color: scheme.onSurfaceVariant),
+          const SizedBox(width: 12),
           Expanded(
             child: Text(
               l10n.emptyHistory,
-              style: TextStyle(color: oneSendMuted),
+              style: Theme.of(context).textTheme.bodyMedium,
             ),
           ),
         ],
@@ -407,6 +520,7 @@ class _HistoryRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final scheme = Theme.of(context).colorScheme;
     final received = record.direction == TransferDirection.received;
     final when = _relativeTime(record.createdAt, l10n);
     final directionLabel = received
@@ -414,31 +528,77 @@ class _HistoryRow extends StatelessWidget {
         : record.status == 'broadcast-ended'
         ? l10n.sendEnded
         : l10n.sent;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      child: FileTile(
-        name: record.fileName,
-        bytes: record.bytes,
-        icon: received ? Icons.south_west_rounded : Icons.north_east_rounded,
-        subtitle: '$directionLabel · $when',
-        onTap: received ? () => _showActions(context) : null,
+    return InkWell(
+      onTap: received ? () => _showActions(context) : null,
+      borderRadius: BorderRadius.circular(14),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Row(
+          children: [
+            DecoratedBox(
+              decoration: BoxDecoration(
+                color: oneSendLime.withValues(alpha: 0.42),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Icon(
+                  received
+                      ? Icons.south_west_rounded
+                      : Icons.north_east_rounded,
+                  color: scheme.onSurface,
+                  size: 22,
+                ),
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    record.fileName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '$directionLabel · $when',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              formatBytes(record.bytes),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w700),
+            ),
+            if (received) ...[
+              const SizedBox(width: 8),
+              Icon(Icons.chevron_right_rounded, color: scheme.onSurfaceVariant),
+            ],
+          ],
+        ),
       ),
     );
   }
 
   Future<void> _showActions(BuildContext context) async {
     final l10n = AppLocalizations.of(context)!;
-    final path = record.path ?? '';
     final stored = StoredTransfer(
       name: record.fileName,
       mimeType: guessMimeType(record.fileName),
       bytes: record.bytes,
-      path: path,
+      path: record.path ?? '',
     );
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       builder: (context) => SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
@@ -453,11 +613,7 @@ class _HistoryRow extends StatelessWidget {
                       Expanded(
                         child: Text(
                           l10n.receivedFileActions,
-                          style: const TextStyle(
-                            color: oneSendInk,
-                            fontSize: 20,
-                            fontWeight: FontWeight.w800,
-                          ),
+                          style: Theme.of(context).textTheme.titleLarge,
                         ),
                       ),
                       IconButton(
@@ -468,10 +624,9 @@ class _HistoryRow extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 10),
-                  FileTile(
-                    name: record.fileName,
-                    bytes: record.bytes,
-                    icon: Icons.south_west_rounded,
+                  Text(
+                    record.fileName,
+                    style: Theme.of(context).textTheme.titleMedium,
                   ),
                   const SizedBox(height: 12),
                   StoredFileActions(file: stored),

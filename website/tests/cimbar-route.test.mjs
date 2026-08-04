@@ -72,13 +72,13 @@ test("desktop update feeds target the current release", () => {
 test("cimbar copy and camera behavior stay local and opt-in", () => {
   const page = text(resolve(appRoot, "page.tsx"));
   const client = text(resolve(appRoot, "cimbar-client.tsx"));
-  const home = text(resolve(websiteRoot, "app", "page.tsx"));
+  const webTransfer = text(resolve(websiteRoot, "app", "web-transfer.tsx"));
   const senderWrapper = text(resolve(assetRoot, "cimbar-send-bootstrap.js"));
   const receiverWrapper = text(resolve(assetRoot, "cimbar-receive-worker.js"));
 
   // Old /cimbar bookmarks redirect into the main web-transfer mode switcher.
   assert.match(page, /redirect\("\/#web-transfer"\)/);
-  assert.match(home, /彩色视觉码/);
+  assert.match(webTransfer, /彩色视觉码/);
   assert.match(client, /发送/);
   assert.match(client, /接收/);
   assert.match(client, /getUserMedia/);

@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.5.2 (build 21) - 2026-08-04
+
+### 中文
+
+- 修复移动端扫码识别到二维码但未推进接收的问题：统一 Android decoded bytes、Apple Vision decoded bytes 与旧 raw bytes 的安全适配，并让无字节/非 OneSend 帧保持可观察而不中断扫描。
+- 增加 JavaScript ↔ Dart 双向协议夹具，覆盖可靠、快速与 Turbo QR 的帧头、分块长度、CRC、文件信封和完整恢复。
+- 将官网拆分为首页、发送、接收和下载页面；390 × 844 的首页与接收页固定在一个视口内，摄像头、进度和速度不再需要滚动查找。
+- Flutter 手机端改为“传输 / 文件 / 设置”三栏底部导航；接收页固定扫描布局，新增跟随系统、日间与夜间主题。
+- 统一全端为“文件 + 扫描框 + 光线”标识；版本显示改为语义版本加发布时间，不再向用户展示内部 build number。
+
+### English
+
+- Fixed mobile scans that recognized a QR without advancing reception by safely adapting Android decoded bytes, Apple Vision decoded bytes, and legacy raw-byte payloads. Missing bytes and non-OneSend frames remain observable without stopping the scan.
+- Added bidirectional JavaScript ↔ Dart interoperability fixtures for Reliable, Fast, and Turbo QR frame headers, block lengths, CRCs, file envelopes, and complete recovery.
+- Split the website into focused home, send, receive, and download routes. The 390 × 844 home and receive views fit in one viewport with camera, progress, and rate visible without scrolling.
+- Reworked Flutter mobile around Transfer, Files, and Settings bottom navigation, a fixed receive layout, and system/light/dark themes.
+- Unified every target on the file, scanner-frame, and light-ray mark. User-facing versions now show semantic version plus release time, never the internal build number.
+
 ## 1.5.1 (build 20) - 2026-08-04
 
 ### 中文

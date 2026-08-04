@@ -49,7 +49,7 @@ class _OneSendAppState extends State<OneSendApp> {
   }
 
   Widget _buildMaterialApp(BuildContext context) {
-    const scheme = ColorScheme.light(
+    const lightScheme = ColorScheme.light(
       primary: oneSendInk,
       onPrimary: Colors.white,
       secondary: oneSendLime,
@@ -58,6 +58,16 @@ class _OneSendAppState extends State<OneSendApp> {
       onSurface: oneSendInk,
       error: Color(0xffa32820),
       onError: Colors.white,
+    );
+    const darkScheme = ColorScheme.dark(
+      primary: oneSendLime,
+      onPrimary: oneSendInk,
+      secondary: oneSendLime,
+      onSecondary: oneSendInk,
+      surface: Color(0xff121512),
+      onSurface: oneSendPaper,
+      error: Color(0xffffaaa0),
+      onError: oneSendInk,
     );
     return MaterialApp(
       debugShowCheckedModeBanner: false,
@@ -75,94 +85,9 @@ class _OneSendAppState extends State<OneSendApp> {
         }
         return const Locale('en');
       },
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: scheme,
-        scaffoldBackgroundColor: oneSendPaper,
-        appBarTheme: const AppBarTheme(
-          backgroundColor: oneSendPaper,
-          foregroundColor: oneSendInk,
-          elevation: 0,
-          scrolledUnderElevation: 0,
-          centerTitle: false,
-        ),
-        cardTheme: CardThemeData(
-          color: Colors.white,
-          margin: EdgeInsets.zero,
-          elevation: 0,
-          shadowColor: Colors.transparent,
-          surfaceTintColor: Colors.transparent,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.all(Radius.circular(6)),
-            side: BorderSide(color: oneSendInk, width: 2),
-          ),
-        ),
-        filledButtonTheme: FilledButtonThemeData(
-          style: FilledButton.styleFrom(
-            backgroundColor: oneSendInk,
-            foregroundColor: Colors.white,
-            minimumSize: const Size(0, 48),
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 13),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.all(Radius.circular(4)),
-            ),
-            side: const BorderSide(color: oneSendInk, width: 2),
-            textStyle: const TextStyle(fontWeight: FontWeight.w700),
-          ),
-        ),
-        outlinedButtonTheme: OutlinedButtonThemeData(
-          style: OutlinedButton.styleFrom(
-            foregroundColor: oneSendInk,
-            minimumSize: const Size(0, 48),
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 13),
-            side: const BorderSide(color: oneSendInk, width: 2),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.all(Radius.circular(4)),
-            ),
-          ),
-        ),
-        textButtonTheme: TextButtonThemeData(
-          style: TextButton.styleFrom(
-            foregroundColor: oneSendInk,
-            minimumSize: const Size(0, 44),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            shape: const RoundedRectangleBorder(
-              borderRadius: BorderRadius.all(Radius.circular(4)),
-            ),
-          ),
-        ),
-        dividerTheme: const DividerThemeData(
-          color: Color(0xffc9cec4),
-          thickness: 1,
-          space: 1,
-        ),
-        popupMenuTheme: const PopupMenuThemeData(
-          color: Colors.white,
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.all(Radius.circular(4)),
-            side: BorderSide(color: oneSendInk, width: 2),
-          ),
-        ),
-        textTheme: const TextTheme(
-          headlineMedium: TextStyle(
-            color: oneSendInk,
-            fontWeight: FontWeight.w800,
-            letterSpacing: -1.2,
-          ),
-          titleLarge: TextStyle(
-            color: oneSendInk,
-            fontWeight: FontWeight.w700,
-            letterSpacing: -0.2,
-          ),
-          titleMedium: TextStyle(
-            color: oneSendInk,
-            fontWeight: FontWeight.w700,
-          ),
-          bodyLarge: TextStyle(color: oneSendInk, height: 1.45),
-          bodyMedium: TextStyle(color: oneSendMuted, height: 1.45),
-        ),
-      ),
+      theme: _buildOneSendTheme(lightScheme),
+      darkTheme: _buildOneSendTheme(darkScheme),
+      themeMode: _settings.themeMode,
       home: HomeScreen(
         store: widget.store,
         settings: _settings,
@@ -170,6 +95,124 @@ class _OneSendAppState extends State<OneSendApp> {
       ),
     );
   }
+}
+
+ThemeData _buildOneSendTheme(ColorScheme scheme) {
+  final baseTextTheme =
+      ThemeData(brightness: scheme.brightness, useMaterial3: true).textTheme
+          .apply(bodyColor: scheme.onSurface, displayColor: scheme.onSurface);
+  final textTheme = baseTextTheme.copyWith(
+    headlineMedium: baseTextTheme.headlineMedium?.copyWith(
+      color: scheme.onSurface,
+      fontWeight: FontWeight.w800,
+      letterSpacing: -1.2,
+    ),
+    titleLarge: baseTextTheme.titleLarge?.copyWith(
+      color: scheme.onSurface,
+      fontWeight: FontWeight.w700,
+      letterSpacing: -0.2,
+    ),
+    titleMedium: baseTextTheme.titleMedium?.copyWith(
+      color: scheme.onSurface,
+      fontWeight: FontWeight.w700,
+    ),
+    bodyLarge: baseTextTheme.bodyLarge?.copyWith(
+      color: scheme.onSurface,
+      height: 1.45,
+    ),
+    bodyMedium: baseTextTheme.bodyMedium?.copyWith(
+      color: scheme.onSurface.withValues(alpha: 0.72),
+      height: 1.45,
+    ),
+  );
+
+  return ThemeData(
+    useMaterial3: true,
+    brightness: scheme.brightness,
+    colorScheme: scheme,
+    scaffoldBackgroundColor: scheme.surface,
+    textTheme: textTheme,
+    appBarTheme: AppBarTheme(
+      backgroundColor: scheme.surface,
+      foregroundColor: scheme.onSurface,
+      elevation: 0,
+      scrolledUnderElevation: 0,
+      centerTitle: false,
+    ),
+    cardTheme: CardThemeData(
+      color: scheme.surfaceContainerHighest,
+      margin: EdgeInsets.zero,
+      elevation: 0,
+      shadowColor: Colors.transparent,
+      surfaceTintColor: Colors.transparent,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.all(Radius.circular(18)),
+      ),
+    ),
+    filledButtonTheme: FilledButtonThemeData(
+      style: FilledButton.styleFrom(
+        backgroundColor: scheme.primary,
+        foregroundColor: scheme.onPrimary,
+        minimumSize: const Size(0, 48),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 13),
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.all(Radius.circular(16)),
+        ),
+        textStyle: const TextStyle(fontWeight: FontWeight.w700),
+      ),
+    ),
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: OutlinedButton.styleFrom(
+        foregroundColor: scheme.onSurface,
+        minimumSize: const Size(0, 48),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 13),
+        side: BorderSide(color: scheme.outline, width: 1.2),
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.all(Radius.circular(16)),
+        ),
+      ),
+    ),
+    textButtonTheme: TextButtonThemeData(
+      style: TextButton.styleFrom(
+        foregroundColor: scheme.primary,
+        minimumSize: const Size(0, 44),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.all(Radius.circular(12)),
+        ),
+      ),
+    ),
+    dividerTheme: DividerThemeData(
+      color: scheme.outlineVariant,
+      thickness: 1,
+      space: 1,
+    ),
+    popupMenuTheme: PopupMenuThemeData(
+      color: scheme.surfaceContainerHighest,
+      elevation: 2,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.all(Radius.circular(16)),
+      ),
+    ),
+    navigationBarTheme: NavigationBarThemeData(
+      backgroundColor: scheme.surfaceContainerHighest,
+      indicatorColor: scheme.secondary,
+      labelTextStyle: WidgetStatePropertyAll(
+        TextStyle(color: scheme.onSurface, fontWeight: FontWeight.w700),
+      ),
+    ),
+    navigationRailTheme: NavigationRailThemeData(
+      backgroundColor: scheme.surfaceContainerHighest,
+      indicatorColor: scheme.secondary,
+      selectedIconTheme: IconThemeData(color: scheme.onSecondary),
+      unselectedIconTheme: IconThemeData(color: scheme.onSurfaceVariant),
+      selectedLabelTextStyle: TextStyle(
+        color: scheme.onSurface,
+        fontWeight: FontWeight.w700,
+      ),
+      unselectedLabelTextStyle: TextStyle(color: scheme.onSurfaceVariant),
+    ),
+  );
 }
 
 String localizedTransferModeName(AppLocalizations l10n, TransferMode mode) {

@@ -29,7 +29,7 @@ void main() {
 
     expect(find.text('OneSend'), findsOneWidget);
     expect(find.text('发送文件'), findsOneWidget);
-    expect(find.text('扫描接收'), findsOneWidget);
+    expect(find.text('接收文件'), findsOneWidget);
   });
 
   testWidgets('new sends expose transfer mode chips without FPS copy', (
@@ -129,7 +129,7 @@ void main() {
     expect(find.textContaining('Invalid argument'), findsNothing);
   });
 
-  testWidgets('home menu separates settings, about, and history clearing', (
+  testWidgets('settings tab contains updates and nested about page', (
     WidgetTester tester,
   ) async {
     final settings = AppSettings(initialLocaleTag: 'zh-Hans');
@@ -152,14 +152,13 @@ void main() {
       );
 
       expect(
-        find.byKey(const ValueKey<String>('home-settings')),
+        find.byKey(const ValueKey<String>('home-tab-settings')),
         findsOneWidget,
       );
-      expect(find.byKey(const ValueKey<String>('home-about')), findsOneWidget);
       expect(find.byIcon(Icons.more_horiz_rounded), findsNothing);
       expect(find.text('检查更新'), findsNothing);
 
-      await tester.tap(find.byKey(const ValueKey<String>('home-settings')));
+      await tester.tap(find.byKey(const ValueKey<String>('home-tab-settings')));
       await tester.pumpAndSettle();
       expect(find.text('自动更新'), findsOneWidget);
       final updateEntry = find.byKey(
@@ -176,9 +175,7 @@ void main() {
       await tester.tap(find.text('完成'));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byType(BackButton));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey<String>('home-about')));
+      await tester.tap(find.byKey(const ValueKey<String>('settings-about')));
       await tester.pumpAndSettle();
       expect(find.text('实验性离线视觉传输'), findsOneWidget);
     } finally {

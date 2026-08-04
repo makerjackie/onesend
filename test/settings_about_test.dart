@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
+import 'package:onesend/core/release_info.dart';
 import 'package:onesend/core/update_manifest.dart';
 import 'package:onesend/l10n/generated/app_localizations.dart';
 import 'package:onesend/l10n/locale_support.dart';
@@ -26,6 +27,8 @@ void main() {
     expect(find.byKey(const ValueKey<String>('settings-fast')), findsNothing);
     expect(find.byKey(const ValueKey<String>('settings-cimbar')), findsNothing);
     expect(find.text('语言'), findsOneWidget);
+    expect(find.text('主题'), findsOneWidget);
+    expect(find.text('关于 OneSend'), findsOneWidget);
   });
 
   testWidgets(
@@ -91,6 +94,10 @@ void main() {
       _testApp(
         AboutScreen(
           packageInfoLoader: () async => packageInfo,
+          releaseInfo: const OneSendReleaseInfo(
+            version: '1.5.2',
+            publishedAt: '2026-08-04 21:30',
+          ),
           urlLauncher: (url) async {
             openedUrls.add(url);
             return true;
@@ -103,7 +110,8 @@ void main() {
     expect(find.text('OneSend'), findsOneWidget);
     expect(find.text('扫传'), findsOneWidget);
     expect(find.text('实验性离线视觉传输'), findsOneWidget);
-    expect(find.text('1.4.0 (14)'), findsOneWidget);
+    expect(find.text('1.4.0（2026-08-04 21:30）'), findsOneWidget);
+    expect(find.textContaining('(14)'), findsNothing);
 
     final githubButton = find.byKey(const ValueKey<String>('about-github'));
     await tester.ensureVisible(githubButton);

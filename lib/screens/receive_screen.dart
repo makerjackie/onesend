@@ -7,6 +7,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../app.dart';
+import '../core/barcode_payload_adapter.dart';
 import '../core/envelope.dart';
 import '../core/optical_transfer.dart';
 import '../core/transfer_codec.dart';
@@ -33,6 +34,10 @@ enum _ReceiveSavePhase {
   saved,
   saveFailed,
 }
+
+enum _BarcodeObservation { bytesUnavailable, invalidFrame }
+
+enum _ReceiveScanAction { togglePause, restart }
 
 class ReceiveScreen extends StatefulWidget {
   const ReceiveScreen({
@@ -62,7 +67,10 @@ class ReceiveScreenState extends State<ReceiveScreen>
     with WidgetsBindingObserver {
   final OpticalReceiver _receiver = OpticalReceiver();
   final MobileScannerController _mobileController = MobileScannerController(
-    autoStart: true,
+    // ReceiveScreen owns the controller lifecycle. Keeping autoStart off
+    // avoids a race with the persisted CIMBAR/QR selection and with our
+    // explicit stop/start transitions.
+    autoStart: false,
     detectionSpeed: DetectionSpeed.unrestricted,
     formats: <BarcodeFormat>[BarcodeFormat.qrCode],
     torchEnabled: false,
@@ -72,10 +80,14 @@ class ReceiveScreenState extends State<ReceiveScreen>
   TransferFile? _receivedFile;
   StoredTransfer? _storedFile;
   String? _error;
+  _BarcodeObservation? _barcodeObservation;
   bool _paused = false;
+  bool _pausedByLifecycle = false;
+  bool _isDisposing = false;
   _ReceiveSavePhase _savePhase = _ReceiveSavePhase.scanning;
   DateTime? _receiveStartedAt;
   Timer? _speedTicker;
+  Future<void> _mobileOperationTail = Future<void>.value();
   late TransferAlgorithm _algorithm;
   late TransferMode _mode;
 
@@ -107,8 +119,8 @@ class ReceiveScreenState extends State<ReceiveScreen>
     _mode = widget.settings?.defaultMode ?? AppSettings.defaultTransferMode;
     WidgetsBinding.instance.addObserver(this);
     if (!_usesCimbar) unawaited(_enableWakelock());
-    if (_algorithm == TransferAlgorithm.cimbar && _usesMobileScanner) {
-      unawaited(_mobileController.stop());
+    if (_usesMobileScanner && !_usesCimbar) {
+      _scheduleMobileScannerStart();
     }
     _speedTicker = Timer.periodic(const Duration(milliseconds: 400), (_) {
       if (!mounted || _completed || _snapshot == null || _paused) return;
@@ -118,6 +130,7 @@ class ReceiveScreenState extends State<ReceiveScreen>
 
   @override
   void dispose() {
+    _isDisposing = true;
     WidgetsBinding.instance.removeObserver(this);
     _speedTicker?.cancel();
     unawaited(_disposeMobileController());
@@ -127,25 +140,131 @@ class ReceiveScreenState extends State<ReceiveScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state != AppLifecycleState.inactive &&
-        state != AppLifecycleState.paused &&
-        state != AppLifecycleState.detached &&
-        state != AppLifecycleState.hidden) {
-      return;
+    switch (state) {
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.paused:
+      case AppLifecycleState.detached:
+      case AppLifecycleState.hidden:
+        unawaited(_pauseForLifecycle());
+      case AppLifecycleState.resumed:
+        unawaited(_resumeAfterLifecycle());
     }
-    unawaited(_pauseForLifecycle());
   }
 
   Future<void> _pauseForLifecycle() async {
-    if (_completed || _processing || _paused) return;
-    _paused = true;
-    if (_usesMobileScanner) {
-      try {
-        await _mobileController.stop();
-      } catch (_) {}
+    if (!_usesMobileScanner ||
+        _usesCimbar ||
+        _completed ||
+        _processing ||
+        _paused ||
+        _isDisposing) {
+      return;
     }
+    final controllerState = _mobileController.value;
+    // Permission prompts can emit inactive before the controller is attached
+    // or started. Do not turn that transient state into a dead scanner.
+    if (!controllerState.isRunning && !controllerState.isStarting) return;
+    _paused = true;
+    _pausedByLifecycle = true;
+    try {
+      await _stopMobileScanner();
+    } catch (_) {}
     await _disableWakelock();
     if (mounted) setState(() {});
+  }
+
+  Future<void> _resumeAfterLifecycle() async {
+    if (!_pausedByLifecycle ||
+        !_usesMobileScanner ||
+        _usesCimbar ||
+        _completed ||
+        _processing ||
+        _isDisposing ||
+        !mounted) {
+      return;
+    }
+    setState(() {
+      _paused = false;
+      _pausedByLifecycle = false;
+    });
+    await _enableWakelock();
+    final started = await _startMobileScanner();
+    if (!started && mounted && !_completed && !_processing) {
+      setState(() {
+        _paused = true;
+        _pausedByLifecycle = true;
+      });
+    }
+  }
+
+  void _scheduleMobileScannerStart() {
+    if (!_usesMobileScanner ||
+        _usesCimbar ||
+        _paused ||
+        _completed ||
+        _processing ||
+        _isDisposing) {
+      return;
+    }
+    // The MobileScanner child attaches the external controller during its
+    // initState. Start only after that attachment, never in the same turn as
+    // a QR/CIMBAR mode transition.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(_startMobileScanner());
+    });
+  }
+
+  Future<bool> _startMobileScanner() async {
+    if (!_usesMobileScanner ||
+        _usesCimbar ||
+        _paused ||
+        _completed ||
+        _processing ||
+        _isDisposing ||
+        !mounted) {
+      return false;
+    }
+    try {
+      await _enqueueMobileOperation(() async {
+        if (!_usesMobileScanner ||
+            _usesCimbar ||
+            _paused ||
+            _completed ||
+            _processing ||
+            _isDisposing ||
+            !mounted) {
+          return;
+        }
+        await _mobileController.start();
+      });
+      final started = _mobileController.value.isRunning;
+      if (!started && mounted && _mobileController.value.error != null) {
+        setState(
+          () => _error = _friendlyReceiveError(_mobileController.value.error!),
+        );
+      }
+      return started;
+    } catch (error) {
+      if (mounted && !_isDisposing) {
+        setState(() => _error = _friendlyReceiveError(error));
+      }
+      return false;
+    }
+  }
+
+  Future<void> _stopMobileScanner() async {
+    if (!_usesMobileScanner) return;
+    try {
+      await _enqueueMobileOperation(_mobileController.stop);
+    } catch (_) {
+      // The controller may already be stopped or still uninitialized.
+    }
+  }
+
+  Future<void> _enqueueMobileOperation(Future<void> Function() operation) {
+    final scheduled = _mobileOperationTail.then<void>((_) => operation());
+    _mobileOperationTail = scheduled.then<void>((_) {}, onError: (_, _) {});
+    return scheduled;
   }
 
   Future<void> _selectQrMode(TransferMode mode) async {
@@ -158,11 +277,11 @@ class ReceiveScreenState extends State<ReceiveScreen>
       _error = null;
       _receiveStartedAt = null;
       _paused = false;
+      _pausedByLifecycle = false;
+      _barcodeObservation = null;
     });
     if (_usesMobileScanner) {
-      try {
-        await _mobileController.start();
-      } catch (_) {}
+      _scheduleMobileScannerStart();
     }
     final settings = widget.settings;
     if (settings == null) return;
@@ -177,15 +296,18 @@ class ReceiveScreenState extends State<ReceiveScreen>
     if (_algorithm == TransferAlgorithm.cimbar) return;
     if (_usesMobileScanner) {
       try {
-        await _mobileController.stop();
+        await _stopMobileScanner();
       } catch (_) {}
     }
+    _receiver.reset();
     setState(() {
       _algorithm = TransferAlgorithm.cimbar;
       _snapshot = null;
       _error = null;
       _receiveStartedAt = null;
       _paused = false;
+      _pausedByLifecycle = false;
+      _barcodeObservation = null;
     });
     final settings = widget.settings;
     if (settings == null) return;
@@ -215,15 +337,41 @@ class ReceiveScreenState extends State<ReceiveScreen>
     return _approxReceivedBytes(snapshot) * 1000 / elapsed;
   }
 
-  Widget _buildModeChips({required bool enabled}) {
+  Widget _buildModeChips({required bool enabled, BuildContext? sheetContext}) {
     return TransferModeSelector(
       algorithm: _algorithm,
       mode: _mode,
       enabled: enabled,
       showQrProfiles: false,
+      dense: true,
       keyPrefix: 'receive-mode',
-      onQrModeSelected: (mode) => unawaited(_selectQrMode(mode)),
-      onCimbarSelected: () => unawaited(_selectCimbar()),
+      onQrModeSelected: (mode) {
+        if (sheetContext != null) Navigator.of(sheetContext).pop();
+        unawaited(_selectQrMode(mode));
+      },
+      onCimbarSelected: () {
+        if (sheetContext != null) Navigator.of(sheetContext).pop();
+        unawaited(_selectCimbar());
+      },
+    );
+  }
+
+  Future<void> _showReceiveModeSheet() async {
+    if (!mounted || _processing || _completed) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+            child: _buildModeChips(
+              enabled: !_processing && !_completed,
+              sheetContext: sheetContext,
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -231,30 +379,52 @@ class ReceiveScreenState extends State<ReceiveScreen>
     if (error is! MobileScannerException || !mounted) return;
     setState(() {
       _paused = true;
+      _pausedByLifecycle = false;
       _error = AppLocalizations.of(context)!.cimbarCameraError;
     });
+    unawaited(_stopMobileScanner());
     unawaited(_disableWakelock());
   }
 
   void _onMobileCapture(BarcodeCapture capture) {
     if (_completed || _paused || _processing) return;
     ReceiverEvent? latest;
+    _BarcodeObservation? observation;
+    var sawUsableFrame = false;
     for (final barcode in capture.barcodes) {
-      final bytes = _barcodeBytes(barcode);
-      if (bytes == null) continue;
-      latest = _receiver.consume(bytes) ?? latest;
-      if (latest?.error != null || latest?.payload != null) break;
+      final payload = adaptBarcodePayload(barcode);
+      final bytes = payload.bytes;
+      if (bytes == null) {
+        observation ??= _BarcodeObservation.bytesUnavailable;
+        continue;
+      }
+      final event = _receiver.consume(bytes);
+      if (event == null) {
+        observation = _BarcodeObservation.invalidFrame;
+        continue;
+      }
+      sawUsableFrame = true;
+      latest = event;
+      if (event.error != null || event.payload != null) break;
     }
+    _setBarcodeObservation(sawUsableFrame ? null : observation);
     _handleReceiverEvent(latest);
   }
 
-  Uint8List? _barcodeBytes(Barcode barcode) {
-    final decoded = barcode.rawDecodedBytes;
-    if (decoded is DecodedBarcodeBytes) return decoded.bytes;
-    if (decoded is DecodedVisionBarcodeBytes) {
-      return decoded.bytes ?? decoded.rawBytes;
+  void _setBarcodeObservation(_BarcodeObservation? observation) {
+    if (_barcodeObservation == observation || !mounted) return;
+    setState(() => _barcodeObservation = observation);
+    if (observation != null) {
+      debugPrint('[OneSend QR scanner] ${observation.name}; continuing scan');
     }
-    return null;
+  }
+
+  String _barcodeObservationMessage(AppLocalizations l10n) {
+    return switch (_barcodeObservation) {
+      _BarcodeObservation.bytesUnavailable => l10n.scannerBytesUnavailable,
+      _BarcodeObservation.invalidFrame => l10n.scannerInvalidFrame,
+      null => '',
+    };
   }
 
   void _consume(Uint8List bytes) {
@@ -286,6 +456,18 @@ class ReceiveScreenState extends State<ReceiveScreen>
   Future<void> acceptVerifiedPayloadForTesting(Uint8List payload) =>
       _acceptVerifiedPayload(payload);
 
+  /// Sends a deterministic native scanner capture through the production
+  /// adapter/receiver path without constructing a platform camera.
+  @visibleForTesting
+  void handleMobileCaptureForTesting(BarcodeCapture capture) =>
+      _onMobileCapture(capture);
+
+  @visibleForTesting
+  String? get barcodeObservationForTesting => _barcodeObservation?.name;
+
+  @visibleForTesting
+  bool get pausedForTesting => _paused;
+
   Future<void> _acceptVerifiedPayload(Uint8List payload) async {
     if (!mounted || _savePhase != _ReceiveSavePhase.scanning) return;
     setState(() {
@@ -298,11 +480,7 @@ class ReceiveScreenState extends State<ReceiveScreen>
   Future<void> _finishTransfer(Uint8List payload) async {
     try {
       if (_usesMobileScanner) {
-        try {
-          await _mobileController.stop();
-        } catch (_) {
-          // Camera cleanup must not prevent decoding an already verified file.
-        }
+        await _stopMobileScanner();
       }
       final file =
           await (widget.payloadDecoder ?? decodeTransferFileInBackground)(
@@ -386,11 +564,7 @@ class ReceiveScreenState extends State<ReceiveScreen>
   Future<void> _recoverFromFailure(String message) async {
     final stableMessage = _friendlyReceiveError(message);
     if (_usesMobileScanner) {
-      try {
-        await _mobileController.stop();
-      } catch (_) {
-        // The scanner may already be stopped after a completed decode.
-      }
+      await _stopMobileScanner();
     }
     _receiver.reset();
     if (!mounted) return;
@@ -401,6 +575,8 @@ class ReceiveScreenState extends State<ReceiveScreen>
       _savePhase = _ReceiveSavePhase.scanning;
       _error = stableMessage;
       _receiveStartedAt = null;
+      _barcodeObservation = null;
+      _pausedByLifecycle = false;
     });
     try {
       await _enableWakelock();
@@ -408,11 +584,7 @@ class ReceiveScreenState extends State<ReceiveScreen>
       // Camera progress remains usable if wakelock is unavailable.
     }
     if (_usesMobileScanner) {
-      try {
-        await _mobileController.start();
-      } catch (error) {
-        if (mounted) setState(() => _error = _friendlyReceiveError(error));
-      }
+      _scheduleMobileScannerStart();
     }
   }
 
@@ -420,15 +592,26 @@ class ReceiveScreenState extends State<ReceiveScreen>
     if (_completed || _processing) return;
     try {
       if (_paused) {
-        setState(() => _paused = false);
+        setState(() {
+          _paused = false;
+          _pausedByLifecycle = false;
+        });
         await _enableWakelock();
-        if (_usesMobileScanner) {
-          await _mobileController.start();
+        if (_usesMobileScanner && !_usesCimbar) {
+          final started = await _startMobileScanner();
+          if (!started && mounted) {
+            setState(() => _paused = true);
+          }
         }
       } else {
-        if (_usesMobileScanner) await _mobileController.stop();
+        if (_usesMobileScanner) await _stopMobileScanner();
         await _disableWakelock();
-        if (mounted) setState(() => _paused = true);
+        if (mounted) {
+          setState(() {
+            _paused = true;
+            _pausedByLifecycle = false;
+          });
+        }
       }
     } catch (error) {
       if (mounted) setState(() => _error = _friendlyReceiveError(error));
@@ -437,11 +620,7 @@ class ReceiveScreenState extends State<ReceiveScreen>
 
   Future<void> _reset() async {
     if (_usesMobileScanner) {
-      try {
-        await _mobileController.stop();
-      } catch (_) {
-        // A stopped controller is already in the state needed for reset.
-      }
+      await _stopMobileScanner();
     }
     _receiver.reset();
     if (!mounted) return;
@@ -452,15 +631,13 @@ class ReceiveScreenState extends State<ReceiveScreen>
       _error = null;
       _savePhase = _ReceiveSavePhase.scanning;
       _paused = false;
+      _pausedByLifecycle = false;
+      _barcodeObservation = null;
       _receiveStartedAt = null;
     });
     await _enableWakelock();
     if (_usesMobileScanner) {
-      try {
-        await _mobileController.start();
-      } catch (error) {
-        if (mounted) setState(() => _error = error.toString());
-      }
+      _scheduleMobileScannerStart();
     }
   }
 
@@ -517,6 +694,7 @@ class ReceiveScreenState extends State<ReceiveScreen>
 
   Future<void> _disposeMobileController() async {
     try {
+      await _stopMobileScanner();
       await _mobileController.dispose();
     } catch (_) {
       // Disposal is best effort during route teardown.
@@ -528,47 +706,51 @@ class ReceiveScreenState extends State<ReceiveScreen>
     final l10n = AppLocalizations.of(context)!;
     if (_usesCimbar && !_completed) {
       return Scaffold(
-        appBar: AppBar(title: Text(l10n.scanReceive)),
+        appBar: _buildReceiveAppBar(l10n),
         body: SafeArea(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [_buildModeChips(enabled: !_processing)],
-                ),
-              ),
-              const Divider(height: 1),
-              Expanded(
-                child: CimbarTransferScreen(
-                  key: const ValueKey<String>('receive-cimbar-panel'),
-                  direction: CimbarDirection.receive,
-                  store: widget.store,
-                  embedded: true,
-                  autoStartReceive: true,
-                ),
-              ),
-            ],
+          child: CimbarTransferScreen(
+            key: const ValueKey<String>('receive-cimbar-panel'),
+            direction: CimbarDirection.receive,
+            store: widget.store,
+            embedded: true,
+            autoStartReceive: true,
           ),
         ),
       );
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(l10n.scanReceive),
-        actions: [
-          if (_usesMobileScanner && !_usesCimbar)
-            IconButton(
-              tooltip: l10n.torch,
-              onPressed: _completed || _processing ? null : _toggleTorch,
-              icon: const Icon(Icons.flashlight_on_outlined),
-            ),
-        ],
-      ),
+      appBar: _buildReceiveAppBar(l10n),
       body: SafeArea(child: _completed ? _buildCompleted() : _buildScanner()),
+    );
+  }
+
+  PreferredSizeWidget _buildReceiveAppBar(AppLocalizations l10n) {
+    return AppBar(
+      toolbarHeight: 52,
+      titleSpacing: 16,
+      title: Text(
+        l10n.scanReceive,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      actions: [
+        if (!_completed)
+          IconButton(
+            key: const ValueKey<String>('receive-mode-menu'),
+            tooltip: l10n.transferModeLabel,
+            onPressed: _processing
+                ? null
+                : () => unawaited(_showReceiveModeSheet()),
+            icon: const Icon(Icons.tune_rounded),
+          ),
+        if (_usesMobileScanner && !_usesCimbar)
+          IconButton(
+            tooltip: l10n.torch,
+            onPressed: _completed || _processing ? null : _toggleTorch,
+            icon: const Icon(Icons.flashlight_on_outlined),
+          ),
+      ],
     );
   }
 
@@ -588,172 +770,306 @@ class ReceiveScreenState extends State<ReceiveScreen>
           );
     return LayoutBuilder(
       builder: (context, constraints) {
-        final cameraHeight = constraints.maxWidth >= 760
-            ? 440.0
-            : (constraints.maxWidth * 0.88).clamp(280.0, 520.0);
-        return SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
+        final compact = constraints.maxWidth < 760;
+        final contentWidth = constraints.maxWidth < 920
+            ? constraints.maxWidth
+            : 920.0;
+        final horizontalPadding = compact ? 16.0 : 24.0;
+        final verticalPadding = compact ? 8.0 : 16.0;
+
+        return SizedBox(
+          width: constraints.maxWidth,
+          height: constraints.maxHeight,
           child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 760),
-              child: Column(
-                children: [
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: _buildModeChips(
-                      enabled: !_processing && snapshot == null,
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  SizedBox(
-                    height: cameraHeight,
-                    width: double.infinity,
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(4),
-                      child: Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          _buildCamera(),
-                          IgnorePointer(
-                            child: CustomPaint(
-                              painter: _ScannerOverlayPainter(paused: _paused),
-                            ),
-                          ),
-                          if (_paused || _processing)
-                            Container(
-                              color: oneSendInk.withValues(alpha: 0.86),
-                              alignment: Alignment.center,
-                              child: Text(
-                                _processing ? l10n.verifying : l10n.paused,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.w700,
+            child: SizedBox(
+              width: contentWidth,
+              height: constraints.maxHeight,
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                  horizontalPadding,
+                  verticalPadding,
+                  horizontalPadding,
+                  verticalPadding,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      child: LayoutBuilder(
+                        builder: (context, cameraConstraints) {
+                          final cameraHeight = compact
+                              ? cameraConstraints.maxHeight
+                              : cameraConstraints.maxHeight < 440.0
+                              ? cameraConstraints.maxHeight
+                              : 440.0;
+                          return Align(
+                            alignment: compact
+                                ? Alignment.center
+                                : Alignment.topCenter,
+                            child: SizedBox(
+                              width: double.infinity,
+                              height: cameraHeight,
+                              child: KeyedSubtree(
+                                key: const ValueKey<String>(
+                                  'receive-camera-frame',
                                 ),
+                                child: _buildCameraFrame(l10n),
                               ),
                             ),
-                        ],
+                          );
+                        },
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(status, style: Theme.of(context).textTheme.titleMedium),
-                  const SizedBox(height: 5),
-                  Text(
-                    _usesMobileScanner
-                        ? l10n.scanInstruction
-                        : l10n.desktopCameraInstruction,
-                    style: Theme.of(context).textTheme.bodyMedium,
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 20),
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          LinearProgressIndicator(
-                            minHeight: 8,
-                            value: progress,
-                            backgroundColor: const Color(0xffe8ebe4),
-                            color: oneSendInk,
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            l10n.currentRate(formatTransferSpeed(currentRate)),
-                            style: const TextStyle(
-                              color: oneSendInk,
-                              fontSize: 20,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                          if (snapshot?.mode != null) ...[
-                            const SizedBox(height: 4),
-                            Text(
-                              l10n.theoreticalRate(
-                                formatTransferSpeed(
-                                  snapshot!.mode!.usefulBytesPerSecond,
-                                ),
-                              ),
-                              style: const TextStyle(
-                                color: oneSendMuted,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ],
-                          const SizedBox(height: 10),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  snapshot == null
-                                      ? l10n.waitingFirstFrame
-                                      : snapshot.usesRatelessFountain
-                                      ? l10n.fountainProgress(
-                                          snapshot.framesNew,
-                                        )
-                                      : l10n.blockProgress(
-                                          snapshot.blockCount,
-                                          snapshot.framesNew,
-                                          snapshot.solvedBlocks,
-                                        ),
-                                  style: Theme.of(context).textTheme.bodySmall,
-                                ),
-                              ),
-                              if (snapshot != null)
-                                Text(
-                                  l10n.modeAndSize(
-                                    _localizedReceiveModeLabel(
-                                      l10n,
-                                      snapshot.mode,
-                                    ),
-                                    formatBytes(snapshot.totalLength),
-                                  ),
-                                  style: Theme.of(context).textTheme.bodySmall,
-                                ),
-                            ],
-                          ),
-                        ],
-                      ),
+                    SizedBox(height: compact ? 10 : 16),
+                    _buildScanReadout(
+                      l10n: l10n,
+                      status: status,
+                      progress: progress,
+                      currentRate: currentRate,
+                      snapshot: snapshot,
+                      compact: compact,
                     ),
-                  ),
-                  if (_error != null) ...[
-                    const SizedBox(height: 14),
-                    _ReceiveError(message: _error!),
-                  ],
-                  const SizedBox(height: 14),
-                  Wrap(
-                    alignment: WrapAlignment.center,
-                    spacing: 10,
-                    runSpacing: 10,
-                    children: [
-                      if (_paused || snapshot != null)
-                        OutlinedButton.icon(
-                          onPressed: _processing ? null : _togglePause,
-                          icon: Icon(
-                            _paused
-                                ? Icons.play_arrow_rounded
-                                : Icons.pause_rounded,
-                          ),
-                          label: Text(
-                            _paused ? l10n.resumeScan : l10n.pauseScan,
-                          ),
-                        ),
-                      FilledButton.icon(
-                        onPressed: _processing ? null : _reset,
-                        icon: const Icon(Icons.refresh_rounded),
-                        label: Text(l10n.restart),
-                      ),
+                    if (_error != null) ...[
+                      const SizedBox(height: 6),
+                      _ReceiveError(message: _error!, compact: true),
                     ],
-                  ),
-                ],
+                    SizedBox(height: compact ? 8 : 16),
+                    _buildScannerControl(l10n: l10n, compact: compact),
+                  ],
+                ),
               ),
             ),
           ),
         );
       },
+    );
+  }
+
+  Widget _buildCameraFrame(AppLocalizations l10n) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(18),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          _buildCamera(),
+          IgnorePointer(
+            child: CustomPaint(
+              painter: _ScannerOverlayPainter(paused: _paused),
+            ),
+          ),
+          if (_paused || _processing)
+            Container(
+              color: oneSendInk.withValues(alpha: 0.86),
+              alignment: Alignment.center,
+              child: Text(
+                _processing ? l10n.verifying : l10n.paused,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildScanReadout({
+    required AppLocalizations l10n,
+    required String status,
+    required double? progress,
+    required double currentRate,
+    required ReceiverSnapshot? snapshot,
+    required bool compact,
+  }) {
+    final progressValue = progress?.clamp(0.0, 1.0).toDouble();
+    final progressPercent = ((progressValue ?? 0) * 100).round();
+    final detail = snapshot == null
+        ? l10n.waitingFirstFrame
+        : snapshot.usesRatelessFountain
+        ? l10n.fountainProgress(snapshot.framesNew)
+        : l10n.blockProgress(
+            snapshot.blockCount,
+            snapshot.framesNew,
+            snapshot.solvedBlocks,
+          );
+    final modeAndSize = snapshot == null
+        ? null
+        : l10n.modeAndSize(
+            _localizedReceiveModeLabel(l10n, snapshot.mode),
+            formatBytes(snapshot.totalLength),
+          );
+
+    return Column(
+      key: const ValueKey<String>('receive-scan-readout'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                status,
+                key: const ValueKey<String>('receive-scan-status'),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(
+                  context,
+                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              '$progressPercent%',
+              key: const ValueKey<String>('receive-progress-percent'),
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurface,
+                fontSize: 18,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(2),
+          child: LinearProgressIndicator(
+            key: const ValueKey<String>('receive-progress'),
+            minHeight: 6,
+            value: progressValue ?? 0,
+            backgroundColor: Theme.of(
+              context,
+            ).colorScheme.onSurface.withValues(alpha: 0.12),
+            color: oneSendLime,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                l10n.currentRate(formatTransferSpeed(currentRate)),
+                key: const ValueKey<String>('receive-current-rate'),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurface,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            if (!compact && snapshot?.mode != null) ...[
+              const SizedBox(width: 12),
+              Flexible(
+                child: Text(
+                  l10n.theoreticalRate(
+                    formatTransferSpeed(snapshot!.mode!.usefulBytesPerSecond),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.end,
+                  style: const TextStyle(
+                    color: oneSendMuted,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+        const SizedBox(height: 4),
+        Row(
+          children: [
+            Flexible(
+              child: Text(
+                detail,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ),
+            if (modeAndSize != null) ...[
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  modeAndSize,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.end,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ),
+            ],
+          ],
+        ),
+        const SizedBox(height: 3),
+        Text(
+          _usesMobileScanner
+              ? l10n.scanInstruction
+              : l10n.desktopCameraInstruction,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(color: oneSendMuted, fontSize: 11),
+        ),
+        if (_barcodeObservation != null) ...[
+          const SizedBox(height: 3),
+          Text(
+            _barcodeObservationMessage(l10n),
+            key: const ValueKey<String>('receive-barcode-observation'),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: oneSendMuted),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildScannerControl({
+    required AppLocalizations l10n,
+    required bool compact,
+  }) {
+    final toggleLabel = _paused ? l10n.resumeScan : l10n.pauseScan;
+    return Align(
+      alignment: compact ? Alignment.center : Alignment.center,
+      child: SizedBox(
+        width: compact ? double.infinity : 320,
+        height: 48,
+        child: PopupMenuButton<_ReceiveScanAction>(
+          key: const ValueKey<String>('receive-scan-control'),
+          enabled: !_processing,
+          tooltip: toggleLabel,
+          position: PopupMenuPosition.over,
+          offset: const Offset(0, -8),
+          onSelected: (action) {
+            switch (action) {
+              case _ReceiveScanAction.togglePause:
+                unawaited(_togglePause());
+              case _ReceiveScanAction.restart:
+                unawaited(_reset());
+            }
+          },
+          itemBuilder: (context) => [
+            PopupMenuItem<_ReceiveScanAction>(
+              value: _ReceiveScanAction.togglePause,
+              child: Text(toggleLabel),
+            ),
+            PopupMenuItem<_ReceiveScanAction>(
+              value: _ReceiveScanAction.restart,
+              child: Text(l10n.restart),
+            ),
+          ],
+          child: _ReceiveScanControlSurface(
+            label: toggleLabel,
+            paused: _paused,
+          ),
+        ),
+      ),
     );
   }
 
@@ -916,24 +1232,77 @@ class _ScannerOverlayPainter extends CustomPainter {
       oldDelegate.paused != paused;
 }
 
+class _ReceiveScanControlSurface extends StatelessWidget {
+  const _ReceiveScanControlSurface({required this.label, required this.paused});
+
+  final String label;
+  final bool paused;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: oneSendInk,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              paused ? Icons.play_arrow_rounded : Icons.pause_rounded,
+              color: Colors.white,
+              size: 20,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(width: 6),
+            const Icon(
+              Icons.expand_more_rounded,
+              color: Colors.white70,
+              size: 19,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _ReceiveError extends StatelessWidget {
-  const _ReceiveError({required this.message});
+  const _ReceiveError({required this.message, this.compact = false});
 
   final String message;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(12),
+      padding: EdgeInsets.all(compact ? 8 : 12),
       decoration: BoxDecoration(
         color: const Color(0xffffe5e1),
-        border: Border.all(color: const Color(0xffa32820), width: 2),
+        border: Border.all(
+          color: const Color(0xffa32820),
+          width: compact ? 1 : 2,
+        ),
         borderRadius: BorderRadius.circular(4),
       ),
       child: Text(
         message,
-        style: const TextStyle(color: Color(0xff9e3025), fontSize: 13),
+        maxLines: compact ? 2 : null,
+        overflow: compact ? TextOverflow.ellipsis : null,
+        style: TextStyle(
+          color: const Color(0xff9e3025),
+          fontSize: compact ? 12 : 13,
+        ),
       ),
     );
   }

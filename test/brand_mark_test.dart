@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
+import 'package:onesend/app.dart';
 import 'package:onesend/l10n/generated/app_localizations.dart';
 import 'package:onesend/l10n/locale_support.dart';
 import 'package:onesend/screens/about_screen.dart';
@@ -12,6 +13,11 @@ import 'package:onesend/services/update_service.dart';
 import 'package:onesend/widgets/brand_mark.dart';
 
 void main() {
+  test('brand constants use the file-scan source and generated app icon', () {
+    expect(oneSendBrandSourceAsset, 'assets/brand/onesend-file-scan-mark.png');
+    expect(oneSendBrandIconAsset, 'assets/brand/onesend-icon-1024.png');
+  });
+
   testWidgets('home and about share the official brand icon asset', (
     WidgetTester tester,
   ) async {
@@ -33,6 +39,7 @@ void main() {
     expect(find.byType(BrandMark), findsOneWidget);
     final homeAsset = _brandAssetName(tester);
     expect(homeAsset, oneSendBrandIconAsset);
+    _expectLightBrandPlate(tester);
     expect(
       find.descendant(of: find.byType(BrandMark), matching: find.text('1')),
       findsNothing,
@@ -47,6 +54,7 @@ void main() {
     final aboutAsset = _brandAssetName(tester);
     expect(aboutAsset, oneSendBrandIconAsset);
     expect(aboutAsset, homeAsset);
+    _expectLightBrandPlate(tester);
     expect(
       find.descendant(of: find.byType(BrandIcon), matching: find.text('1')),
       findsNothing,
@@ -113,4 +121,13 @@ String _brandAssetName(WidgetTester tester) {
   final provider = image.image;
   expect(provider, isA<AssetImage>());
   return (provider as AssetImage).assetName;
+}
+
+void _expectLightBrandPlate(WidgetTester tester) {
+  final plates = find.descendant(
+    of: find.byType(BrandIcon),
+    matching: find.byType(ColoredBox),
+  );
+  expect(plates, findsOneWidget);
+  expect(tester.widget<ColoredBox>(plates).color, oneSendPaper);
 }

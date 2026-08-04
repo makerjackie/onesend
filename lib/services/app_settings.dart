@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/optical_transfer.dart';
@@ -10,6 +10,7 @@ const String appSettingsTransferModeKey = 'default_transfer_mode';
 /// The preference key used for the algorithm selected for new transfers.
 const String appSettingsTransferAlgorithmKey = 'default_transfer_algorithm';
 const String appSettingsLocaleTagKey = 'locale_tag';
+const String appSettingsThemeModeKey = 'theme_mode';
 
 /// The visual transport family used for new transfers.
 ///
@@ -46,6 +47,8 @@ class AppSettings extends ChangeNotifier {
     TransferAlgorithm initialTransferAlgorithm = TransferAlgorithm.qr,
     TransferAlgorithm? initialAlgorithm,
     String? initialLocaleTag,
+    ThemeMode initialThemeMode = ThemeMode.system,
+    ThemeMode? initialThemePreference,
   }) : _preferences = preferences,
        _transferMode = _readTransferMode(preferences) ?? initialTransferMode,
        _transferAlgorithm =
@@ -53,7 +56,11 @@ class AppSettings extends ChangeNotifier {
            initialAlgorithm ??
            initialTransferAlgorithm,
        _localeTag =
-           _readLocaleTag(preferences) ?? _validateLocaleTag(initialLocaleTag);
+           _readLocaleTag(preferences) ?? _validateLocaleTag(initialLocaleTag),
+       _themeMode =
+           _readThemeMode(preferences) ??
+           initialThemePreference ??
+           initialThemeMode;
 
   /// The first-run mode, chosen for the best default throughput.
   static const TransferMode defaultTransferMode = TransferMode.fast;
@@ -63,6 +70,7 @@ class AppSettings extends ChangeNotifier {
   static const String transferAlgorithmPreferenceKey =
       appSettingsTransferAlgorithmKey;
   static const String localeTagPreferenceKey = appSettingsLocaleTagKey;
+  static const String themeModePreferenceKey = appSettingsThemeModeKey;
 
   /// The first-run algorithm. QR is the stable, broadly compatible default.
   static const TransferAlgorithm defaultTransferAlgorithm =
@@ -72,6 +80,7 @@ class AppSettings extends ChangeNotifier {
   TransferMode _transferMode;
   TransferAlgorithm _transferAlgorithm;
   String? _localeTag;
+  ThemeMode _themeMode;
   Future<void> _transferWriteTail = Future<void>.value();
 
   /// Loads settings from [preferences], or from the platform preferences.
@@ -95,6 +104,12 @@ class AppSettings extends ChangeNotifier {
 
   /// The explicitly selected locale tag, or null to follow the system.
   String? get localeTag => _localeTag;
+
+  /// The visual theme selected for the application.
+  ThemeMode get themeMode => _themeMode;
+
+  /// Alias for settings UIs that call this a theme preference.
+  ThemeMode get themePreference => _themeMode;
 
   static bool isValidLocaleTag(String? localeTag) {
     return localeTag == null || LocaleSupport.isSupportedTag(localeTag);
@@ -223,6 +238,43 @@ class AppSettings extends ChangeNotifier {
 
   Future<void> setLocale(String? localeTag) => setLocaleTag(localeTag);
 
+  /// Changes and persists the visual theme. [ThemeMode.system] follows the
+  /// operating system and is the default for new installs.
+  Future<void> setThemeMode(ThemeMode mode) {
+    final previousMode = _themeMode;
+    final changed = previousMode != mode;
+    if (changed) {
+      _themeMode = mode;
+      notifyListeners();
+    }
+
+    final preferences = _preferences;
+    if (preferences == null ||
+        (!changed &&
+            preferences.getInt(themeModePreferenceKey) == _themeModeId(mode))) {
+      return Future<void>.value();
+    }
+
+    final operation = _enqueueTransferWrite(() async {
+      final persisted = await preferences.setInt(
+        themeModePreferenceKey,
+        _themeModeId(mode),
+      );
+      if (!persisted) {
+        throw StateError('无法保存主题设置。');
+      }
+    });
+    return operation.catchError((Object error, StackTrace stackTrace) {
+      if (changed && _themeMode == mode) {
+        _themeMode = previousMode;
+        notifyListeners();
+      }
+      Error.throwWithStackTrace(error, stackTrace);
+    });
+  }
+
+  Future<void> setThemePreference(ThemeMode mode) => setThemeMode(mode);
+
   Future<void> _enqueueTransferWrite(Future<void> Function() write) {
     final operation = _transferWriteTail.then<void>((_) => write());
     // A failed write must not poison later user selections. The individual
@@ -266,5 +318,27 @@ class AppSettings extends ChangeNotifier {
     } catch (_) {
       return null;
     }
+  }
+
+  static ThemeMode? _readThemeMode(SharedPreferences? preferences) {
+    try {
+      final id = preferences?.getInt(themeModePreferenceKey);
+      return switch (id) {
+        0 => ThemeMode.system,
+        1 => ThemeMode.light,
+        2 => ThemeMode.dark,
+        _ => null,
+      };
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static int _themeModeId(ThemeMode mode) {
+    return switch (mode) {
+      ThemeMode.system => 0,
+      ThemeMode.light => 1,
+      ThemeMode.dark => 2,
+    };
   }
 }

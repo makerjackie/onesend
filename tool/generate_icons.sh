@@ -2,10 +2,11 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SOURCE_RELATIVE="assets/brand/onesend-transfer-mark.svg"
+SOURCE_RELATIVE="assets/brand/onesend-file-scan-mark.png"
 SOURCE="$ROOT_DIR/$SOURCE_RELATIVE"
 MANIFEST_RELATIVE="assets/brand/generated-assets.sha256"
 MANIFEST="$ROOT_DIR/$MANIFEST_RELATIVE"
+APP_ICON_BACKGROUND="#f5f6f0"
 MODE="generate"
 
 usage() {
@@ -13,8 +14,9 @@ usage() {
 Usage: tool/generate_icons.sh [--check]
 
 Without arguments, render all checked-in OneSend icon assets from the canonical
-transfer-mark SVG and refresh the committed SHA-256 manifest. With --check,
-verify the committed files against that manifest without rendering any images.
+transparent file-scan PNG on a warm off-white app-icon plate and refresh the
+committed SHA-256 manifest. With --check, verify the committed files against
+that manifest without rendering any images.
 EOF
 }
 
@@ -39,13 +41,25 @@ if (( $# != 0 )); then
   exit 2
 fi
 
-render_svg() {
+render_icon() {
   local size="$1"
   local output="$2"
 
   mkdir -p "$(dirname "$output")"
-  "$MAGICK_BIN" -background none "$SOURCE" -resize "${size}x${size}!" \
+  "$MAGICK_BIN" "$SOURCE" -background "$APP_ICON_BACKGROUND" \
+    -resize "${size}x${size}!" -alpha remove -alpha off \
     -strip "PNG24:$output"
+}
+
+write_favicon_reference() {
+  local output="$1"
+
+  mkdir -p "$(dirname "$output")"
+  printf '%s\n' \
+    '<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">' \
+    '  <title>OneSend file scan mark</title>' \
+    '  <image href="/icon.png" width="1024" height="1024" preserveAspectRatio="xMidYMid meet" />' \
+    '</svg>' > "$output"
 }
 
 copy_asset() {
@@ -64,7 +78,7 @@ render_target_list() {
 
   while IFS='|' read -r size relative; do
     [[ -n "$relative" ]] || continue
-    render_svg "$size" "$output_root/$relative"
+    render_icon "$size" "$output_root/$relative"
   done <<< "$targets"
 }
 
@@ -74,25 +88,25 @@ build_assets() {
   local relative
   local size
 
-  render_svg 1024 "$master"
+  render_icon 1024 "$master"
 
-  # Keep the 1024px root, website, iOS, and macOS assets byte-identical.
+  # Keep the 1024px root, website, iOS, macOS, and Linux assets byte-identical.
   for relative in \
     assets/brand/onesend-icon-1024.png \
     website/public/icon.png \
     ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-1024x1024@1x.png \
-    macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_1024.png; do
+    macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_1024.png \
+    linux/runner/resources/app_icon.png; do
     copy_asset "$master" "$output_root/$relative"
   done
 
-  # The browser favicon is the canonical SVG itself, without a second drawing.
-  copy_asset "$SOURCE" "$output_root/website/public/favicon.svg"
+  # Keep the SVG favicon as a deterministic reference to the PNG asset rather
+  # than drawing a second, potentially divergent mark.
+  write_favicon_reference "$output_root/website/public/favicon.svg"
 
   render_target_list "$output_root" "$ANDROID_TARGETS"
   render_target_list "$output_root" "$IOS_TARGETS"
   render_target_list "$output_root" "$MACOS_TARGETS"
-  render_svg 1024 "$output_root/linux/runner/resources/app_icon.png"
-
   # Windows ICO contains standard shell sizes as PNG-compressed frames.
   mkdir -p "$output_root/windows/runner/resources"
   "$MAGICK_BIN" "$master" \

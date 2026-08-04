@@ -30,7 +30,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get modeCimbar => 'CIMBAR 컬러 비주얼 코드(실험적)';
 
   @override
-  String get modeQr => 'QR code';
+  String get modeQr => 'QR 코드';
 
   @override
   String get compatibilityMode => '호환성';
@@ -66,6 +66,39 @@ class AppLocalizationsKo extends AppLocalizations {
   String get about => 'OneSend 정보';
 
   @override
+  String get transferTab => '전송';
+
+  @override
+  String get filesTab => '파일';
+
+  @override
+  String get filesTitle => '파일';
+
+  @override
+  String get filesSubtitle => '전송 기록과 받은 파일을 관리합니다.';
+
+  @override
+  String get theme => '테마';
+
+  @override
+  String get themeSubtitle => '시스템, 라이트 또는 다크';
+
+  @override
+  String get themeSystem => '시스템 따르기';
+
+  @override
+  String get themeLight => '라이트';
+
+  @override
+  String get themeDark => '다크';
+
+  @override
+  String get themeSaveError => '테마를 저장하지 못했습니다. 다시 시도하세요.';
+
+  @override
+  String get aboutSubtitle => '버전, 개인정보 보호 및 오픈 소스.';
+
+  @override
   String get clearHistory => '전송 기록 삭제';
 
   @override
@@ -94,7 +127,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get sendFile => '파일 보내기';
 
   @override
-  String get receiveFile => '스캔하여 받기';
+  String get receiveFile => '파일 받기';
 
   @override
   String get sendCardDescription => '화면에 코드를 표시하고 다른 기기를 그쪽으로 향하게 하세요.';
@@ -323,13 +356,13 @@ class AppLocalizationsKo extends AppLocalizations {
   }
 
   @override
-  String get transferModeLabel => 'Transfer mode';
+  String get transferModeLabel => '전송 모드';
 
   @override
-  String get dropFilesHint => 'Or drag and drop a file here';
+  String get dropFilesHint => '또는 파일을 여기로 드래그하세요';
 
   @override
-  String get dropFilesActive => 'Drop to send';
+  String get dropFilesActive => '놓아서 보내기';
 
   @override
   String get reading => '읽는 중…';
@@ -433,6 +466,13 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get scanInstruction => '비주얼 코드 전체가 프레임 안에 들어오도록 하고 기기를 고정하세요.';
+
+  @override
+  String get scannerBytesUnavailable =>
+      'QR 코드를 감지했지만 카메라가 데이터를 반환하지 않았습니다. 계속 스캔합니다.';
+
+  @override
+  String get scannerInvalidFrame => 'OneSend 데이터가 아닌 QR 코드를 감지했습니다. 계속 스캔합니다.';
 
   @override
   String get desktopCameraInstruction =>

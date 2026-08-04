@@ -1,8 +1,10 @@
 "use client";
 
 import QRCode from "qrcode";
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
+import { Brand } from "./brand";
 import { CimbarTransfer } from "./cimbar/cimbar-client";
 import {
   TRANSFER_MODES,
@@ -75,7 +77,66 @@ export type WebTransferCopy = {
   errorPrefix: string;
 };
 
-type TransferRole = "send" | "receive";
+export const webTransferCopy: WebTransferCopy = {
+  eyebrow: "WEB TRANSFER",
+  title: "网页传输",
+  lead: "不装 App 也能发。选发送或接收，其他交给 OneSend。",
+  localBadge: "仅本地",
+  pickRole: "选择",
+  pickRoleHint: "",
+  senderTitle: "发送",
+  senderBlurb: "",
+  receiverTitle: "接收",
+  receiverBlurb: "",
+  backToPick: "返回",
+  fileChooser: "文件",
+  noFile: "未选文件",
+  chooseFile: "选择文件",
+  sampleVideo: "测试视频",
+  mode: "模式",
+  modeSettings: "传输模式设置",
+  autoFast: "自动 · 快速",
+  fast: "快速",
+  reliable: "可靠",
+  turbo: "Turbo QR",
+  color: "彩色视觉码",
+  fastDetail: "",
+  reliableDetail: "",
+  turboDetail: "",
+  colorDetail: "",
+  displayCode: "开始发送",
+  pause: "暂停",
+  resume: "继续",
+  stop: "结束",
+  readyToSend: "已就绪，点开始发送",
+  sending: "发送中",
+  paused: "已暂停",
+  pass: "轮次",
+  cameraIdle: "开启摄像头后对准发送端",
+  startCamera: "开启摄像头",
+  stopCamera: "停止",
+  scanning: "准备摄像头…",
+  receiving: "接收中",
+  progress: "进度",
+  speed: "速度",
+  frames: "帧",
+  complete: "完成",
+  download: "下载",
+  openPreview: "预览",
+  closePreview: "收起预览",
+  openInBrowser: "打开 / 新标签",
+  saveFile: "保存",
+  previewUnavailable: "此文件格式暂不支持内置预览。",
+  receiveAgain: "再收一次",
+  cameraNote: "对准发送端的视觉码。",
+  localNote: "文件只在本机处理。",
+  interopNote: "",
+  browserOnly: "浏览器",
+  preparing: "准备中…",
+  errorPrefix: "错误：",
+};
+
+export type TransferRole = "send" | "receive";
 type TransferModeChoice = "fast" | "reliable" | "turbo" | "cimbar";
 type QrModeChoice = "fast" | "reliable" | "turbo";
 
@@ -116,6 +177,80 @@ type ReceiverSnapshot = {
 };
 
 /**
+ * QR display policy for the live sender canvas.
+ *
+ * A QR module must stay an integer number of CSS pixels. Three pixels is the
+ * floor for dense optical QR on phone cameras; four is preferred when the
+ * viewport can spare it. The desktop budgets leave room for the surrounding
+ * workbench while the height budget prevents a short desktop viewport from
+ * producing a canvas taller than its useful display area.
+ */
+export const QR_DISPLAY_POLICY = {
+  quietZoneModules: 4,
+  minimumModulePx: 3,
+  preferredModulePx: 4,
+  desktopBreakpointPx: 840,
+  desktopWidthRatio: 0.44,
+  desktopHeightRatio: 0.46,
+  mobileWidthRatio: 0.94,
+  maximumDisplayPx: 640,
+  fallbackViewport: { width: 1024, height: 768 },
+} as const;
+
+export type QrDisplayViewport = {
+  width: number;
+  height: number;
+};
+
+export type QrDisplayMetrics = {
+  availableDisplayPx: number;
+  modulePx: number;
+  pixelSize: number;
+};
+
+/** Return deterministic integer-pixel sizing for a QR with the given extent. */
+export function getQrDisplayMetrics(
+  totalModules: number,
+  viewport: QrDisplayViewport,
+): QrDisplayMetrics {
+  const safeTotalModules = Math.max(1, Math.floor(totalModules));
+  const viewportWidth = Math.max(1, Math.floor(viewport.width));
+  const viewportHeight = Math.max(1, Math.floor(viewport.height));
+  const isDesktop =
+    viewportWidth >= QR_DISPLAY_POLICY.desktopBreakpointPx;
+  const widthBudget = Math.floor(
+    viewportWidth *
+      (isDesktop
+        ? QR_DISPLAY_POLICY.desktopWidthRatio
+        : QR_DISPLAY_POLICY.mobileWidthRatio),
+  );
+  const heightBudget = isDesktop
+    ? Math.floor(viewportHeight * QR_DISPLAY_POLICY.desktopHeightRatio)
+    : QR_DISPLAY_POLICY.maximumDisplayPx;
+  const availableDisplayPx = Math.max(
+    0,
+    Math.min(
+      QR_DISPLAY_POLICY.maximumDisplayPx,
+      widthBudget,
+      heightBudget,
+    ),
+  );
+  const modulePx = Math.max(
+    QR_DISPLAY_POLICY.minimumModulePx,
+    Math.min(
+      QR_DISPLAY_POLICY.preferredModulePx,
+      Math.floor(availableDisplayPx / safeTotalModules),
+    ),
+  );
+
+  return {
+    availableDisplayPx,
+    modulePx,
+    pixelSize: safeTotalModules * modulePx,
+  };
+}
+
+/**
  * Renders a OneSend QR so it stays camera-scannable on real phones.
  *
  * Critical: never let CSS bilinear-scale a dense QR down. Version-30 codes
@@ -136,34 +271,27 @@ function drawQr(
       maskPattern: maskPattern as 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7,
     },
   );
-  const marginModules = 4;
+  const marginModules = QR_DISPLAY_POLICY.quietZoneModules;
   const totalModules = symbol.modules.size + marginModules * 2;
-  // Desktop workbench reserves half a viewport for the code. Keep fast-mode
-  // symbols inside that pane without CSS downscaling; mobile may use its width.
-  const maxDisplay =
+  const viewport =
     typeof window !== "undefined"
-      ? window.innerWidth >= 840
-        ? Math.min(
-            360,
-            Math.floor(window.innerWidth * 0.34),
-            Math.floor(window.innerHeight * 0.46),
-          )
-        : Math.min(640, Math.floor(window.innerWidth * 0.94))
-      : 360;
-  const modulePx = Math.max(
-    2,
-    Math.min(6, Math.floor(maxDisplay / totalModules)),
+      ? { width: window.innerWidth, height: window.innerHeight }
+      : QR_DISPLAY_POLICY.fallbackViewport;
+  const { modulePx, pixelSize } = getQrDisplayMetrics(
+    totalModules,
+    viewport,
   );
-  const pixelSize = totalModules * modulePx;
   if (canvas.width !== pixelSize || canvas.height !== pixelSize) {
     canvas.width = pixelSize;
     canvas.height = pixelSize;
   }
   // Keep CSS size equal to the bitmap so modules are not bilinear-filtered.
-  canvas.style.width = `${pixelSize}px`;
-  canvas.style.height = `${pixelSize}px`;
-  canvas.style.maxWidth = "none";
-  canvas.style.imageRendering = "pixelated";
+  // The compact mobile stylesheet has a max-width !important rule, so these
+  // inline declarations must carry the same priority to preserve 1:1 pixels.
+  canvas.style.setProperty("width", `${pixelSize}px`, "important");
+  canvas.style.setProperty("height", `${pixelSize}px`, "important");
+  canvas.style.setProperty("max-width", "none", "important");
+  canvas.style.setProperty("image-rendering", "pixelated");
 
   const context = canvas.getContext("2d");
   if (!context) throw new Error("The browser cannot draw a visual code.");
@@ -278,9 +406,19 @@ function nowMs() {
   return Date.now();
 }
 
-export function WebTransfer({ copy }: { copy: WebTransferCopy }) {
+export type WebTransferProps = {
+  copy: WebTransferCopy;
+  initialRole?: TransferRole;
+  lockedRole?: TransferRole;
+};
+
+export function WebTransfer({
+  copy,
+  initialRole = "send",
+  lockedRole,
+}: WebTransferProps) {
   // Fast is the automatic default. Reliability remains one compact setting away.
-  const [role, setRole] = useState<TransferRole>("send");
+  const [role, setRole] = useState<TransferRole>(lockedRole ?? initialRole);
   const [mode, setMode] = useState<TransferModeChoice>("fast");
   const [senderState, setSenderState] = useState<SenderState>("idle");
   const [senderReady, setSenderReady] = useState(false);
@@ -292,6 +430,7 @@ export function WebTransfer({ copy }: { copy: WebTransferCopy }) {
   const [receiverState, setReceiverState] = useState<ReceiverState>("idle");
   const [receiverProgress, setReceiverProgress] = useState<ReceiverSnapshot | null>(null);
   const [receiverSpeed, setReceiverSpeed] = useState("—");
+  const [receiverPaused, setReceiverPaused] = useState(false);
   const [receivedFile, setReceivedFile] = useState<ReceivedFile | null>(null);
   const [previewOpen, setPreviewOpen] = useState(true);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -320,6 +459,7 @@ export function WebTransfer({ copy }: { copy: WebTransferCopy }) {
   const modeMenuRef = useRef<HTMLDetailsElement>(null);
   const previewUrlRef = useRef<string | null>(null);
   const usesCimbar = mode === "cimbar";
+  const roleIsLocked = lockedRole !== undefined;
   const captureCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
   function clearSenderTimer() {
@@ -366,6 +506,7 @@ export function WebTransfer({ copy }: { copy: WebTransferCopy }) {
   }
 
   function chooseRole(next: TransferRole) {
+    if (lockedRole && next !== lockedRole) return;
     if (next === "send") {
       stopCameraTracks();
       if (receiverState !== "complete") {
@@ -409,8 +550,9 @@ export function WebTransfer({ copy }: { copy: WebTransferCopy }) {
   useEffect(() => {
     function openFromHash() {
       const hash = window.location.hash.replace(/^#/, "");
-    if (hash === "web-transfer-send" || hash === "send") {
-      chooseRole("send");
+      if (roleIsLocked) return;
+      if (hash === "web-transfer-send" || hash === "send") {
+        chooseRole("send");
       } else if (hash === "web-transfer-receive" || hash === "receive") {
         chooseRole("receive");
       }
@@ -420,7 +562,7 @@ export function WebTransfer({ copy }: { copy: WebTransferCopy }) {
     return () => window.removeEventListener("hashchange", openFromHash);
     // Only react to hash navigation; chooseRole closes over fresh setters.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [roleIsLocked]);
 
   function buildSenderFromBytes(
     bytes: Uint8Array,
@@ -742,6 +884,7 @@ export function WebTransfer({ copy }: { copy: WebTransferCopy }) {
       const file = await decodeTransferFile(event.payload);
       stopCameraTracks();
       showReceivedFile(file);
+      setReceiverPaused(false);
       setReceiverState("complete");
     } catch (error) {
       setReceiverState("error");
@@ -757,12 +900,16 @@ export function WebTransfer({ copy }: { copy: WebTransferCopy }) {
       );
       return;
     }
+    const resumeExistingTransfer = receiverPaused && receiverProgress !== null;
     stopCameraTracks();
-    receiverRef.current.reset();
-    clearPreview();
-    setReceivedFile(null);
-    setReceiverProgress(null);
-    setReceiverSpeed("—");
+    if (!resumeExistingTransfer) {
+      receiverRef.current.reset();
+      clearPreview();
+      setReceivedFile(null);
+      setReceiverProgress(null);
+      setReceiverSpeed("—");
+    }
+    setReceiverPaused(false);
     setReceiverError(null);
     setScanHint(null);
     setReceiverState("starting");
@@ -926,7 +1073,12 @@ export function WebTransfer({ copy }: { copy: WebTransferCopy }) {
 
   function stopCamera() {
     stopCameraTracks();
-    if (receiverState !== "complete") setReceiverState("idle");
+    if (receiverState === "starting" || receiverState === "receiving") {
+      setReceiverPaused(true);
+      setReceiverState("idle");
+    } else if (receiverState !== "complete") {
+      setReceiverState("idle");
+    }
   }
 
   function receiveAgain() {
@@ -936,6 +1088,7 @@ export function WebTransfer({ copy }: { copy: WebTransferCopy }) {
     setReceivedFile(null);
     setReceiverProgress(null);
     setReceiverSpeed("—");
+    setReceiverPaused(false);
     setReceiverError(null);
     setReceiverState("idle");
   }
@@ -947,7 +1100,12 @@ export function WebTransfer({ copy }: { copy: WebTransferCopy }) {
   const showReceiver = role === "receive";
 
   return (
-    <section className="section gray-section web-transfer-section" id="web-transfer" aria-labelledby="web-transfer-title">
+    <section
+      className="section gray-section web-transfer-section"
+      id="web-transfer"
+      data-transfer-role={lockedRole ?? "switchable"}
+      aria-labelledby="web-transfer-title"
+    >
       <div className="page-shell web-transfer-shell">
         <div className="web-transfer-header">
           <div>
@@ -962,6 +1120,7 @@ export function WebTransfer({ copy }: { copy: WebTransferCopy }) {
         </div>
 
         <div className="web-lab">
+            {!roleIsLocked && (
             <div className="web-role-tabs web-role-tabs-compact" role="tablist" aria-label={copy.pickRole} onKeyDown={handleRoleKeyDown}>
               <button
                 id="web-transfer-send-tab"
@@ -988,9 +1147,15 @@ export function WebTransfer({ copy }: { copy: WebTransferCopy }) {
                 {copy.receiverTitle}
               </button>
             </div>
+            )}
 
             {showSender && (
-              <article id="web-transfer-send-panel" className="web-transfer-card web-transfer-card-compact" role="tabpanel" aria-labelledby="web-transfer-send-tab">
+              <article
+                id="web-transfer-send-panel"
+                className="web-transfer-card web-transfer-card-compact"
+                role={roleIsLocked ? undefined : "tabpanel"}
+                aria-labelledby={roleIsLocked ? "web-transfer-title" : "web-transfer-send-tab"}
+              >
                 {renderModeSwitcher()}
                 {usesCimbar ? (
                   <div className="web-cimbar-embed">
@@ -1117,7 +1282,12 @@ export function WebTransfer({ copy }: { copy: WebTransferCopy }) {
             )}
 
             {showReceiver && (
-              <article id="web-transfer-receive-panel" className="web-transfer-card web-transfer-card-compact" role="tabpanel" aria-labelledby="web-transfer-receive-tab">
+              <article
+                id="web-transfer-receive-panel"
+                className="web-transfer-card web-transfer-card-compact"
+                role={roleIsLocked ? undefined : "tabpanel"}
+                aria-labelledby={roleIsLocked ? "web-transfer-title" : "web-transfer-receive-tab"}
+              >
                 {renderModeSwitcher()}
                 {usesCimbar ? (
                   <div className="web-cimbar-embed">
@@ -1137,12 +1307,12 @@ export function WebTransfer({ copy }: { copy: WebTransferCopy }) {
                       <div className="web-transfer-actions web-transfer-actions-primary">
                         {!cameraIsActive && receiverState !== "complete" && (
                           <button className="button button-primary" type="button" onClick={startCamera}>
-                            {copy.startCamera}
+                            {receiverPaused ? copy.resume : copy.startCamera}
                           </button>
                         )}
                         {cameraIsActive && (
                           <button className="button button-secondary" type="button" onClick={stopCamera}>
-                            {copy.stopCamera}
+                            {copy.pause}
                           </button>
                         )}
                         {receiverState === "complete" && (
@@ -1280,4 +1450,56 @@ export function WebTransfer({ copy }: { copy: WebTransferCopy }) {
 
 export function webTransferSpeed(mode: QrModeChoice) {
   return formatSpeed(theoreticalSpeed(mode));
+}
+
+export function StandaloneTransferPage({ role }: { role: TransferRole }) {
+  const copy =
+    role === "send"
+      ? {
+          ...webTransferCopy,
+          title: "发送文件",
+          lead: "选一个文件，让另一台设备用摄像头扫描屏幕上的视觉码。",
+        }
+      : {
+          ...webTransferCopy,
+          title: "接收文件",
+          lead: "打开摄像头，对准发送端的视觉码；文件会留在这台设备上。",
+        };
+
+  return (
+    <main className={`site-compact transfer-page transfer-page-${role}`}>
+      <header className="site-header page-shell">
+        <Brand href="/" />
+        <nav aria-label="传输导航">
+          <a className={role === "send" ? "is-current" : ""} href="/send">
+            发送
+          </a>
+          <a className={role === "receive" ? "is-current" : ""} href="/receive">
+            接收
+          </a>
+          <a className="nav-download" href="/download">
+            下载
+          </a>
+          <Link className="nav-home" href="/">
+            首页
+          </Link>
+        </nav>
+      </header>
+
+      <WebTransfer
+        copy={copy}
+        initialRole={role}
+        lockedRole={role}
+      />
+
+      <footer className="site-footer page-shell">
+        <Brand href="/" />
+        <p>OneSend · 扫传 · 本地处理</p>
+        <div>
+          <a href="/how">原理</a>
+          <a href="/privacy">隐私</a>
+        </div>
+      </footer>
+    </main>
+  );
 }
