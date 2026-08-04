@@ -7,26 +7,26 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
     <description>Stable desktop releases for OneSend · 扫传</description>
     <language>zh-cn</language>
     <item>
-      <title>OneSend 1.5.1</title>
-      <link>https://github.com/makerjackie/onesend/releases/tag/v1.5.1</link>
-      <sparkle:version>20</sparkle:version>
-      <sparkle:shortVersionString>1.5.1</sparkle:shortVersionString>
+      <title>OneSend 1.5.2</title>
+      <link>https://github.com/makerjackie/onesend/releases/tag/v1.5.2</link>
+      <sparkle:version>21</sparkle:version>
+      <sparkle:shortVersionString>1.5.2</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>10.15</sparkle:minimumSystemVersion>
-      <description><![CDATA[<ul><li>统一官网与 Android、iOS、macOS、Windows、Linux 的 OneSend 官方标识。</li><li>快速 QR 继续作为稳定默认模式，并保留 Turbo QR 与 CIMBAR 实验模式。</li><li>完善任意文件选择以及接收后的保存、打开、分享和另存为流程。</li></ul>]]></description>
-      <pubDate>Tue, 04 Aug 2026 12:19:38 +0000</pubDate>
-      <enclosure url="https://github.com/makerjackie/onesend/releases/download/v1.5.1/onesend-macos-universal.zip" sparkle:edSignature="NjurhMxEaAblo6fMdH5r9ycFdTdcJvWZ7+zHD/ITb56AcKmdOWZspBsJAjdIadREALWNjlCBNny7ElasjtBzCw==" sparkle:os="macos" length="22549488" type="application/octet-stream"></enclosure>
+      <description><![CDATA[<ul><li>Improved mobile QR scanner reliability across Android and iOS payload formats.</li><li>Focused Transfer, Files, and Settings navigation with saved-file actions.</li><li>Unified OneSend branding and website transfer routes across platforms.</li></ul>]]></description>
+      <pubDate>Tue, 04 Aug 2026 14:12:00 +0000</pubDate>
+      <enclosure url="https://github.com/makerjackie/onesend/releases/download/v1.5.2/onesend-macos-universal.zip" sparkle:edSignature="JPnJ5zozmoL1kzAPM4TZ9prBPrjanRaEl+ER/aV6J0Dvfk1A2zX+dwMi09kMsKATcwF3PVVBwkexY9sibl5oCA==" sparkle:os="macos" length="23215585" type="application/octet-stream"></enclosure>
     </item>
     <item>
-      <title>OneSend 1.5.1</title>
-      <link>https://github.com/makerjackie/onesend/releases/tag/v1.5.1</link>
-      <sparkle:version>20</sparkle:version>
-      <sparkle:shortVersionString>1.5.1</sparkle:shortVersionString>
-      <description><![CDATA[<ul><li>统一官网与 Android、iOS、macOS、Windows、Linux 的 OneSend 官方标识。</li><li>快速 QR 继续作为稳定默认模式，并保留 Turbo QR 与 CIMBAR 实验模式。</li><li>完善任意文件选择以及接收后的保存、打开、分享和另存为流程。</li></ul>]]></description>
-      <pubDate>Tue, 04 Aug 2026 12:19:38 +0000</pubDate>
-      <enclosure url="https://github.com/makerjackie/onesend/releases/download/v1.5.1/onesend-windows-setup.exe" sparkle:edSignature="6wddtEh8jolXP7yb41z82rCGIcx+Sc673p0S0iwR/COFb5qriW7oDIjfjS7X7bq5yBzh0+41Ly8LsdAJ+yJZBQ==" sparkle:installerArguments="/SILENT /SP- /NOICONS /NORESTART /ONESENDUPDATE=1" sparkle:os="windows-x64" length="13506665" type="application/octet-stream"></enclosure>
+      <title>OneSend 1.5.2</title>
+      <link>https://github.com/makerjackie/onesend/releases/tag/v1.5.2</link>
+      <sparkle:version>21</sparkle:version>
+      <sparkle:shortVersionString>1.5.2</sparkle:shortVersionString>
+      <description><![CDATA[<ul><li>Improved mobile QR scanner reliability across Android and iOS payload formats.</li><li>Focused Transfer, Files, and Settings navigation with saved-file actions.</li><li>Unified OneSend branding and website transfer routes across platforms.</li></ul>]]></description>
+      <pubDate>Tue, 04 Aug 2026 14:12:00 +0000</pubDate>
+      <enclosure url="https://github.com/makerjackie/onesend/releases/download/v1.5.2/onesend-windows-setup.exe" sparkle:edSignature="OgArwOL3OT026r/0CwWKzdxNCkMP5UMFFlBhyWFRGwKK7iCuzegBw2YijIcvojX3UYTqR4zgAjiaV0hQ9JdrCQ==" sparkle:installerArguments="/SILENT /SP- /NOICONS /NORESTART /ONESENDUPDATE=1" sparkle:os="windows-x64" length="13763071" type="application/octet-stream"></enclosure>
     </item>
   </channel>
 </rss><!-- sparkle-signatures:
-edSignature: 0CBwCTV6xrsJbMrvy1OHK5NxpU6UArfdeKOls2mB6bet+3gG00GKOCnX4Z0/NGLDkYFFG+7hOwFv01KcFgvVBQ==
-length: 2667
+edSignature: weB/LhOEahhLyPkJePJPC5jXVu3YdliMHPZ7L2QIoPIlqDvdDUpdd8EZqgW0UJT5pNWL9QBUNbtDaIJKuEt/Cw==
+length: 2593
 -->
