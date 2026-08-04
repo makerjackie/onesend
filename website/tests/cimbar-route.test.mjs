@@ -88,8 +88,15 @@ test("cimbar copy and camera behavior stay local and opt-in", () => {
   // Peak experimental profile for high-end phones (Mode B + 15 fps).
   assert.match(client, /const CIMBAR_MODE = 68/);
   assert.match(client, /const CIMBAR_DISPLAY_FPS = 15/);
-  assert.match(client, /const CIMBAR_CANVAS_SIZE = 1024/);
+  assert.match(client, /CIMBAR_THEORETICAL_KBPS/);
+  assert.match(client, /理论峰值/);
+  assert.match(client, /实测/);
+  assert.match(client, /explainReceiveGap/);
   assert.match(client, /ideal: 1920/);
+  // Display fits the right workbench like QR — not a full-bleed 1024 canvas.
+  assert.match(client, /CIMBAR_DISPLAY_POLICY/);
+  assert.match(client, /maximumDisplayPx: 420/);
+  assert.match(client, /sizeCimbarCanvas/);
   assert.ok(client.indexOf("async function startReceiver") < client.indexOf("getUserMedia"));
   assert.doesNotMatch(`${page}\n${client}\n${senderWrapper}\n${receiverWrapper}`, /serviceWorker\.register/);
   assert.doesNotMatch(`${senderWrapper}\n${receiverWrapper}`, /https?:\/\//);

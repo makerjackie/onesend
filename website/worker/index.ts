@@ -34,7 +34,11 @@ const worker = {
     // content-hashed client bundles live under /assets/* and would otherwise
     // fall through to the RSC router and 404 — unstyled SSR HTML looks like
     // "乱码". Serve them directly from the ASSETS binding.
-    if (url.pathname.startsWith("/assets/")) {
+    //
+    // Dev (vinext/Vite) also links CSS by source path, e.g. /app/globals.css
+    // and /app/**/*.module.css, plus Vite virtual modules under /@id/, /@fs/,
+    // /@vite/. Those must hit the Vite asset pipeline too — not the RSC router.
+    if (shouldServeFromAssets(url.pathname)) {
       return env.ASSETS.fetch(request);
     }
 
@@ -52,5 +56,27 @@ const worker = {
     return handler.fetch(request, env, ctx);
   },
 };
+
+function shouldServeFromAssets(pathname: string): boolean {
+  // Production hashed client bundles + vinext fonts.
+  if (pathname.startsWith("/assets/")) return true;
+
+  // Vite / vinext virtual modules and absolute file URLs used in dev HMR.
+  // Covers /@id/, /@fs/, /@vite/, /@react-refresh, etc.
+  if (pathname.startsWith("/@")) return true;
+  if (pathname.startsWith("/node_modules/")) return true;
+
+  // vinext dev serves App Router sources as client modules under /app/*
+  // (e.g. /app/web-transfer.tsx, /app/globals.css). Without this, SSR HTML
+  // paints but React never hydrates — buttons look dead.
+  if (pathname.startsWith("/app/")) return true;
+
+  // Other project sources Vite may request with a leading slash.
+  if (/\.(?:tsx?|jsx?|mjs|cjs|css|map)(?:$|\?)/.test(pathname)) {
+    return true;
+  }
+
+  return false;
+}
 
 export default worker;

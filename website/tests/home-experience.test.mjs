@@ -69,20 +69,43 @@ test("web transfer keeps fast defaults, two primary modes, and completed-file ac
   assert.doesNotMatch(transfer, /href="\/cimbar"/);
 });
 
+test("web transfer allows live mode switches without pausing first", () => {
+  // Must not hard-block mode changes while sending/paused.
+  assert.doesNotMatch(
+    transfer,
+    /if \(senderState === "sending" \|\| senderState === "paused"\) return/,
+  );
+  // Live switch rebuilds the QR sender and can auto-resume.
+  assert.match(transfer, /autoStart:\s*wasSending/);
+  assert.match(transfer, /modeSwitchHint/);
+  assert.match(transfer, /web-mode-hint/);
+  assert.match(transfer, /flashModeNotice/);
+  // Only preparing (file still loading) should lock mode buttons.
+  assert.match(transfer, /const modeBusy = senderState === "preparing"/);
+});
+
 test("warm visual system and constrained mobile receive loop are present", () => {
   assert.match(styles, /--paper: #fbfaf4/);
   assert.match(styles, /--lime:/);
   assert.match(styles, /border-radius: 20px/);
   assert.match(styles, /\.web-code-stage \.web-code-canvas[\s\S]*?max-width: none !important/);
   assert.match(styles, /@media \(prefers-color-scheme: dark\)/);
-  assert.match(styles, /\.transfer-page-receive \{[\s\S]*?height: 100svh[\s\S]*?overflow: hidden/);
-  assert.match(styles, /\.transfer-page-receive \.web-transfer-section \{[\s\S]*?height: calc\(100svh - 64px\)/);
+  // /send and /receive: single-screen, no page scroll, footer hidden.
+  assert.match(styles, /\.transfer-page \{[\s\S]*?height: 100svh[\s\S]*?overflow: hidden/);
+  assert.match(styles, /\.transfer-page \.site-footer \{[\s\S]*?display: none/);
+  assert.match(styles, /\.transfer-page-send \.web-workbench-send/);
   assert.match(styles, /\.transfer-page-receive \.web-workbench-receive \{[\s\S]*?grid-template-areas:[\s\S]*?"stage"[\s\S]*?"controls"/);
-  assert.match(styles, /\.transfer-page-receive \.web-workbench-receive \.web-camera-stage-compact \{[\s\S]*?aspect-ratio: 1/);
+  assert.match(styles, /\.transfer-page-receive \.web-camera-stage-compact \{[\s\S]*?aspect-ratio: 1/);
+  assert.match(transfer, /transfer-header-compact/);
+  assert.doesNotMatch(transfer, /site-footer page-shell/);
 });
 
 test("worker serves hashed assets before the RSC handler when worker-first assets are enabled", () => {
   assert.match(worker, /run_worker_first/);
+  assert.match(worker, /shouldServeFromAssets/);
   assert.match(worker, /pathname\.startsWith\("\/assets\/"\)/);
+  // vinext dev: CSS + client components under /app/* must hit Vite, not RSC.
+  assert.match(worker, /pathname\.startsWith\("\/app\/"\)/);
+  assert.match(worker, /pathname\.startsWith\("\/@"\)/);
   assert.match(worker, /return env\.ASSETS\.fetch\(request\)/);
 });

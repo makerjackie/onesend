@@ -463,14 +463,17 @@ class _SendScreenState extends State<SendScreen>
           ),
         );
 
-        if (workbench) {
-          return Padding(padding: const EdgeInsets.all(16), child: panel);
-        }
-        return Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
+        // Fixed viewport: no scroll on phone or desktop picker.
+        return Padding(
+          padding: EdgeInsets.all(workbench ? 16 : 16),
+          child: Align(
+            alignment: Alignment.center,
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 520),
+              constraints: BoxConstraints(
+                maxWidth: workbench ? double.infinity : 520,
+                minHeight: math.max(0, constraints.maxHeight - 32),
+                maxHeight: math.max(0, constraints.maxHeight - 32),
+              ),
               child: panel,
             ),
           ),
@@ -505,12 +508,13 @@ class _SendScreenState extends State<SendScreen>
     final currentRate = _currentBytesPerSecond();
     final scheme = Theme.of(context).colorScheme;
 
-    Widget qrStage(double qrSize) {
+    Widget qrStage(double qrSize, {required bool compact}) {
       return Card(
         child: Padding(
-          padding: const EdgeInsets.all(18),
+          padding: EdgeInsets.all(compact ? 12 : 16),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
             children: [
               SizedBox.square(
                 dimension: qrSize,
@@ -522,11 +526,11 @@ class _SendScreenState extends State<SendScreen>
                         robust: _mode == TransferMode.reliable,
                       ),
               ),
-              const SizedBox(height: 14),
+              SizedBox(height: compact ? 8 : 12),
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 10,
-                  vertical: 6,
+                  vertical: 5,
                 ),
                 decoration: BoxDecoration(
                   color: oneSendLime,
@@ -542,19 +546,27 @@ class _SendScreenState extends State<SendScreen>
                   ),
                 ),
               ),
-              const SizedBox(height: 10),
+              SizedBox(height: compact ? 6 : 8),
               Text(
                 sender?.isPaused == true
                     ? l10n.pausedPlayback
                     : l10n.broadcasting,
-                style: Theme.of(context).textTheme.titleMedium,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
               ),
-              const SizedBox(height: 5),
-              Text(
-                l10n.cameraAim,
-                style: Theme.of(context).textTheme.bodyMedium,
-                textAlign: TextAlign.center,
-              ),
+              if (!compact) ...[
+                const SizedBox(height: 4),
+                Text(
+                  l10n.cameraAim,
+                  style: Theme.of(context).textTheme.bodySmall,
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
             ],
           ),
         ),
@@ -564,8 +576,14 @@ class _SendScreenState extends State<SendScreen>
     Widget controlPanel({required bool dense}) {
       return Card(
         child: Padding(
-          padding: EdgeInsets.all(dense ? 16 : 18),
+          padding: EdgeInsets.fromLTRB(
+            dense ? 14 : 16,
+            dense ? 12 : 14,
+            dense ? 14 : 16,
+            dense ? 10 : 12,
+          ),
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               FileTile(
@@ -573,81 +591,72 @@ class _SendScreenState extends State<SendScreen>
                 bytes: file.bytes,
                 icon: Icons.north_east_rounded,
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 10),
               LinearProgressIndicator(
-                minHeight: 8,
+                minHeight: 6,
                 value: progress,
                 backgroundColor: scheme.outlineVariant,
                 color: scheme.primary,
               ),
-              const SizedBox(height: 10),
-              Wrap(
-                alignment: WrapAlignment.spaceBetween,
-                runSpacing: 4,
-                spacing: 18,
+              const SizedBox(height: 8),
+              Row(
                 children: [
-                  Text(
-                    l10n.passAndFrames(_framesSent, pass),
-                    style: Theme.of(context).textTheme.bodySmall,
+                  Expanded(
+                    child: Text(
+                      l10n.passAndFrames(_framesSent, pass),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
                   ),
                   Text(
                     l10n.runningTime(elapsed),
+                    maxLines: 1,
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 6),
               Text(
-                l10n.currentRate(formatTransferSpeed(currentRate)),
+                '${l10n.currentRate(formatTransferSpeed(currentRate))} · ${l10n.theoreticalRate(formatTransferSpeed(_mode.usefulBytesPerSecond))}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   color: scheme.onSurface,
-                  fontSize: dense ? 16 : 18,
+                  fontSize: dense ? 13 : 14,
                   fontWeight: FontWeight.w800,
                 ),
               ),
-              const SizedBox(height: 4),
-              Text(
-                l10n.theoreticalRate(
-                  formatTransferSpeed(_mode.usefulBytesPerSecond),
-                ),
-                style: const TextStyle(
-                  color: oneSendMuted,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
               if (_error != null) ...[
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
                 _ErrorText(message: _error!),
               ],
-              const SizedBox(height: 16),
-              Wrap(
-                spacing: 10,
-                runSpacing: 10,
+              const SizedBox(height: 10),
+              Row(
                 children: [
                   if (sender != null && _error == null)
-                    OutlinedButton.icon(
-                      onPressed: _togglePause,
-                      icon: Icon(
-                        sender.isPaused
-                            ? Icons.play_arrow_rounded
-                            : Icons.pause_rounded,
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _togglePause,
+                        icon: Icon(
+                          sender.isPaused
+                              ? Icons.play_arrow_rounded
+                              : Icons.pause_rounded,
+                        ),
+                        label: Text(
+                          sender.isPaused ? l10n.resume : l10n.pause,
+                        ),
                       ),
-                      label: Text(sender.isPaused ? l10n.resume : l10n.pause),
                     ),
-                  FilledButton.icon(
-                    onPressed: _endTransfer,
-                    icon: const Icon(Icons.stop_rounded),
-                    label: Text(l10n.endTransfer),
+                  if (sender != null && _error == null) const SizedBox(width: 8),
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: _endTransfer,
+                      icon: const Icon(Icons.stop_rounded),
+                      label: Text(l10n.endTransfer),
+                    ),
                   ),
                 ],
-              ),
-              const SizedBox(height: 4),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: TextButton(
-                  onPressed: _preparing ? null : _pickFile,
-                  child: Text(l10n.sendAnother),
-                ),
               ),
             ],
           ),
@@ -661,7 +670,7 @@ class _SendScreenState extends State<SendScreen>
         if (workbench) {
           final qrSize = math.min(
             400.0,
-            math.max(260.0, constraints.maxHeight - 120),
+            math.max(220.0, constraints.maxHeight - 100),
           );
           return Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
@@ -670,38 +679,36 @@ class _SendScreenState extends State<SendScreen>
               children: [
                 Expanded(
                   flex: 5,
-                  child: SingleChildScrollView(child: controlPanel(dense: true)),
+                  child: Align(
+                    alignment: Alignment.topCenter,
+                    child: controlPanel(dense: true),
+                  ),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
                   flex: 6,
-                  child: Align(
-                    alignment: Alignment.topCenter,
-                    child: qrStage(qrSize),
-                  ),
+                  child: Center(child: qrStage(qrSize, compact: false)),
                 ),
               ],
             ),
           );
         }
 
+        // Phone: pin controls to bottom, QR fills remaining height — no scroll.
+        const bottomReserve = 196.0;
         final qrSize = math.min(
-          500.0,
-          math.max(220.0, constraints.maxWidth - 40),
+          constraints.maxWidth - 32,
+          math.max(140.0, constraints.maxHeight - bottomReserve),
         );
-        return SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 30),
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 720),
-              child: Column(
-                children: [
-                  qrStage(qrSize),
-                  const SizedBox(height: 14),
-                  controlPanel(dense: false),
-                ],
-              ),
-            ),
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 6, 16, 10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(child: Center(child: qrStage(qrSize, compact: true))),
+              const SizedBox(height: 8),
+              controlPanel(dense: true),
+            ],
           ),
         );
       },

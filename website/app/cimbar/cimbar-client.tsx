@@ -14,18 +14,129 @@ const RECEIVE_WORKER_URL = "/cimbar/node_modules/cimbar-receive-worker.js";
 const MAX_INPUT_BYTES = 33 * 1024 * 1024;
 const CIMBAR_MODE = 68;
 const CIMBAR_MODE_LABEL = "B";
-/** Upstream peak display rate (~106 KB/s reference conditions). */
+/** Upstream peak display rate. */
 const CIMBAR_DISPLAY_FPS = 15;
+/** Upstream reference under ideal monitor+phone conditions (not a guarantee). */
+const CIMBAR_THEORETICAL_KBPS = 106;
 /**
  * Sample the camera faster than the 15 fps display so dwell frames are
  * more likely to be captured on iPhone-class sensors.
  */
 const RECEIVE_CAPTURE_INTERVAL_MS = 33;
-/** Full Mode B grid. Keep bitmap size == CSS size (no downscale). */
-const CIMBAR_CANVAS_SIZE = 1024;
 
-function resolveCimbarCanvasSize() {
-  return CIMBAR_CANVAS_SIZE;
+/**
+ * CIMBAR display policy — same idea as QR: fully visible in the right-hand
+ * workbench stage. Never force 1024×1024 CSS size; that overflows the panel
+ * and forces scroll/crop so phones cannot see the whole code.
+ *
+ * Bitmap size equals CSS size (no bilinear downscale of color cells).
+ */
+export const CIMBAR_DISPLAY_POLICY = {
+  desktopBreakpointPx: 840,
+  /** Right-column workbench budget on desktop (aligned with QR stage). */
+  desktopWidthRatio: 0.34,
+  desktopHeightRatio: 0.44,
+  mobileWidthRatio: 0.88,
+  mobileHeightRatio: 0.4,
+  /** Hard cap so the code never dominates the page like a full-screen GL demo. */
+  maximumDisplayPx: 420,
+  minimumDisplayPx: 280,
+  fallbackDisplayPx: 360,
+} as const;
+
+/** Viewport-based square size that fits the right workbench stage. */
+export function resolveCimbarCanvasSize(
+  viewport: { width: number; height: number } = {
+    width:
+      typeof window !== "undefined"
+        ? window.innerWidth
+        : CIMBAR_DISPLAY_POLICY.fallbackDisplayPx * 3,
+    height:
+      typeof window !== "undefined"
+        ? window.innerHeight
+        : CIMBAR_DISPLAY_POLICY.fallbackDisplayPx * 2,
+  },
+) {
+  const width = Math.max(1, Math.floor(viewport.width));
+  const height = Math.max(1, Math.floor(viewport.height));
+  const isDesktop = width >= CIMBAR_DISPLAY_POLICY.desktopBreakpointPx;
+  const widthBudget = Math.floor(
+    width *
+      (isDesktop
+        ? CIMBAR_DISPLAY_POLICY.desktopWidthRatio
+        : CIMBAR_DISPLAY_POLICY.mobileWidthRatio),
+  );
+  const heightBudget = Math.floor(
+    height *
+      (isDesktop
+        ? CIMBAR_DISPLAY_POLICY.desktopHeightRatio
+        : CIMBAR_DISPLAY_POLICY.mobileHeightRatio),
+  );
+  const fit = Math.min(
+    CIMBAR_DISPLAY_POLICY.maximumDisplayPx,
+    widthBudget,
+    heightBudget,
+  );
+  return Math.max(
+    CIMBAR_DISPLAY_POLICY.minimumDisplayPx,
+    Math.floor(fit) || CIMBAR_DISPLAY_POLICY.fallbackDisplayPx,
+  );
+}
+
+/** Size canvas from its stage box when available; fall back to viewport policy. */
+function sizeCimbarCanvas(canvas: HTMLCanvasElement) {
+  const stage = canvas.closest(".web-cimbar-stage") as HTMLElement | null;
+  const rect = stage?.getBoundingClientRect();
+  const size = rect && rect.width > 40 && rect.height > 40
+    ? Math.max(
+        CIMBAR_DISPLAY_POLICY.minimumDisplayPx,
+        Math.min(
+          CIMBAR_DISPLAY_POLICY.maximumDisplayPx,
+          Math.floor(Math.min(rect.width - 16, rect.height - 16)),
+        ),
+      )
+    : resolveCimbarCanvasSize();
+
+  if (canvas.width !== size || canvas.height !== size) {
+    canvas.width = size;
+    canvas.height = size;
+  }
+  canvas.style.setProperty("width", `${size}px`, "important");
+  canvas.style.setProperty("height", `${size}px`, "important");
+  canvas.style.setProperty("max-width", "100%", "important");
+  canvas.style.setProperty("max-height", "100%", "important");
+  canvas.style.setProperty("image-rendering", "pixelated");
+  return size;
+}
+
+function formatSpeedKBps(kbps: number) {
+  if (!Number.isFinite(kbps) || kbps <= 0) return "—";
+  if (kbps >= 100) return `${Math.round(kbps)} KB/s`;
+  return `${kbps.toFixed(1)} KB/s`;
+}
+
+/** One short line: why measured speed lags the theoretical peak. */
+function explainReceiveGap(input: {
+  actualKbps: number | null;
+  emptyRatio: number | null;
+  decoded: number;
+  receiving: boolean;
+}) {
+  const { actualKbps, emptyRatio, decoded, receiving } = input;
+  if (!receiving && actualKbps == null) return null;
+  if (decoded === 0 && receiving) {
+    return "未达峰值：还没解到有效帧，对准、拉近、屏幕调亮。";
+  }
+  if (emptyRatio != null && emptyRatio >= 0.7) {
+    return "未达峰值：空帧偏多，相机跟不上或对焦/光线不够。";
+  }
+  if (actualKbps != null && actualKbps > 0 && actualKbps < CIMBAR_THEORETICAL_KBPS * 0.4) {
+    return "未达峰值：有效吞吐偏低，发送端显示比接收端解码快。";
+  }
+  if (actualKbps != null && actualKbps >= CIMBAR_THEORETICAL_KBPS * 0.6) {
+    return "接近参考峰值。";
+  }
+  return null;
 }
 
 function guessMimeFromName(name: string, fallback = "application/octet-stream") {
@@ -198,10 +309,16 @@ export function CimbarTransfer({
   const [receiverError, setReceiverError] = useState<string | null>(null);
   const [receivedFile, setReceivedFile] = useState<ReceivedFile | null>(null);
   const [verification, setVerification] = useState<string | null>(null);
-  const [canvasSize] = useState(() => resolveCimbarCanvasSize());
+  const [canvasSize, setCanvasSize] = useState(() =>
+    resolveCimbarCanvasSize(),
+  );
   const [scanStats, setScanStats] = useState({ noData: 0, decoded: 0 });
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(true);
+  const [receiverSpeedLabel, setReceiverSpeedLabel] = useState("—");
+  const [receiverGapHint, setReceiverGapHint] = useState<string | null>(null);
+  const receiveStartedAtRef = useRef<number | null>(null);
+  const scanStatsRef = useRef({ noData: 0, decoded: 0 });
 
   useEffect(() => {
     if (!direction || direction === view) return;
@@ -275,10 +392,49 @@ export function CimbarTransfer({
     setPreviewUrl(null);
   }
 
+  function refreshReceiveHints(options?: {
+    completeBytes?: number;
+    receiving?: boolean;
+  }) {
+    const startedAt = receiveStartedAtRef.current;
+    const elapsedSec =
+      startedAt == null
+        ? 0
+        : Math.max(0.001, (performance.now() - startedAt) / 1000);
+    const { decoded, noData } = scanStatsRef.current;
+    const totalSamples = decoded + noData;
+    const emptyRatio = totalSamples > 0 ? noData / totalSamples : null;
+
+    let actualKbps: number | null = null;
+    if (options?.completeBytes != null && options.completeBytes > 0) {
+      actualKbps = options.completeBytes / 1024 / elapsedSec;
+      setReceiverSpeedLabel(formatSpeedKBps(actualKbps));
+    } else if (decoded > 0 && elapsedSec > 0.5) {
+      // Live proxy before size is known: effective decode rate vs 15 fps display.
+      const effectiveFps = decoded / elapsedSec;
+      const ratio = Math.min(1, effectiveFps / CIMBAR_DISPLAY_FPS);
+      actualKbps = CIMBAR_THEORETICAL_KBPS * ratio;
+      setReceiverSpeedLabel(`约 ${formatSpeedKBps(actualKbps)}`);
+    }
+
+    setReceiverGapHint(
+      explainReceiveGap({
+        actualKbps,
+        emptyRatio,
+        decoded,
+        receiving: options?.receiving ?? true,
+      }),
+    );
+  }
+
   function presentReceivedFile(file: ReceivedFile) {
     setReceivedFile(file);
     setReceiverProgress(1);
     setReceiverState("complete");
+    refreshReceiveHints({
+      completeBytes: file.bytes.length,
+      receiving: false,
+    });
     revokePreviewUrl();
     if (isViewableMime(resolvedMime(file))) {
       const url = URL.createObjectURL(fileBlob(file));
@@ -365,6 +521,11 @@ export function CimbarTransfer({
       setSenderError("当前浏览器不支持 OffscreenCanvas，无法运行本地编码器。");
       return;
     }
+
+    // Fit the right-hand stage before the OffscreenCanvas is transferred
+    // (bitmap size is locked after transferControlToOffscreen).
+    const sized = sizeCimbarCanvas(canvas);
+    setCanvasSize(sized);
 
     setSenderState("loading");
     const worker = new Worker(SEND_WORKER_URL, {
@@ -613,6 +774,10 @@ export function CimbarTransfer({
     setDecodedFrames(0);
     setReceiverProgress(0);
     setScanStats({ noData: 0, decoded: 0 });
+    scanStatsRef.current = { noData: 0, decoded: 0 };
+    setReceiverSpeedLabel("—");
+    setReceiverGapHint(null);
+    receiveStartedAtRef.current = performance.now();
     lastCaptureAtRef.current = 0;
 
     const worker = new Worker(RECEIVE_WORKER_URL, {
@@ -636,20 +801,23 @@ export function CimbarTransfer({
         }
         if (data.type === "frame") {
           if (data.result === "decoded") {
-            setDecodedFrames((count) => count + 1);
-            setScanStats((stats) => ({
-              ...stats,
-              decoded: stats.decoded + 1,
-            }));
+            scanStatsRef.current = {
+              ...scanStatsRef.current,
+              decoded: scanStatsRef.current.decoded + 1,
+            };
+            setDecodedFrames(scanStatsRef.current.decoded);
+            setScanStats({ ...scanStatsRef.current });
           } else if (data.result === "no-data") {
-            setScanStats((stats) => ({
-              ...stats,
-              noData: stats.noData + 1,
-            }));
+            scanStatsRef.current = {
+              ...scanStatsRef.current,
+              noData: scanStatsRef.current.noData + 1,
+            };
+            setScanStats({ ...scanStatsRef.current });
           }
           if (typeof data.progress === "number") {
             setReceiverProgress(data.progress);
           }
+          refreshReceiveHints({ receiving: true });
           return;
         }
         if (data.type === "complete") {
@@ -750,6 +918,11 @@ export function CimbarTransfer({
     setVerification(null);
     setReceiverProgress(0);
     setDecodedFrames(0);
+    setScanStats({ noData: 0, decoded: 0 });
+    scanStatsRef.current = { noData: 0, decoded: 0 };
+    setReceiverSpeedLabel("—");
+    setReceiverGapHint(null);
+    receiveStartedAtRef.current = null;
     setReceiverError(null);
     setReceiverState("idle");
   }
@@ -758,14 +931,16 @@ export function CimbarTransfer({
     receiverState === "starting" || receiverState === "receiving";
   const senderIsActive =
     senderState === "sending" || senderState === "paused";
-  const senderReady =
-    senderState === "ready" ||
-    senderState === "paused" ||
-    (senderState === "loading" && !!selectedFile);
   const showTabs = !embedded && !direction;
   const fileInputId = embedded
     ? `cimbar-file-${direction ?? view}`
     : "cimbar-file";
+  const emptyRatio =
+    scanStats.decoded + scanStats.noData > 0
+      ? Math.round(
+          (100 * scanStats.noData) / (scanStats.decoded + scanStats.noData),
+        )
+      : null;
 
   const senderStatusText =
     senderState === "loading"
@@ -794,9 +969,9 @@ export function CimbarTransfer({
             : "开启摄像头后对准发送端";
 
   return (
-    <div className={embedded ? "web-cimbar-shell" : styles.lab}>
+    <div className={`web-cimbar-shell${embedded ? " is-embedded" : ""}`}>
       {showTabs && (
-        <div className="web-role-switch" role="tablist" aria-label="彩色视觉码">
+        <div className="web-role-tabs web-role-tabs-compact" role="tablist" aria-label="彩色视觉码">
           <button
             type="button"
             role="tab"
@@ -819,7 +994,7 @@ export function CimbarTransfer({
       )}
 
       {view === "send" && (
-        <div className="web-workbench web-workbench-send">
+        <div className="web-workbench web-workbench-send web-cimbar-workbench">
           <div className="web-workbench-left">
             <section className="web-task-block" aria-labelledby="cimbar-send-file-title">
               <div className="web-task-heading">
@@ -863,9 +1038,9 @@ export function CimbarTransfer({
             <section className="web-task-block web-send-controls" aria-labelledby="cimbar-send-action-title">
               <div className="web-task-heading">
                 <span className="web-task-index">2.</span>
-                <h3 id="cimbar-send-action-title">准备发送</h3>
+                <h3 id="cimbar-send-action-title">发送</h3>
               </div>
-              <div className="web-transfer-actions web-transfer-actions-primary">
+              <div className="web-transfer-actions web-transfer-actions-primary web-cimbar-actions">
                 {!senderIsActive && (
                   <button
                     className="button button-primary"
@@ -877,29 +1052,17 @@ export function CimbarTransfer({
                   </button>
                 )}
                 {senderState === "sending" && (
-                  <button
-                    className="button button-secondary"
-                    type="button"
-                    onClick={pauseSender}
-                  >
+                  <button className="button button-secondary" type="button" onClick={pauseSender}>
                     暂停
                   </button>
                 )}
                 {senderState === "paused" && (
-                  <button
-                    className="button button-primary"
-                    type="button"
-                    onClick={startSender}
-                  >
+                  <button className="button button-primary" type="button" onClick={startSender}>
                     继续
                   </button>
                 )}
                 {senderIsActive && (
-                  <button
-                    className="button button-secondary"
-                    type="button"
-                    onClick={stopSender}
-                  >
+                  <button className="button button-secondary" type="button" onClick={stopSender}>
                     结束
                   </button>
                 )}
@@ -909,15 +1072,22 @@ export function CimbarTransfer({
               </p>
               <div className="web-transfer-stats web-transfer-stats-inline" aria-live="polite">
                 <span>
-                  速度<strong>—</strong>
+                  理论峰值
+                  <strong>~{CIMBAR_THEORETICAL_KBPS} KB/s</strong>
                 </span>
                 <span>
-                  进度<strong>{senderIsActive ? "播放中" : senderReady ? "就绪" : "—"}</strong>
+                  显示
+                  <strong>
+                    {CIMBAR_DISPLAY_FPS} fps · Mode {CIMBAR_MODE_LABEL}
+                  </strong>
                 </span>
                 <span>
-                  帧<strong>{senderFrames}</strong>
+                  已出帧<strong>{senderFrames}</strong>
                 </span>
               </div>
+              <p className="web-stage-note web-cimbar-hint">
+                参考峰值来自理想条件；另一台也要选「彩色视觉码」，屏幕调最亮。
+              </p>
             </section>
           </div>
 
@@ -926,16 +1096,17 @@ export function CimbarTransfer({
               <span className="web-task-index">3.</span>
               <h3 id="cimbar-send-code-title">扫码连接</h3>
             </div>
-            <div className="web-code-stage web-code-stage-compact">
+            <div className="web-code-stage web-code-stage-compact web-cimbar-stage">
               <canvas
                 ref={senderCanvasRef}
-                className="web-code-canvas"
+                className="web-code-canvas web-cimbar-canvas"
                 width={canvasSize}
                 height={canvasSize}
                 style={{
-                  // Keep bitmap == CSS size; CSS downscaling breaks color cells.
-                  width: canvasSize,
-                  height: canvasSize,
+                  width: `${canvasSize}px`,
+                  height: `${canvasSize}px`,
+                  maxWidth: "100%",
+                  maxHeight: "100%",
                   imageRendering: "pixelated",
                 }}
                 role="img"
@@ -945,49 +1116,33 @@ export function CimbarTransfer({
                 <span className="web-code-placeholder">准备中…</span>
               )}
             </div>
-            <p className="web-stage-note">
-              峰值实验 · Mode {CIMBAR_MODE_LABEL} · {CIMBAR_DISPLAY_FPS}
-              fps · 请用另一台设备选「彩色视觉码」扫描，屏幕调最亮。
-            </p>
           </section>
         </div>
       )}
 
       {view === "receive" && (
-        <div className="web-workbench web-workbench-receive">
+        <div className="web-workbench web-workbench-receive web-cimbar-workbench">
           <section
             className="web-workbench-left web-receive-controls"
             aria-labelledby="cimbar-receive-action-title"
           >
             <div className="web-task-heading">
               <span className="web-task-index">1.</span>
-              <h3 id="cimbar-receive-action-title">开启接收</h3>
+              <h3 id="cimbar-receive-action-title">接收</h3>
             </div>
-            <div className="web-transfer-actions web-transfer-actions-primary">
+            <div className="web-transfer-actions web-transfer-actions-primary web-cimbar-actions">
               {!receiverActive && receiverState !== "complete" && (
-                <button
-                  className="button button-primary"
-                  type="button"
-                  onClick={startReceiver}
-                >
+                <button className="button button-primary" type="button" onClick={startReceiver}>
                   开启摄像头
                 </button>
               )}
               {receiverActive && (
-                <button
-                  className="button button-secondary"
-                  type="button"
-                  onClick={stopReceiver}
-                >
+                <button className="button button-secondary" type="button" onClick={stopReceiver}>
                   暂停
                 </button>
               )}
               {receiverState === "complete" && (
-                <button
-                  className="button button-secondary"
-                  type="button"
-                  onClick={receiveAgain}
-                >
+                <button className="button button-secondary" type="button" onClick={receiveAgain}>
                   再收一次
                 </button>
               )}
@@ -997,26 +1152,35 @@ export function CimbarTransfer({
             </p>
             <div className="web-transfer-stats web-transfer-stats-inline" aria-live="polite">
               <span>
-                速度<strong>—</strong>
+                实测<strong>{receiverSpeedLabel}</strong>
               </span>
               <span>
                 进度<strong>{Math.round(receiverProgress * 100)}%</strong>
               </span>
               <span>
-                帧<strong>{decodedFrames}</strong>
+                有效帧
+                <strong>
+                  {decodedFrames}
+                  {emptyRatio != null ? ` · 空${emptyRatio}%` : ""}
+                </strong>
               </span>
             </div>
+            {receiverGapHint && (
+              <p className="web-stage-note web-cimbar-hint" aria-live="polite">
+                {receiverGapHint}
+              </p>
+            )}
             {receivedFile && receiverState === "complete" && (
-              <div className="web-received-actions">
+              <div className="web-receipt-actions web-cimbar-actions">
                 <button
-                  className="button button-primary"
+                  className="button button-primary button-compact"
                   type="button"
                   onClick={() => openReceivedInBrowser(receivedFile)}
                 >
-                  打开 / 新标签
+                  打开
                 </button>
                 <button
-                  className="button button-secondary"
+                  className="button button-secondary button-compact"
                   type="button"
                   onClick={() => downloadFile(receivedFile)}
                 >
@@ -1024,34 +1188,37 @@ export function CimbarTransfer({
                 </button>
                 {previewUrl && (
                   <button
-                    className="button button-secondary"
+                    className="button button-secondary button-compact"
                     type="button"
                     onClick={() => setPreviewOpen((open) => !open)}
                   >
                     {previewOpen ? "收起预览" : "预览"}
                   </button>
                 )}
-                {verification && (
-                  <p className="web-stage-note">{verification}</p>
-                )}
-                {previewOpen && previewUrl && resolvedMime(receivedFile).startsWith("image/") && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={previewUrl}
-                    alt={receivedFile.name}
-                    className={styles.inlinePreview}
-                  />
-                )}
-                {previewOpen && previewUrl && resolvedMime(receivedFile).startsWith("video/") && (
-                  <video
-                    src={previewUrl}
-                    className={styles.inlinePreview}
-                    controls
-                    playsInline
-                  />
-                )}
               </div>
             )}
+            {previewOpen &&
+              previewUrl &&
+              receivedFile &&
+              resolvedMime(receivedFile).startsWith("image/") && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={previewUrl}
+                  alt={receivedFile.name}
+                  className={styles.inlinePreview}
+                />
+              )}
+            {previewOpen &&
+              previewUrl &&
+              receivedFile &&
+              resolvedMime(receivedFile).startsWith("video/") && (
+                <video
+                  src={previewUrl}
+                  className={styles.inlinePreview}
+                  controls
+                  playsInline
+                />
+              )}
           </section>
 
           <section className="web-workbench-right" aria-labelledby="cimbar-receive-stage-title">
@@ -1060,7 +1227,7 @@ export function CimbarTransfer({
               <h3 id="cimbar-receive-stage-title">扫码连接</h3>
             </div>
             <div
-              className={`web-camera-stage web-camera-stage-compact${
+              className={`web-camera-stage web-camera-stage-compact web-cimbar-stage${
                 receiverActive ? " is-active" : ""
               }`}
             >
@@ -1081,7 +1248,6 @@ export function CimbarTransfer({
               className={styles.captureCanvas}
               aria-hidden="true"
             />
-            <p className="web-stage-note">对准发送端的视觉码。</p>
           </section>
         </div>
       )}

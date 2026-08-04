@@ -464,6 +464,223 @@ summary:focus-visible {
   margin-bottom: 14px;
 }
 
+.web-mode-hint {
+  flex: 1 0 100%;
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+/* ------------------------------------------------------------------ */
+/* Transfer pages (/send, /receive): single-screen, no page scroll.   */
+/* ------------------------------------------------------------------ */
+.transfer-page {
+  height: 100svh;
+  min-height: 100svh !important;
+  max-height: 100svh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+}
+
+/* Prevent document scroll behind the locked transfer surface. */
+body:has(.transfer-page) {
+  overflow: hidden;
+  height: 100svh;
+}
+
+.transfer-page .site-footer {
+  display: none;
+}
+
+.transfer-page .site-header,
+.transfer-page .transfer-header-compact {
+  flex: 0 0 auto;
+  min-height: 52px;
+  gap: 16px;
+}
+
+.transfer-page .brand {
+  font-size: 18px;
+}
+
+.transfer-page .brand-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 11px;
+}
+
+.transfer-page .site-header nav {
+  gap: 16px;
+  font-size: 12px;
+}
+
+.transfer-page .web-transfer-section {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  height: auto;
+  overflow: hidden;
+  padding-block: 10px 12px;
+  border-top: 0;
+  scroll-margin-top: 0;
+}
+
+.transfer-page .web-transfer-shell {
+  height: 100%;
+  max-width: 1180px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.transfer-page .web-lab,
+.transfer-page .web-transfer-card {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.transfer-page .web-mode-switcher {
+  flex: 0 0 auto;
+  margin-bottom: 8px;
+  gap: 8px;
+}
+
+.transfer-page .web-mode-primary button {
+  min-height: 32px;
+  padding: 0 12px;
+  font-size: 12px;
+}
+
+.transfer-page .web-mode-menu summary {
+  min-height: 34px;
+  padding: 6px 10px;
+}
+
+.transfer-page .web-workbench {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  min-height: 0 !important;
+}
+
+.transfer-page .web-task-heading {
+  margin-bottom: 6px;
+}
+
+.transfer-page .web-task-heading h3 {
+  font-size: 13px;
+}
+
+.transfer-page .web-task-index {
+  font-size: 11px;
+}
+
+.transfer-page .web-task-block {
+  margin-bottom: 10px;
+}
+
+.transfer-page .web-stage-note {
+  display: none;
+}
+
+/* Send: two-column workbench fills remaining height; QR stage grows. */
+.transfer-page-send .web-workbench-send {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.9fr) minmax(0, 1.1fr);
+  grid-template-rows: minmax(0, 1fr);
+  align-items: stretch;
+}
+
+.transfer-page-send .web-workbench-left {
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+}
+
+.transfer-page-send .web-workbench-right {
+  min-height: 0 !important;
+  display: flex;
+  flex-direction: column;
+  padding: 12px 14px;
+}
+
+.transfer-page-send .web-task-heading {
+  display: none;
+}
+
+.transfer-page-send .web-code-stage-compact {
+  flex: 1 1 auto;
+  min-height: 0 !important;
+  width: 100%;
+  max-width: none;
+  aspect-ratio: auto;
+  height: 100%;
+  margin: 0;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+.transfer-page-send .web-code-stage-compact .web-code-canvas {
+  width: auto !important;
+  height: auto !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
+  object-fit: contain;
+}
+
+.transfer-page-send .web-send-controls {
+  margin-top: auto;
+}
+
+/* Receive: keep camera first, controls under it, no page scroll. */
+.transfer-page-receive .web-workbench-receive {
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "stage"
+    "controls";
+  height: 100%;
+  min-height: 0;
+}
+
+.transfer-page-receive .web-workbench-receive .web-workbench-right {
+  grid-area: stage;
+  min-height: 0;
+  padding: 10px 14px 0;
+}
+
+.transfer-page-receive .web-workbench-receive .web-receive-controls {
+  grid-area: controls;
+  min-height: 0;
+  padding: 10px 14px 12px;
+  border-top: 1px solid var(--line);
+  border-bottom: 0;
+}
+
+.transfer-page-receive .web-camera-stage-compact {
+  width: min(100%, min(420px, 70svh));
+  height: min(100%, min(420px, 70svh));
+  min-height: 0 !important;
+  aspect-ratio: 1;
+  margin: 0 auto;
+  flex: 0 0 auto;
+}
+
+.transfer-page-receive .web-receive-controls .web-task-heading {
+  display: none;
+}
+
 .web-mode-primary {
   display: inline-flex;
   flex-wrap: wrap;
@@ -980,8 +1197,82 @@ summary:focus-visible {
   margin-top: 0;
 }
 
-.web-cimbar-embed .web-workbench {
+.web-cimbar-shell.is-embedded {
+  margin: 0;
+}
+
+.web-cimbar-embed .web-workbench,
+.web-cimbar-workbench {
   margin-top: 0;
+  min-height: 0;
+}
+
+.web-cimbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.web-cimbar-actions .button {
+  flex: 1 1 auto;
+  min-width: 7.5rem;
+}
+
+.web-cimbar-hint {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+/* Match QR: full code visible inside the right workbench, no scroll crop. */
+.web-code-stage.web-cimbar-stage,
+.web-cimbar-stage {
+  display: grid;
+  place-items: center;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  /* Override QR compact stage overflow:auto so a tall canvas never clips. */
+  overflow: hidden !important;
+  max-height: none;
+  background: #000;
+}
+
+.web-cimbar-canvas {
+  display: block;
+  background: #000;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+/*
+ * QR sets max-width:none on .web-code-canvas. CIMBAR must cap to the stage so
+ * the whole color code stays visible in the right panel.
+ */
+.web-code-stage.web-cimbar-stage .web-code-canvas.web-cimbar-canvas {
+  max-width: 100% !important;
+  max-height: 100% !important;
+}
+
+@media (max-width: 840px) {
+  .web-cimbar-workbench {
+    min-height: 0;
+  }
+
+  .web-cimbar-workbench .web-workbench-right {
+    min-height: 0;
+  }
+
+  .web-cimbar-stage {
+    min-height: 280px;
+    max-height: none;
+  }
+
+  .web-cimbar-actions .button {
+    min-width: calc(50% - 6px);
+  }
 }
 
 /* Download route */
@@ -1250,6 +1541,18 @@ summary:focus-visible {
     min-height: 420px;
   }
 
+  /* Transfer pages own their height; do not force tall stages that scroll. */
+  .transfer-page .web-workbench-right,
+  .transfer-page .web-code-stage-compact,
+  .transfer-page .web-camera-stage-compact {
+    min-height: 0;
+  }
+
+  .transfer-page-send .web-workbench-send {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
   .steps-grid {
     grid-template-columns: 1fr;
   }
@@ -1430,94 +1733,34 @@ summary:focus-visible {
     font-size: 52px;
   }
 
-  /* Keep the active receive loop inside a 390 x 844-class viewport. The
-     camera window comes first; controls stay directly beneath it. */
-  .transfer-page-receive {
-    height: 100svh;
-    min-height: 100svh;
-    overflow: hidden;
-  }
-
-  .transfer-page-receive .site-footer {
-    display: none;
-  }
-
-  .transfer-page-receive .web-transfer-section {
-    height: calc(100svh - 64px);
-    max-height: calc(100svh - 64px);
-    min-height: 0;
-    overflow: hidden;
-    padding-block: 22px 12px;
-  }
-
-  .transfer-page-receive .web-transfer-shell {
-    height: 100%;
-    display: grid;
-    grid-template-rows: auto minmax(0, 1fr);
-    min-height: 0;
-  }
-
-  .transfer-page-receive .web-transfer-header {
-    margin-bottom: 12px;
-  }
-
-  .transfer-page-receive .web-transfer-header p,
-  .transfer-page-receive .web-transfer-badges {
-    display: none;
-  }
-
-  .transfer-page-receive .web-transfer-header h2 {
-    margin-top: 6px;
-    font-size: 36px;
-  }
-
-  .transfer-page-receive .web-lab,
-  .transfer-page-receive .web-transfer-card {
-    min-height: 0;
-    height: 100%;
-  }
-
-  .transfer-page-receive .web-mode-menu {
-    width: 100%;
-    margin-bottom: 10px;
-  }
-
-  .transfer-page-receive .web-workbench-receive {
-    height: calc(100% - 52px);
-    min-height: 0;
-    display: grid;
+  /* Narrow phones: stack send workbench; keep page non-scrolling. */
+  .transfer-page-send .web-workbench-send {
     grid-template-columns: 1fr;
-    grid-template-rows: minmax(0, 1fr) auto;
-    grid-template-areas:
-      "stage"
-      "controls";
+    grid-template-rows: auto minmax(0, 1fr);
   }
 
-  .transfer-page-receive .web-workbench-receive .web-workbench-right {
-    grid-area: stage;
-    min-height: 0;
-    padding: 12px 14px 0;
+  .transfer-page-send .web-workbench-left {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+    overflow: visible;
+    padding: 10px 12px;
   }
 
-  .transfer-page-receive .web-workbench-receive .web-receive-controls {
-    grid-area: controls;
-    min-height: 0;
-    padding: 12px 14px 13px;
-    border-top: 1px solid var(--line);
-    border-bottom: 0;
+  .transfer-page-send .web-workbench-right {
+    padding: 8px 12px 10px;
   }
 
-  .transfer-page-receive .web-workbench-receive .web-camera-stage-compact {
-    width: min(100%, 300px);
-    min-height: 0;
-    height: min(100%, 300px);
-    flex: 0 0 min(100%, 300px);
-    aspect-ratio: 1;
-    margin: 10px auto 0;
-  }
-
-  .transfer-page-receive .web-receive-controls .web-task-heading {
+  .transfer-page-send .web-task-heading {
     display: none;
+  }
+
+  .transfer-page-send .web-code-stage-compact {
+    min-height: 0 !important;
+  }
+
+  .transfer-page-receive .web-camera-stage-compact {
+    width: min(100%, 280px);
+    height: min(100%, 280px);
   }
 
   .transfer-page-receive .web-receive-controls .web-transfer-actions {
@@ -1533,15 +1776,15 @@ summary:focus-visible {
 
   .transfer-page-receive .web-receive-controls .web-status {
     min-height: 18px;
-    margin-top: 8px;
+    margin-top: 6px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
   .transfer-page-receive .web-receive-controls .web-transfer-stats-inline {
-    margin-top: 8px;
-    padding-top: 8px;
+    margin-top: 6px;
+    padding-top: 6px;
   }
 
   .transfer-page-receive .web-receive-controls .web-transfer-stats > span {
@@ -1555,6 +1798,10 @@ summary:focus-visible {
 
   .transfer-page-receive .web-receive-controls .web-transfer-stats strong {
     font-size: 11px;
+  }
+
+  .transfer-page .site-header nav .nav-download {
+    display: none;
   }
 }
 

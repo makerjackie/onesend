@@ -13,10 +13,10 @@ usage() {
   cat <<'EOF'
 Usage: tool/generate_icons.sh [--check]
 
-Without arguments, render all checked-in OneSend icon assets from the canonical
-transparent file-scan PNG on a warm off-white app-icon plate and refresh the
-committed SHA-256 manifest. With --check, verify the committed files against
-that manifest without rendering any images.
+Without arguments, resize the canonical brand PNG
+(assets/brand/onesend-file-scan-mark.png) to every checked-in app-icon target
+and refresh the committed SHA-256 manifest. With --check, verify the
+committed files against that manifest without rendering any images.
 EOF
 }
 
@@ -46,8 +46,10 @@ render_icon() {
   local output="$2"
 
   mkdir -p "$(dirname "$output")"
-  "$MAGICK_BIN" "$SOURCE" -background "$APP_ICON_BACKGROUND" \
-    -resize "${size}x${size}!" -alpha remove -alpha off \
+  # High-quality resize of the raster master (C3 PNG). No SVG redraw.
+  "$MAGICK_BIN" "$SOURCE" \
+    -filter Lanczos -resize "${size}x${size}!" \
+    -background "$APP_ICON_BACKGROUND" -alpha remove -alpha off \
     -strip "PNG24:$output"
 }
 
@@ -57,7 +59,7 @@ write_favicon_reference() {
   mkdir -p "$(dirname "$output")"
   printf '%s\n' \
     '<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">' \
-    '  <title>OneSend file scan mark</title>' \
+    '  <title>OneSend optical file-scan mark</title>' \
     '  <image href="/icon.png" width="1024" height="1024" preserveAspectRatio="xMidYMid meet" />' \
     '</svg>' > "$output"
 }
@@ -105,7 +107,10 @@ build_assets() {
   write_favicon_reference "$output_root/website/public/favicon.svg"
 
   render_target_list "$output_root" "$ANDROID_TARGETS"
+  # Android launch splash mark (windowBackground bitmap).
+  render_icon 288 "$output_root/android/app/src/main/res/drawable/splash_logo.png"
   render_target_list "$output_root" "$IOS_TARGETS"
+  render_target_list "$output_root" "$IOS_LAUNCH_TARGETS"
   render_target_list "$output_root" "$MACOS_TARGETS"
   # Windows ICO contains standard shell sizes as PNG-compressed frames.
   mkdir -p "$output_root/windows/runner/resources"
@@ -118,6 +123,10 @@ ANDROID_TARGETS=$'48|android/app/src/main/res/mipmap-mdpi/ic_launcher.png\n72|an
 
 IOS_TARGETS=$'20|ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-20x20@1x.png\n40|ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-20x20@2x.png\n60|ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-20x20@3x.png\n29|ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-29x29@1x.png\n58|ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-29x29@2x.png\n87|ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-29x29@3x.png\n40|ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-40x40@1x.png\n80|ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-40x40@2x.png\n120|ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-40x40@3x.png\n120|ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-60x60@2x.png\n180|ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-60x60@3x.png\n76|ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-76x76@1x.png\n152|ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-76x76@2x.png\n167|ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-83.5x83.5@2x.png'
 
+# iOS launch splash (LaunchScreen.storyboard → LaunchImage). Previously left as
+# the legacy "1" mark; must stay in lockstep with the app icon.
+IOS_LAUNCH_TARGETS=$'96|ios/Runner/Assets.xcassets/LaunchImage.imageset/LaunchImage.png\n192|ios/Runner/Assets.xcassets/LaunchImage.imageset/LaunchImage@2x.png\n288|ios/Runner/Assets.xcassets/LaunchImage.imageset/LaunchImage@3x.png'
+
 MACOS_TARGETS=$'16|macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_16.png\n32|macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_32.png\n64|macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_64.png\n128|macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_128.png\n256|macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_256.png\n512|macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_512.png'
 
 CHECK_FILES=(
@@ -129,6 +138,7 @@ CHECK_FILES=(
   android/app/src/main/res/mipmap-xhdpi/ic_launcher.png
   android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png
   android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+  android/app/src/main/res/drawable/splash_logo.png
   ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-1024x1024@1x.png
   ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-20x20@1x.png
   ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-20x20@2x.png
@@ -144,6 +154,9 @@ CHECK_FILES=(
   ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-76x76@1x.png
   ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-76x76@2x.png
   ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-83.5x83.5@2x.png
+  ios/Runner/Assets.xcassets/LaunchImage.imageset/LaunchImage.png
+  ios/Runner/Assets.xcassets/LaunchImage.imageset/LaunchImage@2x.png
+  ios/Runner/Assets.xcassets/LaunchImage.imageset/LaunchImage@3x.png
   macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_1024.png
   macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_16.png
   macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_32.png
@@ -299,7 +312,7 @@ if [[ "$MODE" == "check" ]]; then
   echo "Brand asset manifest is complete and all hashes match."
 else
   if [[ ! -f "$SOURCE" ]]; then
-    echo "Missing canonical brand source: $SOURCE" >&2
+    echo "Missing canonical brand source PNG: $SOURCE" >&2
     exit 1
   fi
 
@@ -318,5 +331,5 @@ else
 
   build_assets "$ROOT_DIR"
   write_manifest
-  echo "Generated OneSend icons from $SOURCE and updated $MANIFEST_RELATIVE"
+  echo "Generated OneSend icons from $SOURCE_RELATIVE and updated $MANIFEST_RELATIVE"
 fi

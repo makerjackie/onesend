@@ -6,7 +6,8 @@ final result: passed
 
 - Selected transfer-home concept: `exec-59e6b3b5-6f03-46e4-9bf1-2daa7ec120be.png`
 - Selected receive concept: `exec-9754288b-90ee-42b0-ac6e-cfd98171c8bc.png`
-- Canonical product mark: `assets/brand/onesend-file-scan-mark.png`
+- Canonical product mark: `assets/brand/onesend-file-scan-mark.png` (C3 raster: file + QR + outer scan corners + scan line)
+- Generated plates: `assets/brand/onesend-icon-1024.png` and all platform icons via `tool/generate_icons.sh`
 
 The selected concepts and 390 × 844 Flutter captures were reviewed side by side in a single comparison image for each screen. The website was inspected at 390 × 844 and 1440 × 1024 in the in-app browser.
 

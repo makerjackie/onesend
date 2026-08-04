@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../app.dart';
 
-/// Transparent source for the generated OneSend file-scan mark.
+/// Canonical C3 raster mark (file + QR + scan corners + scan line).
+/// Source of truth: `assets/brand/onesend-file-scan-mark.png`.
 const String oneSendBrandSourceAsset =
     'assets/brand/onesend-file-scan-mark.png';
 

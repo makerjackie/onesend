@@ -25,7 +25,7 @@ OneSend（扫传）是一款实验性的、纯视觉的跨设备文件传输工�
 ### v1.5.2 功能
 
 - 支持任意文件，单文件上限为 **64 MB**。
-- 官网与 Android、iOS、macOS、Windows、Linux 全端统一使用“文件 + 扫描框 + 光线”标识，并增加品牌资源防漂移检查。
+- 官网与 Android、iOS、macOS、Windows、Linux 全端统一使用“文件 + 二维码 + 扫描框 + 扫线”标识，并增加品牌资源防漂移检查。
 - 官网拆分为首页、发送、接收和下载页面；390 × 844 的首页与接收页无需滚动，手机端扫码窗口和进度始终在首屏。
 - Flutter 手机端采用“传输 / 文件 / 设置”底部导航，设置中提供跟随系统、日间和夜间主题。
 - 修复 Android、iOS 和 Apple Vision 扫码返回字节格式不一致导致的“识别二维码但无反应”，并保留可观察诊断而不中断扫描。
@@ -50,7 +50,7 @@ OneSend（扫传）是一款实验性的、纯视觉的跨设备文件传输工�
 App 内置九种语言：简体中文、繁體中文、English、日本語、한국어、Español、
 Français、Deutsch、Português。首次启动会自动检测系统语言，也可以在“设置”中手动切换。
 
-官网与各端共享官方“文件 + 扫描框 + 光线”标识和品牌资源；“关于”页面提供 GitHub
+官网与各端共享官方“文件 + 二维码 + 扫描框 + 扫线”标识和品牌资源；“关于”页面提供 GitHub
 入口，并标明 MIT 许可、MakerJackie 与 01MVP。
 
 ### 内置测试素材
@@ -125,7 +125,7 @@ Version 1.5.2 (build 21) remains experimental; the details below describe the cu
 ### v1.5.2 features
 
 - Any file up to **64 MB** per file.
-- The file, scanner-frame, and light-ray mark is shared across the website and Android, iOS, macOS, Windows, and Linux, with a brand-asset drift check.
+- The file + QR + scanner-frame + scan-line mark is shared across the website and Android, iOS, macOS, Windows, and Linux, with a brand-asset drift check.
 - The website is split into focused home, send, receive, and download routes. The 390 × 844 home and receive views fit without page scrolling, keeping camera progress on the first screen.
 - Flutter mobile uses Transfer, Files, and Settings bottom navigation, with system, light, and dark themes in Settings.
 - Fixed Android, iOS, and Apple Vision scanner byte-format differences that could recognize a QR code without advancing reception; diagnostics remain visible without stopping the scanner.
@@ -164,7 +164,7 @@ The app includes nine languages: Simplified Chinese, Traditional Chinese, Englis
 Korean, Spanish, French, German, and Portuguese. It detects the system language on first
 launch, and users can switch manually in Settings.
 
-The website and all app targets share the official file, scanner-frame, and light-ray mark.
+The website and all app targets share the official file + QR + scanner-frame + scan-line mark.
 About links to GitHub and identifies the MIT license, MakerJackie, and 01MVP.
 
 ### Included test fixture

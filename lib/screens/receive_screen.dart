@@ -15,7 +15,6 @@ import '../l10n/generated/app_localizations.dart';
 import '../services/app_settings.dart';
 import '../services/file_service.dart';
 import '../services/transfer_store.dart';
-import '../widgets/adaptive_sheet.dart';
 import '../widgets/desktop_camera_receiver.dart';
 import '../widgets/file_tile.dart';
 import '../widgets/stored_file_actions.dart';
@@ -37,8 +36,6 @@ enum _ReceiveSavePhase {
 }
 
 enum _BarcodeObservation { bytesUnavailable, invalidFrame }
-
-enum _ReceiveScanAction { togglePause, restart }
 
 class ReceiveScreen extends StatefulWidget {
   const ReceiveScreen({
@@ -296,6 +293,9 @@ class ReceiveScreenState extends State<ReceiveScreen>
   Future<void> _selectCimbar() async {
     if (_processing || _completed) return;
     if (_algorithm == TransferAlgorithm.cimbar) return;
+    // Native QR scanner and the CIMBAR WebView cannot share one camera
+    // session. Stop the QR pipeline first so only one capture path is live;
+    // the OS camera permission is app-level and should not re-prompt.
     if (_usesMobileScanner) {
       try {
         await _stopMobileScanner();
@@ -339,7 +339,7 @@ class ReceiveScreenState extends State<ReceiveScreen>
     return _approxReceivedBytes(snapshot) * 1000 / elapsed;
   }
 
-  Widget _buildModeChips({required bool enabled, BuildContext? sheetContext}) {
+  Widget _buildModeChips({required bool enabled}) {
     return TransferModeSelector(
       algorithm: _algorithm,
       mode: _mode,
@@ -347,34 +347,8 @@ class ReceiveScreenState extends State<ReceiveScreen>
       showQrProfiles: false,
       dense: true,
       keyPrefix: 'receive-mode',
-      onQrModeSelected: (mode) {
-        if (sheetContext != null) Navigator.of(sheetContext).pop();
-        unawaited(_selectQrMode(mode));
-      },
-      onCimbarSelected: () {
-        if (sheetContext != null) Navigator.of(sheetContext).pop();
-        unawaited(_selectCimbar());
-      },
-    );
-  }
-
-  Future<void> _showReceiveModeSheet() async {
-    if (!mounted || _processing || _completed) return;
-    await showOneSendSheet<void>(
-      context: context,
-      showDragHandle: true,
-      maxDialogWidth: 420,
-      builder: (sheetContext) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-            child: _buildModeChips(
-              enabled: !_processing && !_completed,
-              sheetContext: sheetContext,
-            ),
-          ),
-        );
-      },
+      onQrModeSelected: (mode) => unawaited(_selectQrMode(mode)),
+      onCimbarSelected: () => unawaited(_selectCimbar()),
     );
   }
 
@@ -707,24 +681,40 @@ class ReceiveScreenState extends State<ReceiveScreen>
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    if (_usesCimbar && !_completed) {
-      return Scaffold(
-        appBar: _buildReceiveAppBar(l10n),
-        body: SafeArea(
-          child: CimbarTransferScreen(
-            key: const ValueKey<String>('receive-cimbar-panel'),
-            direction: CimbarDirection.receive,
-            store: widget.store,
-            embedded: true,
-            autoStartReceive: true,
-          ),
-        ),
-      );
-    }
-
+    // Same shell as send: top mode chips stay visible; only the body swaps
+    // between QR scanner and color-code panel.
     return Scaffold(
       appBar: _buildReceiveAppBar(l10n),
-      body: SafeArea(child: _completed ? _buildCompleted() : _buildScanner()),
+      body: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (!_completed) ...[
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 6, 16, 4),
+                child: _buildModeChips(enabled: !_processing),
+              ),
+              const Divider(height: 1),
+            ],
+            Expanded(
+              child: _completed
+                  ? _buildCompleted()
+                  : _usesCimbar
+                  ? CimbarTransferScreen(
+                      key: const ValueKey<String>('receive-cimbar-panel'),
+                      direction: CimbarDirection.receive,
+                      store: widget.store,
+                      embedded: true,
+                      // Reuse the app-level camera grant; WebView still has to
+                      // open its own stream, but we should not sound like a
+                      // second permission prompt.
+                      autoStartReceive: true,
+                    )
+                  : _buildScanner(),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -738,19 +728,10 @@ class ReceiveScreenState extends State<ReceiveScreen>
         overflow: TextOverflow.ellipsis,
       ),
       actions: [
-        if (!_completed)
-          IconButton(
-            key: const ValueKey<String>('receive-mode-menu'),
-            tooltip: l10n.transferModeLabel,
-            onPressed: _processing
-                ? null
-                : () => unawaited(_showReceiveModeSheet()),
-            icon: const Icon(Icons.tune_rounded),
-          ),
-        if (_usesMobileScanner && !_usesCimbar)
+        if (_usesMobileScanner && !_usesCimbar && !_completed)
           IconButton(
             tooltip: l10n.torch,
-            onPressed: _completed || _processing ? null : _toggleTorch,
+            onPressed: _processing ? null : _toggleTorch,
             icon: const Icon(Icons.flashlight_on_outlined),
           ),
       ],
@@ -790,14 +771,15 @@ class ReceiveScreenState extends State<ReceiveScreen>
           compact: compact,
         );
         final controls = Column(
+          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             readout,
             if (_error != null) ...[
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               _ReceiveError(message: _error!, compact: true),
             ],
-            SizedBox(height: compact ? 8 : 14),
+            SizedBox(height: compact ? 8 : 12),
             _buildScannerControl(l10n: l10n, compact: compact),
           ],
         );
@@ -816,6 +798,8 @@ class ReceiveScreenState extends State<ReceiveScreen>
                   horizontalPadding,
                   verticalPadding,
                 ),
+                // One viewport only — never scroll. Camera fills leftover
+                // height; readout + control stay pinned below (or beside).
                 child: workbench
                     ? Row(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -832,11 +816,32 @@ class ReceiveScreenState extends State<ReceiveScreen>
                           const SizedBox(width: 16),
                           Expanded(
                             flex: 4,
-                            child: SingleChildScrollView(
-                              child: Card(
-                                child: Padding(
-                                  padding: const EdgeInsets.all(16),
-                                  child: controls,
+                            child: Card(
+                              child: Padding(
+                                padding: const EdgeInsets.all(16),
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    Expanded(
+                                      child: Align(
+                                        alignment: Alignment.topCenter,
+                                        child: readout,
+                                      ),
+                                    ),
+                                    if (_error != null) ...[
+                                      const SizedBox(height: 8),
+                                      _ReceiveError(
+                                        message: _error!,
+                                        compact: true,
+                                      ),
+                                    ],
+                                    const SizedBox(height: 12),
+                                    _buildScannerControl(
+                                      l10n: l10n,
+                                      compact: false,
+                                    ),
+                                  ],
                                 ),
                               ),
                             ),
@@ -854,7 +859,7 @@ class ReceiveScreenState extends State<ReceiveScreen>
                               child: _buildCameraFrame(l10n),
                             ),
                           ),
-                          SizedBox(height: compact ? 10 : 12),
+                          SizedBox(height: compact ? 8 : 10),
                           controls,
                         ],
                       ),
@@ -1055,39 +1060,28 @@ class ReceiveScreenState extends State<ReceiveScreen>
     required AppLocalizations l10n,
     required bool compact,
   }) {
+    // One control only: 暂停扫描 ↔ 继续扫描. No dropdown / no second button.
     final toggleLabel = _paused ? l10n.resumeScan : l10n.pauseScan;
     return Align(
-      alignment: compact ? Alignment.center : Alignment.center,
+      alignment: Alignment.center,
       child: SizedBox(
         width: compact ? double.infinity : 320,
         height: 48,
-        child: PopupMenuButton<_ReceiveScanAction>(
+        child: FilledButton.icon(
           key: const ValueKey<String>('receive-scan-control'),
-          enabled: !_processing,
-          tooltip: toggleLabel,
-          position: PopupMenuPosition.over,
-          offset: const Offset(0, -8),
-          onSelected: (action) {
-            switch (action) {
-              case _ReceiveScanAction.togglePause:
-                unawaited(_togglePause());
-              case _ReceiveScanAction.restart:
-                unawaited(_reset());
-            }
-          },
-          itemBuilder: (context) => [
-            PopupMenuItem<_ReceiveScanAction>(
-              value: _ReceiveScanAction.togglePause,
-              child: Text(toggleLabel),
+          onPressed: _processing ? null : () => unawaited(_togglePause()),
+          icon: Icon(
+            _paused ? Icons.play_arrow_rounded : Icons.pause_rounded,
+          ),
+          label: Text(toggleLabel),
+          style: FilledButton.styleFrom(
+            backgroundColor: _paused ? oneSendLime : oneSendInk,
+            foregroundColor: _paused ? oneSendInk : Colors.white,
+            disabledBackgroundColor: oneSendInk.withValues(alpha: 0.35),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(4),
+              side: const BorderSide(color: oneSendInk, width: 2),
             ),
-            PopupMenuItem<_ReceiveScanAction>(
-              value: _ReceiveScanAction.restart,
-              child: Text(l10n.restart),
-            ),
-          ],
-          child: _ReceiveScanControlSurface(
-            label: toggleLabel,
-            paused: _paused,
           ),
         ),
       ),
@@ -1128,78 +1122,87 @@ class ReceiveScreenState extends State<ReceiveScreen>
     final l10n = AppLocalizations.of(context)!;
     final file = _receivedFile!;
     final stored = _storedFile;
-    return Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 560),
-          child: Card(
-            child: Padding(
-              padding: const EdgeInsets.all(26),
-              child: Column(
-                children: [
-                  Container(
-                    width: 76,
-                    height: 76,
-                    decoration: BoxDecoration(
-                      color: oneSendLime,
-                      border: Border.all(color: oneSendInk, width: 2),
-                      borderRadius: BorderRadius.circular(4),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: 560,
+              maxHeight: constraints.maxHeight,
+            ),
+            child: Card(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 64,
+                      height: 64,
+                      decoration: BoxDecoration(
+                        color: oneSendLime,
+                        border: Border.all(color: oneSendInk, width: 2),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Icon(Icons.check_rounded, size: 36),
                     ),
-                    child: const Icon(Icons.check_rounded, size: 42),
-                  ),
-                  const SizedBox(height: 20),
-                  Text(
-                    l10n.receivedComplete,
-                    style: Theme.of(context).textTheme.headlineMedium,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    stored == null ? l10n.verifiedNotSaved : l10n.verifiedSaved,
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 24),
-                  FileTile(
-                    name: file.name,
-                    bytes: file.bytes.length,
-                    icon: Icons.south_west_rounded,
-                  ),
-                  if (_saving) ...[
-                    const SizedBox(height: 20),
-                    const LinearProgressIndicator(minHeight: 4),
-                  ],
-                  if (_error != null) ...[
-                    const SizedBox(height: 14),
-                    _ReceiveError(message: _error!),
-                  ],
-                  const SizedBox(height: 24),
-                  if (stored != null)
-                    StoredFileActions(file: stored)
-                  else if (!_saving)
+                    const SizedBox(height: 12),
+                    Text(
+                      l10n.receivedComplete,
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      stored == null
+                          ? l10n.verifiedNotSaved
+                          : l10n.verifiedSaved,
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 12),
+                    FileTile(
+                      name: file.name,
+                      bytes: file.bytes.length,
+                      icon: Icons.south_west_rounded,
+                    ),
+                    if (_saving) ...[
+                      const SizedBox(height: 12),
+                      const LinearProgressIndicator(minHeight: 4),
+                    ],
+                    if (_error != null) ...[
+                      const SizedBox(height: 8),
+                      _ReceiveError(message: _error!, compact: true),
+                    ],
+                    const SizedBox(height: 12),
+                    if (stored != null)
+                      StoredFileActions(file: stored)
+                    else if (!_saving)
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          key: const ValueKey<String>('receive-retry-save'),
+                          onPressed: _retrySave,
+                          icon: const Icon(Icons.refresh_rounded),
+                          label: Text(l10n.retrySave),
+                        ),
+                      ),
+                    const SizedBox(height: 8),
                     SizedBox(
                       width: double.infinity,
-                      child: OutlinedButton.icon(
-                        key: const ValueKey<String>('receive-retry-save'),
-                        onPressed: _retrySave,
-                        icon: const Icon(Icons.refresh_rounded),
-                        label: Text(l10n.retrySave),
+                      child: FilledButton.icon(
+                        onPressed: _saving ? null : _reset,
+                        icon: const Icon(Icons.qr_code_scanner_rounded),
+                        label: Text(l10n.continueReceiving),
                       ),
                     ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton.icon(
-                      onPressed: _saving ? null : _reset,
-                      icon: const Icon(Icons.qr_code_scanner_rounded),
-                      label: Text(l10n.continueReceiving),
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
@@ -1251,50 +1254,6 @@ class _ScannerOverlayPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _ScannerOverlayPainter oldDelegate) =>
       oldDelegate.paused != paused;
-}
-
-class _ReceiveScanControlSurface extends StatelessWidget {
-  const _ReceiveScanControlSurface({required this.label, required this.paused});
-
-  final String label;
-  final bool paused;
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: oneSendInk,
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              paused ? Icons.play_arrow_rounded : Icons.pause_rounded,
-              color: Colors.white,
-              size: 20,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            const SizedBox(width: 6),
-            const Icon(
-              Icons.expand_more_rounded,
-              color: Colors.white70,
-              size: 19,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 class _ReceiveError extends StatelessWidget {

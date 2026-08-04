@@ -211,7 +211,7 @@
   "cimbarLoadFailed": "載入失敗，請重試。",
   "cimbarTransferFailed": "CIMBAR 傳輸失敗，請重試。",
   "cimbarReloading": "正在重新載入實驗引擎…",
-  "cimbarRequestingCamera": "正在請求相機權限…",
+  "cimbarRequestingCamera": "正在打開相機…",
   "cimbarFileInfo": "檔案：{name} · {size}",
   "cimbarSendRate": "上游參考：106 KB/s · 模式 B",
   "cimbarReceiveRate": "上游參考：106 KB/s · 本次接收實測：{speed} KB/s",

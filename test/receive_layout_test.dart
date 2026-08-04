@@ -31,39 +31,20 @@ void main() {
           expect(find.byKey(key), findsOneWidget);
           _expectInsideViewport(tester, find.byKey(key), size);
         }
+        // Mode chips stay on the top of the receive body (same as send).
         expect(
-          find.byKey(const ValueKey<String>('receive-mode-menu')),
+          find.byKey(const ValueKey<String>('receive-mode-qr')),
           findsOneWidget,
         );
         expect(
-          find.byKey(const ValueKey<String>('receive-mode-qr')),
+          find.byKey(const ValueKey<String>('receive-mode-cimbar')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const ValueKey<String>('receive-mode-menu')),
           findsNothing,
         );
         expect(tester.takeException(), isNull);
-
-        if (size == sizes.first) {
-          await tester.tap(
-            find.byKey(const ValueKey<String>('receive-mode-menu')),
-          );
-          await tester.pumpAndSettle();
-          expect(
-            find.byKey(const ValueKey<String>('receive-mode-qr')),
-            findsOneWidget,
-          );
-          expect(
-            find.byKey(const ValueKey<String>('receive-mode-cimbar')),
-            findsOneWidget,
-          );
-          await tester.tap(
-            find.byKey(const ValueKey<String>('receive-mode-qr')),
-          );
-          await tester.pumpAndSettle();
-          expect(
-            find.byKey(const ValueKey<String>('receive-mode-qr')),
-            findsNothing,
-          );
-          expect(tester.takeException(), isNull);
-        }
       }
     },
   );

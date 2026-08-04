@@ -47,6 +47,8 @@ export type WebTransferCopy = {
   reliableDetail: string;
   turboDetail: string;
   colorDetail: string;
+  /** Short guidance under the mode switcher. */
+  modeSwitchHint: string;
   displayCode: string;
   pause: string;
   resume: string;
@@ -108,6 +110,7 @@ export const webTransferCopy: WebTransferCopy = {
   reliableDetail: "",
   turboDetail: "",
   colorDetail: "",
+  modeSwitchHint: "可随时切换模式；发送中切换会按新模式立刻重发。",
   displayCode: "开始发送",
   pause: "暂停",
   resume: "继续",
@@ -317,14 +320,20 @@ function drawQr(
 }
 
 /**
- * Web display interval. Protocol targets are optimistic; real phone cameras
- * need longer dwell — especially dense fast/turbo symbols.
+ * Match protocol frame intervals. An earlier 140–170 ms dwell capped Turbo at
+ * ~6 fps (~13 KB/s) and made the mode look broken. Real-world scan success can
+ * still lag the protocol estimate; we show actual display FPS so that is clear.
  */
 function displayIntervalMs(mode: QrModeChoice) {
-  if (mode === "reliable") return 150;
-  if (mode === "fast") return 140;
-  if (mode === "turbo") return 170;
-  return Math.max(140, Math.round(TRANSFER_MODES[mode].frameIntervalMs));
+  const configured = TRANSFER_MODES[mode]?.frameIntervalMs;
+  if (typeof configured === "number" && configured > 0) {
+    return Math.max(16, Math.round(configured));
+  }
+  return 42; // ~24 fps fallback
+}
+
+function displayFps(mode: QrModeChoice) {
+  return Math.round(1000 / displayIntervalMs(mode));
 }
 
 function isQrMode(mode: TransferModeChoice): mode is QrModeChoice {
@@ -440,8 +449,10 @@ export function WebTransfer({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [receiverError, setReceiverError] = useState<string | null>(null);
   const [scanHint, setScanHint] = useState<string | null>(null);
+  const [modeNotice, setModeNotice] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const modeNoticeTimerRef = useRef<number | null>(null);
   const senderCanvasRef = useRef<HTMLCanvasElement>(null);
   const senderRef = useRef<OpticalSender | null>(null);
   const senderTimerRef = useRef<number | null>(null);
@@ -547,6 +558,9 @@ export function WebTransfer({
       clearSenderTimer();
       stopCameraTracks();
       sampleAbortRef.current?.abort();
+      if (modeNoticeTimerRef.current !== null) {
+        window.clearTimeout(modeNoticeTimerRef.current);
+      }
       if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
     };
   }, []);
@@ -568,10 +582,29 @@ export function WebTransfer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roleIsLocked]);
 
+  function flashModeNotice(message: string) {
+    setModeNotice(message);
+    if (modeNoticeTimerRef.current !== null) {
+      window.clearTimeout(modeNoticeTimerRef.current);
+    }
+    modeNoticeTimerRef.current = window.setTimeout(() => {
+      setModeNotice(null);
+      modeNoticeTimerRef.current = null;
+    }, 3200);
+  }
+
+  function modeLabel(nextMode: TransferModeChoice) {
+    if (nextMode === "reliable") return copy.reliable;
+    if (nextMode === "turbo") return copy.turbo;
+    if (nextMode === "cimbar") return copy.color;
+    return copy.fast;
+  }
+
   function buildSenderFromBytes(
     bytes: Uint8Array,
     file: SelectedFile,
     nextMode: QrModeChoice,
+    options?: { autoStart?: boolean },
   ) {
     // QR-only builder; cimbar uses the dedicated panel.
     const payload = encodeTransferFile({
@@ -579,6 +612,7 @@ export function WebTransfer({
       mimeType: file.mimeType,
       bytes,
     });
+    clearSenderTimer();
     const sender = new OpticalSender(payload, nextMode);
     senderRef.current = sender;
     setSenderReady(true);
@@ -587,6 +621,14 @@ export function WebTransfer({
     setSenderProgress(0);
     setSenderPass(1);
     setSenderSpeed("—");
+    setSenderError(null);
+
+    if (options?.autoStart) {
+      // Mid-transfer mode switch: resume immediately on the new profile.
+      startSender();
+      return;
+    }
+
     setSenderState("ready");
     // Draw a static first frame so the user can verify the code is visible
     // before pressing send (and so canvas sizing is correct early).
@@ -773,16 +815,30 @@ export function WebTransfer({
   }
 
   function handleModeChange(nextMode: TransferModeChoice) {
-    if (senderState === "sending" || senderState === "paused") return;
-    if (receiverState === "starting" || receiverState === "receiving") {
-      stopCameraTracks();
-      if (receiverState !== "complete") setReceiverState("idle");
-    }
     if (modeRef.current === nextMode) return;
+    // File is still being read into memory — wait.
+    if (senderState === "preparing") return;
+
+    const wasSending = senderState === "sending";
+    const wasPaused = senderState === "paused";
+    const wasReceiving =
+      receiverState === "starting" || receiverState === "receiving";
+
+    if (wasReceiving) {
+      // Drop the in-flight receive session; user restarts camera on the new mode.
+      stopCameraTracks();
+      receiverRef.current.reset();
+      setReceiverProgress(null);
+      setReceiverSpeed("—");
+      setReceiverPaused(false);
+      setReceiverState("idle");
+    }
+
     modeRef.current = nextMode;
     setMode(nextMode);
     setScanHint(null);
     setReceiverError(null);
+
     if (nextMode === "cimbar") {
       // Leave QR engine; cimbar panel owns its own workers.
       clearSenderTimer();
@@ -792,22 +848,42 @@ export function WebTransfer({
       setSenderProgress(0);
       setSenderPass(1);
       setSenderSpeed("—");
+      flashModeNotice(
+        wasReceiving
+          ? `已切换到${modeLabel(nextMode)}。请重新开启摄像头。`
+          : `已切换到${modeLabel(nextMode)}。`,
+      );
       return;
     }
+
     const bytes = pendingBytesRef.current;
     const file = selectedFile;
     if (bytes && file && isQrMode(nextMode)) {
-      clearSenderTimer();
-      buildSenderFromBytes(bytes, file, nextMode);
+      // Live send/pause: rebuild on the new profile and keep going if sending.
+      buildSenderFromBytes(bytes, file, nextMode, {
+        autoStart: wasSending,
+      });
+      if (wasPaused) {
+        flashModeNotice(
+          `已切换到${modeLabel(nextMode)}。点「继续」按新模式发送。`,
+        );
+      } else if (wasSending) {
+        flashModeNotice(`已切换到${modeLabel(nextMode)}，发送已按新模式继续。`);
+      } else {
+        flashModeNotice(`已切换到${modeLabel(nextMode)}。`);
+      }
+    } else {
+      flashModeNotice(
+        wasReceiving
+          ? `已切换到${modeLabel(nextMode)}。请重新开启摄像头。`
+          : `已切换到${modeLabel(nextMode)}。`,
+      );
     }
   }
 
   function renderModeSwitcher() {
-    const modeLocked =
-      senderState === "sending" ||
-      senderState === "paused" ||
-      receiverState === "starting" ||
-      receiverState === "receiving";
+    // Only block while the file is still loading into memory.
+    const modeBusy = senderState === "preparing";
     const family: "qr" | "cimbar" = usesCimbar ? "cimbar" : "qr";
     const qrProfileLabel =
       mode === "reliable"
@@ -831,7 +907,7 @@ export function WebTransfer({
             type="button"
             className={family === "qr" ? "is-selected" : ""}
             aria-pressed={family === "qr"}
-            disabled={modeLocked}
+            disabled={modeBusy}
             onClick={() =>
               handleModeChange(isQrMode(mode) ? mode : "fast")
             }
@@ -842,7 +918,7 @@ export function WebTransfer({
             type="button"
             className={family === "cimbar" ? "is-selected" : ""}
             aria-pressed={family === "cimbar"}
-            disabled={modeLocked}
+            disabled={modeBusy}
             onClick={() => handleModeChange("cimbar")}
           >
             {copy.color}
@@ -866,7 +942,7 @@ export function WebTransfer({
                   className={mode === option.id ? "is-selected" : ""}
                   type="button"
                   aria-pressed={mode === option.id}
-                  disabled={modeLocked}
+                  disabled={modeBusy}
                   onClick={() => {
                     handleModeChange(option.id);
                     modeMenuRef.current?.removeAttribute("open");
@@ -878,6 +954,11 @@ export function WebTransfer({
             </div>
           </details>
         )}
+        {modeNotice ? (
+          <p className="web-mode-hint mono-label" role="status" aria-live="polite">
+            {modeNotice}
+          </p>
+        ) : null}
       </div>
     );
   }
@@ -1147,17 +1228,25 @@ export function WebTransfer({
       aria-labelledby="web-transfer-title"
     >
       <div className="page-shell web-transfer-shell">
-        <div className="web-transfer-header">
-          <div>
-            <span className="section-index">{copy.eyebrow}</span>
-            <h2 id="web-transfer-title">{copy.title}</h2>
-            <p>{copy.lead}</p>
+        {/* Standalone /send|/receive: title lives in the site header nav.
+            Keep a compact title only when the role switcher is shown. */}
+        {!roleIsLocked ? (
+          <div className="web-transfer-header">
+            <div>
+              <span className="section-index">{copy.eyebrow}</span>
+              <h2 id="web-transfer-title">{copy.title}</h2>
+              <p>{copy.lead}</p>
+            </div>
+            <div className="web-transfer-badges" aria-label={copy.localBadge}>
+              <span>{copy.localBadge}</span>
+              <span>{copy.browserOnly}</span>
+            </div>
           </div>
-          <div className="web-transfer-badges" aria-label={copy.localBadge}>
-            <span>{copy.localBadge}</span>
-            <span>{copy.browserOnly}</span>
-          </div>
-        </div>
+        ) : (
+          <h2 id="web-transfer-title" className="visually-hidden">
+            {copy.title}
+          </h2>
+        )}
 
         <div className="web-lab">
             {!roleIsLocked && (
@@ -1290,6 +1379,18 @@ export function WebTransfer({
                         </p>
                         <div className="web-transfer-stats web-transfer-stats-inline" aria-live="polite">
                           <span>{copy.speed}<strong>{senderSpeed}</strong></span>
+                          <span>
+                            显示
+                            <strong>
+                              {isQrMode(mode) ? `${displayFps(mode)} fps` : "—"}
+                            </strong>
+                          </span>
+                          <span>
+                            协议估
+                            <strong>
+                              {isQrMode(mode) ? webTransferSpeed(mode) : "—"}
+                            </strong>
+                          </span>
                           <span>{copy.progress}<strong>{Math.round(senderProgress * 100)}%</strong></span>
                           <span>{copy.pass}<strong>{senderPass}</strong></span>
                         </div>
@@ -1508,7 +1609,7 @@ export function StandaloneTransferPage({ role }: { role: TransferRole }) {
 
   return (
     <main className={`site-compact transfer-page transfer-page-${role}`}>
-      <header className="site-header page-shell">
+      <header className="site-header page-shell transfer-header-compact">
         <Brand href="/" />
         <nav aria-label="传输导航">
           <a className={role === "send" ? "is-current" : ""} href="/send">
@@ -1531,15 +1632,6 @@ export function StandaloneTransferPage({ role }: { role: TransferRole }) {
         initialRole={role}
         lockedRole={role}
       />
-
-      <footer className="site-footer page-shell">
-        <Brand href="/" />
-        <p>OneSend · 扫传 · 本地处理</p>
-        <div>
-          <a href="/how">原理</a>
-          <a href="/privacy">隐私</a>
-        </div>
-      </footer>
     </main>
   );
 }

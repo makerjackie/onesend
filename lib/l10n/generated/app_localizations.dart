@@ -1381,7 +1381,7 @@ abstract class AppLocalizations {
   /// No description provided for @cimbarRequestingCamera.
   ///
   /// In en, this message translates to:
-  /// **'Requesting camera access…'**
+  /// **'Opening camera…'**
   String get cimbarRequestingCamera;
 
   /// No description provided for @cimbarFileInfo.

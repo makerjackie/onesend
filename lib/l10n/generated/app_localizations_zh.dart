@@ -701,7 +701,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get cimbarDecoderReady => '解码器已就绪，正在寻找 CIMBAR。';
 
   @override
-  String get cimbarDecoderReadyStart => '解码器已就绪，点击开始后请求摄像头权限。';
+  String get cimbarDecoderReadyStart => '解码器已就绪，正在打开摄像头…';
 
   @override
   String get cimbarCameraStarted => '摄像头已启动，正在寻找 CIMBAR。';
@@ -734,7 +734,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get cimbarReloading => '正在重新加载实验引擎…';
 
   @override
-  String get cimbarRequestingCamera => '正在请求摄像头权限…';
+  String get cimbarRequestingCamera => '正在打开摄像头…';
 
   @override
   String cimbarFileInfo(Object name, Object size) {
@@ -1535,7 +1535,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get cimbarDecoderReady => '解码器已就绪，正在寻找 CIMBAR。';
 
   @override
-  String get cimbarDecoderReadyStart => '解码器已就绪，点击开始后请求摄像头权限。';
+  String get cimbarDecoderReadyStart => '解码器已就绪，正在打开摄像头…';
 
   @override
   String get cimbarCameraStarted => '摄像头已启动，正在寻找 CIMBAR。';
@@ -1568,7 +1568,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get cimbarReloading => '正在重新加载实验引擎…';
 
   @override
-  String get cimbarRequestingCamera => '正在请求摄像头权限…';
+  String get cimbarRequestingCamera => '正在打开摄像头…';
 
   @override
   String cimbarFileInfo(Object name, Object size) {
@@ -2407,7 +2407,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get cimbarReloading => '正在重新載入實驗引擎…';
 
   @override
-  String get cimbarRequestingCamera => '正在請求相機權限…';
+  String get cimbarRequestingCamera => '正在打開相機…';
 
   @override
   String cimbarFileInfo(Object name, Object size) {

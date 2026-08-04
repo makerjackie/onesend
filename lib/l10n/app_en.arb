@@ -211,7 +211,7 @@
   "cimbarLoadFailed": "Loading failed. Try again.",
   "cimbarTransferFailed": "CIMBAR transfer failed. Try again.",
   "cimbarReloading": "Reloading the experimental engine…",
-  "cimbarRequestingCamera": "Requesting camera access…",
+  "cimbarRequestingCamera": "Opening camera…",
   "cimbarFileInfo": "File: {name} · {size}",
   "cimbarSendRate": "Upstream reference: 106 KB/s · Mode B",
   "cimbarReceiveRate": "Upstream reference: 106 KB/s · Measured for this receive: {speed} KB/s",

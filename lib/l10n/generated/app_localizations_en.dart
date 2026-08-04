@@ -774,7 +774,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get cimbarReloading => 'Reloading the experimental engine…';
 
   @override
-  String get cimbarRequestingCamera => 'Requesting camera access…';
+  String get cimbarRequestingCamera => 'Opening camera…';
 
   @override
   String cimbarFileInfo(Object name, Object size) {

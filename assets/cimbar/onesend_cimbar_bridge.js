@@ -32,6 +32,7 @@
     workerProxy: null,
     pendingAnimationFrames: [],
     pausedRequestAnimationFrame: null,
+    cameraCaptureInstalled: false,
   };
 
   function bridge(type, details) {
@@ -276,7 +277,13 @@
 
     const originalError = global.Recv.set_error;
     global.Recv.set_error = function (message) {
-      bridge('error', { phase: 'decode', message: String(message) });
+      const text = String(message || '');
+      // Upstream reports getUserMedia failures through set_error; keep the
+      // phase accurate so the UI does not blame "decode" for camera issues.
+      const phase = /camera|mediaDevices|getUserMedia|permission/i.test(text)
+        ? 'camera'
+        : 'decode';
+      bridge('error', { phase: phase, message: text });
       return originalError.apply(this, arguments);
     };
 
@@ -378,6 +385,24 @@
     state.originalDownload = originalDownload;
   }
 
+  /**
+   * OneSend shells live at assets/cimbar/*.html while unmodified upstream
+   * workers live at assets/cimbar/upstream/*.js. Upstream code constructs
+   * `new Worker('recv-worker….js')` (same-dir as the page), which 404s and
+   * was previously surfaced as a fake camera/permission error.
+   */
+  function resolveUpstreamWorkerUrl(scriptUrl) {
+    if (typeof scriptUrl !== 'string') return scriptUrl;
+    if (
+      scriptUrl.indexOf('://') >= 0 ||
+      scriptUrl.indexOf('/') >= 0 ||
+      scriptUrl.indexOf('blob:') === 0
+    ) {
+      return scriptUrl;
+    }
+    return 'upstream/' + scriptUrl;
+  }
+
   function installReceiveWorkerTracking() {
     if (state.workerProxy || typeof global.Worker !== 'function') {
       return;
@@ -385,8 +410,21 @@
     state.nativeWorker = global.Worker;
     state.workerProxy = new Proxy(state.nativeWorker, {
       construct(target, args) {
-        const worker = Reflect.construct(target, args);
+        const nextArgs = args.slice();
+        if (nextArgs.length > 0) {
+          nextArgs[0] = resolveUpstreamWorkerUrl(nextArgs[0]);
+        }
+        const worker = Reflect.construct(target, nextArgs);
         state.receiveWorkers.push(worker);
+        worker.addEventListener('error', function (event) {
+          fail(
+            'decode',
+            new Error(
+              '解码 worker 加载失败: ' +
+                (event && event.message ? event.message : nextArgs[0]),
+            ),
+          );
+        });
         return worker;
       },
     });
@@ -409,6 +447,119 @@
     state.nativeWorker = null;
   }
 
+  function ensureVideoFrameCallback(video) {
+    if (video.requestVideoFrameCallback) return;
+    video.requestVideoFrameCallback = function (callback) {
+      return global.requestAnimationFrame(function (timestamp) {
+        callback(timestamp, { presentedFrames: 0 });
+      });
+    };
+  }
+
+  /**
+   * Soften getUserMedia and wrap Recv.init_video while still calling the
+   * original (it owns private `_video` used by on_frame).
+   */
+  function installMobileCameraCapture() {
+    if (state.cameraCaptureInstalled || !global.Recv) return;
+    if (!global.navigator ||
+        !global.navigator.mediaDevices ||
+        typeof global.navigator.mediaDevices.getUserMedia !== 'function') {
+      return;
+    }
+    state.cameraCaptureInstalled = true;
+
+    const originalGum = global.navigator.mediaDevices.getUserMedia.bind(
+      global.navigator.mediaDevices,
+    );
+    global.navigator.mediaDevices.getUserMedia = function () {
+      const attempts = [
+        {
+          audio: false,
+          video: {
+            facingMode: { ideal: 'environment' },
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          },
+        },
+        { audio: false, video: { facingMode: 'environment' } },
+        { audio: false, video: true },
+      ];
+      function tryAt(i) {
+        return originalGum(attempts[i]).catch(function (err) {
+          if (i + 1 < attempts.length) return tryAt(i + 1);
+          throw err;
+        });
+      }
+      return tryAt(0);
+    };
+
+    const originalInitVideo = global.Recv.init_video.bind(global.Recv);
+    global.Recv.init_video = function (video) {
+      if (video) {
+        video.autoplay = true;
+        video.muted = true;
+        video.playsInline = true;
+        video.setAttribute('playsinline', 'true');
+        video.setAttribute('webkit-playsinline', 'true');
+        video.setAttribute('muted', 'true');
+        video.style.width = '100%';
+        video.style.height = '100%';
+        video.style.objectFit = 'cover';
+        ensureVideoFrameCallback(video);
+      }
+      // Patch set_error once around the open so success can be inferred if
+      // play starts without an error callback.
+      const previousSetError = global.Recv.set_error;
+      var opened = false;
+      global.Recv.set_error = function (message) {
+        if (!opened) {
+          fail('camera', new Error(String(message || 'camera error')));
+        }
+        if (typeof previousSetError === 'function') {
+          return previousSetError.apply(this, arguments);
+        }
+      };
+      try {
+        originalInitVideo(video);
+        // Upstream does not emit success; poll for live tracks.
+        var tries = 0;
+        var timer = global.setInterval(function () {
+          tries += 1;
+          var stream = video && video.srcObject;
+          var live = stream && stream.getVideoTracks &&
+            stream.getVideoTracks().some(function (t) {
+              return t.readyState === 'live';
+            });
+          if (live || (video && video.videoWidth > 0)) {
+            opened = true;
+            global.clearInterval(timer);
+            global.Recv.set_error = previousSetError;
+            bridge('receive-camera-live', {
+              width: video.videoWidth || 0,
+              height: video.videoHeight || 0,
+            });
+            try {
+              var playResult = video.play();
+              if (playResult && typeof playResult.catch === 'function') {
+                playResult.catch(function () {});
+              }
+            } catch (e) {}
+          } else if (tries >= 40) {
+            global.clearInterval(timer);
+            global.Recv.set_error = previousSetError;
+            if (!opened) {
+              fail('camera', new Error('摄像头预览超时（黑屏）。'));
+            }
+          }
+        }, 100);
+      } catch (error) {
+        global.Recv.set_error = previousSetError;
+        fail('camera', error);
+      }
+    };
+  }
+
   function initializeReceiveVideo() {
     if (!state.receiveStarted || state.receiveVideoStarted) {
       return;
@@ -419,16 +570,7 @@
       if (!video) {
         throw new Error('接收页面 video 元素未找到。');
       }
-      video.autoplay = true;
-      video.playsInline = true;
-      video.muted = true;
-      if (!video.requestVideoFrameCallback) {
-        video.requestVideoFrameCallback = function (callback) {
-          return global.requestAnimationFrame(function (timestamp) {
-            callback(timestamp, { presentedFrames: 0 });
-          });
-        };
-      }
+      installMobileCameraCapture();
       global.Recv.init_video(video);
     } catch (error) {
       state.receiveVideoStarted = false;
@@ -442,6 +584,7 @@
         throw new Error('接收页面上游 worker/解码器未加载。');
       }
       installReceiveHooks();
+      installMobileCameraCapture();
       global.Module = global.Module || {};
       global.Module.onRuntimeInitialized = function () {
         state.receiveWasmReady = true;
@@ -451,6 +594,7 @@
           global.Recv.setMode(68);
         }
         bridge('receive-ready', { decoder: 'upstream-worker', mode: 'B' });
+        // Only open the camera after Flutter/native startReceive has armed us.
         initializeReceiveVideo();
       };
     } catch (error) {
@@ -477,7 +621,14 @@
       initializeReceiveVideo();
     } catch (error) {
       state.receiveStarted = false;
-      fail('camera', error);
+      // init_ww / worker construction failures are not camera permission issues.
+      const text = error && error.message ? String(error.message) : String(error);
+      const phase = /camera|mediaDevices|getUserMedia|permission|NotAllowed|NotFound/i.test(
+        text,
+      )
+        ? 'camera'
+        : 'decode';
+      fail(phase, error);
     }
   }
 
