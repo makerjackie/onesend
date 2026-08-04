@@ -146,7 +146,7 @@
     bridge('send-prepared', {
       name: file.name || 'selected.bin',
       size: file.size,
-      mode: 'Bm',
+      mode: 'B',
     });
 
     try {
@@ -198,7 +198,7 @@
       bridge('send-complete', {
         name: file.name || 'selected.bin',
         size: file.size,
-        mode: 'Bm',
+        mode: 'B',
       });
     } catch (error) {
       fail('send', error);

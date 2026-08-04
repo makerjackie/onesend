@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
@@ -5,31 +7,18 @@ import '../core/optical_transfer.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../l10n/locale_support.dart';
 import '../services/app_settings.dart';
-import '../services/file_service.dart';
 import '../services/update_service.dart';
+import '../widgets/transfer_mode_selector.dart';
 import '../widgets/update_ui.dart';
 
 const Color _settingsInk = Color(0xff10130f);
 const Color _settingsPaper = Color(0xfff5f6f0);
 const Color _settingsPanel = Color(0xffffffff);
 const Color _settingsMuted = Color(0xff667066);
-const Color _settingsSelected = Color(0xffe8ebe3);
 const BorderRadius _settingsRadius = BorderRadius.all(Radius.circular(6));
 
-/// Returns the theoretical useful transfer speed in the unit shown in the UI.
-///
-/// This deliberately reports KB/s rather than a display cadence. The value is
-/// derived from the same transport profile used by [OpticalSender].
-String transferModeSpeedLabel(TransferMode mode) {
-  return formatTransferSpeed(mode.usefulBytesPerSecond);
-}
-
-/// Settings page that can be pushed directly by a parent route.
-///
-/// [settings] is intentionally supplied by the caller so HomeScreen can share
-/// one persisted [AppSettings] instance with future send flows. [updates] is
-/// only used for desktop update settings. [onLanguageTap] remains an
-/// injectable seam for narrow widget tests and host integrations.
+/// Settings page: language and desktop updates only.
+/// Transfer mode is chosen on the send/receive screens.
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({
     required this.settings,
@@ -51,52 +40,12 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  bool _saving = false;
-  String? _message;
+  bool _savingMode = false;
 
   bool get _desktop => widget.isDesktop ?? _isDesktopPlatform();
 
   bool get _showUpdateSettings =>
       _desktop && widget.updates?.supportsUpdates == true;
-
-  Future<void> _selectQrMode(TransferMode mode) async {
-    await _selectTransfer(algorithm: TransferAlgorithm.qr, mode: mode);
-  }
-
-  Future<void> _selectCimbar() async {
-    await _selectTransfer(algorithm: TransferAlgorithm.cimbar);
-  }
-
-  Future<void> _selectTransfer({
-    required TransferAlgorithm algorithm,
-    TransferMode? mode,
-  }) async {
-    final alreadySelected =
-        widget.settings.transferAlgorithm == algorithm &&
-        (algorithm == TransferAlgorithm.cimbar ||
-            widget.settings.transferMode == mode);
-    if (_saving || alreadySelected) return;
-
-    final modeSaveError = AppLocalizations.of(context)?.modeSaveError;
-    setState(() {
-      _saving = true;
-      _message = null;
-    });
-    String? errorMessage;
-    try {
-      await widget.settings.setDefaultAlgorithm(algorithm);
-      if (mode != null && widget.settings.transferMode != mode) {
-        await widget.settings.setDefaultMode(mode);
-      }
-    } catch (_) {
-      errorMessage = modeSaveError;
-    }
-    if (!mounted) return;
-    setState(() {
-      _saving = false;
-      _message = errorMessage;
-    });
-  }
 
   Future<void> _openLanguageEntry() async {
     final callback = widget.onLanguageTap;
@@ -159,6 +108,95 @@ class _SettingsScreenState extends State<SettingsScreen> {
     await showOneSendUpdateSettings(context, updates);
   }
 
+  Future<void> _openTransferModeEntry() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (sheetContext) => SafeArea(
+        child: AnimatedBuilder(
+          animation: widget.settings,
+          builder: (context, _) => SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 620),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      AppLocalizations.of(context)!.defaultTransferAlgorithm,
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      AppLocalizations.of(context)!.algorithmDescription,
+                      style: const TextStyle(
+                        color: _settingsMuted,
+                        height: 1.4,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TransferModeSelector(
+                      key: const ValueKey<String>('settings-mode-selector'),
+                      algorithm: widget.settings.transferAlgorithm,
+                      mode: widget.settings.transferMode,
+                      enabled: !_savingMode,
+                      dense: true,
+                      keyPrefix: 'settings',
+                      onQrModeSelected: (mode) => unawaited(
+                        _selectTransfer(
+                          sheetContext,
+                          algorithm: TransferAlgorithm.qr,
+                          mode: mode,
+                        ),
+                      ),
+                      onCimbarSelected: () => unawaited(
+                        _selectTransfer(
+                          sheetContext,
+                          algorithm: TransferAlgorithm.cimbar,
+                        ),
+                      ),
+                    ),
+                    if (_savingMode) ...[
+                      const SizedBox(height: 14),
+                      const LinearProgressIndicator(minHeight: 3),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _selectTransfer(
+    BuildContext sheetContext, {
+    required TransferAlgorithm algorithm,
+    TransferMode? mode,
+  }) async {
+    final alreadySelected =
+        widget.settings.transferAlgorithm == algorithm &&
+        (algorithm == TransferAlgorithm.cimbar ||
+            widget.settings.transferMode == mode);
+    if (_savingMode || alreadySelected) return;
+    setState(() => _savingMode = true);
+    try {
+      await widget.settings.setDefaultAlgorithm(algorithm);
+      if (mode != null) await widget.settings.setDefaultMode(mode);
+      if (mounted && sheetContext.mounted) Navigator.of(sheetContext).pop();
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppLocalizations.of(context)!.modeSaveError)),
+      );
+    } finally {
+      if (mounted) setState(() => _savingMode = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -181,8 +219,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Widget _buildContent(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final mode = widget.settings.transferMode;
-    final algorithm = widget.settings.transferAlgorithm;
     return LayoutBuilder(
       builder: (context, constraints) {
         return SingleChildScrollView(
@@ -210,117 +246,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   _SectionLabel(label: l10n.transportSection),
                   const SizedBox(height: 8),
                   _SettingsPanel(
-                    child: Padding(
-                      padding: const EdgeInsets.all(14),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            l10n.defaultTransferAlgorithm,
-                            style: TextStyle(
-                              color: _settingsInk,
-                              fontSize: 17,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            l10n.algorithmDescription,
-                            style: TextStyle(
-                              color: _settingsMuted,
-                              height: 1.4,
-                            ),
-                          ),
-                          const SizedBox(height: 14),
-                          _ModeOption(
-                            key: const ValueKey<String>('settings-fast'),
-                            semanticLabel: l10n.modeAccessibilityLabel(
-                              l10n.modeFast,
-                              formatTransferSpeed(
-                                TransferMode.fast.usefulBytesPerSecond,
-                              ),
-                            ),
-                            title: l10n.modeFast,
-                            description: l10n.fastModeDescription(
-                              l10n.theoreticalSpeed(
-                                formatTransferSpeed(
-                                  TransferMode.fast.usefulBytesPerSecond,
-                                ),
-                              ),
-                            ),
-                            selected:
-                                algorithm == TransferAlgorithm.qr &&
-                                mode == TransferMode.fast,
-                            enabled: !_saving,
-                            onTap: () => _selectQrMode(TransferMode.fast),
-                          ),
-                          const SizedBox(height: 10),
-                          _ModeOption(
-                            key: const ValueKey<String>('settings-reliable'),
-                            semanticLabel: l10n.modeAccessibilityLabel(
-                              l10n.modeReliable,
-                              formatTransferSpeed(
-                                TransferMode.reliable.usefulBytesPerSecond,
-                              ),
-                            ),
-                            title: l10n.modeReliable,
-                            description: l10n.reliableModeDescription(
-                              l10n.theoreticalSpeed(
-                                formatTransferSpeed(
-                                  TransferMode.reliable.usefulBytesPerSecond,
-                                ),
-                              ),
-                            ),
-                            selected:
-                                algorithm == TransferAlgorithm.qr &&
-                                mode == TransferMode.reliable,
-                            enabled: !_saving,
-                            onTap: () => _selectQrMode(TransferMode.reliable),
-                          ),
-                          const SizedBox(height: 10),
-                          _ModeOption(
-                            key: const ValueKey<String>('settings-turbo'),
-                            semanticLabel: l10n.modeAccessibilityLabel(
-                              l10n.modeTurboQr,
-                              formatTransferSpeed(
-                                TransferMode.turbo.usefulBytesPerSecond,
-                              ),
-                            ),
-                            title: l10n.modeTurboQr,
-                            description: l10n.turboModeDescription(
-                              l10n.theoreticalSpeed(
-                                formatTransferSpeed(
-                                  TransferMode.turbo.usefulBytesPerSecond,
-                                ),
-                              ),
-                            ),
-                            selected:
-                                algorithm == TransferAlgorithm.qr &&
-                                mode == TransferMode.turbo,
-                            enabled: !_saving,
-                            onTap: () => _selectQrMode(TransferMode.turbo),
-                          ),
-                          const SizedBox(height: 10),
-                          _ModeOption(
-                            key: const ValueKey<String>('settings-cimbar'),
-                            semanticLabel: l10n.modeCimbar,
-                            title: l10n.modeCimbar,
-                            description: l10n.cimbarModeDescription,
-                            selected: algorithm == TransferAlgorithm.cimbar,
-                            enabled: !_saving,
-                            onTap: _selectCimbar,
-                          ),
-                          if (_message != null) ...[
-                            const SizedBox(height: 12),
-                            Text(
-                              _message!,
-                              style: TextStyle(
-                                color: Theme.of(context).colorScheme.error,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
+                    child: _SettingRow(
+                      key: const ValueKey<String>('settings-transfer-mode'),
+                      icon:
+                          widget.settings.transferAlgorithm ==
+                              TransferAlgorithm.cimbar
+                          ? Icons.palette_outlined
+                          : Icons.qr_code_2_rounded,
+                      title: l10n.defaultTransferAlgorithm,
+                      subtitle: _selectedTransferLabel(l10n),
+                      onTap: _openTransferModeEntry,
                     ),
                   ),
                   const SizedBox(height: 28),
@@ -351,14 +286,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ],
                     ),
                   ),
-                  if (constraints.maxWidth < 420) const SizedBox(height: 4),
-                  if (!_desktop) ...[
-                    const SizedBox(height: 28),
-                    Text(
-                      l10n.mobileOfflineNote,
-                      style: TextStyle(color: _settingsMuted, height: 1.45),
-                    ),
-                  ],
                 ],
               ),
             ),
@@ -375,6 +302,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (option.tag == tag) return option.nativeLabel;
     }
     return l10n.followSystem;
+  }
+
+  String _selectedTransferLabel(AppLocalizations l10n) {
+    if (widget.settings.transferAlgorithm == TransferAlgorithm.cimbar) {
+      return l10n.modeCimbar;
+    }
+    return switch (widget.settings.transferMode) {
+      TransferMode.reliable => l10n.modeReliable,
+      TransferMode.fast => l10n.modeFast,
+      TransferMode.turbo => l10n.modeTurboQr,
+    };
   }
 }
 
@@ -414,103 +352,6 @@ class _SettingsPanel extends StatelessWidget {
         borderRadius: _settingsRadius,
       ),
       child: child,
-    );
-  }
-}
-
-class _ModeOption extends StatelessWidget {
-  const _ModeOption({
-    required this.semanticLabel,
-    required this.title,
-    required this.description,
-    required this.selected,
-    required this.enabled,
-    required this.onTap,
-    super.key,
-  });
-
-  final String semanticLabel;
-  final String title;
-  final String description;
-  final bool selected;
-  final bool enabled;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      selected: selected,
-      enabled: enabled,
-      label: semanticLabel,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: enabled ? onTap : null,
-          borderRadius: _settingsRadius,
-          child: Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(13),
-            decoration: BoxDecoration(
-              color: selected ? _settingsSelected : _settingsPanel,
-              border: Border.all(color: _settingsInk, width: 2),
-              borderRadius: _settingsRadius,
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _SelectionMark(selected: selected),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: const TextStyle(
-                          color: _settingsInk,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        description,
-                        style: const TextStyle(
-                          color: _settingsMuted,
-                          height: 1.4,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _SelectionMark extends StatelessWidget {
-  const _SelectionMark({required this.selected});
-
-  final bool selected;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 22,
-      height: 22,
-      decoration: BoxDecoration(
-        color: selected ? _settingsInk : Colors.transparent,
-        border: Border.all(color: _settingsInk, width: 2),
-        borderRadius: const BorderRadius.all(Radius.circular(3)),
-      ),
-      child: selected
-          ? const Icon(Icons.check, color: Colors.white, size: 16)
-          : null,
     );
   }
 }

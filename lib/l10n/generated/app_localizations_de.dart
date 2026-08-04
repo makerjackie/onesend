@@ -30,6 +30,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get modeCimbar => 'CIMBAR-Farbcode (experimentell)';
 
   @override
+  String get modeQr => 'QR code';
+
+  @override
   String get compatibilityMode => 'Kompatibilität';
 
   @override
@@ -331,6 +334,15 @@ class AppLocalizationsDe extends AppLocalizations {
   String newTransferStatus(Object mode, Object speed) {
     return 'Neue Übertragungen nutzen den Modus $mode · theoretische Rate: etwa $speed';
   }
+
+  @override
+  String get transferModeLabel => 'Transfer mode';
+
+  @override
+  String get dropFilesHint => 'Or drag and drop a file here';
+
+  @override
+  String get dropFilesActive => 'Drop to send';
 
   @override
   String get reading => 'Wird gelesen…';

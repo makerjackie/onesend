@@ -45,6 +45,12 @@ test("worker deployment keeps dynamic routes and static assets available", () =>
   assert.match(viteConfig, /assets:\s*\{/);
   assert.match(viteConfig, /binding:\s*"ASSETS"/);
   assert.match(viteConfig, /run_worker_first:\s*true/);
+
+  // With run_worker_first, vinext only signals public/ files to ASSETS.
+  // Hashed Vite bundles under /assets/* must be proxied by the Worker.
+  const worker = text(resolve(websiteRoot, "worker", "index.ts"));
+  assert.match(worker, /pathname\.startsWith\("\/assets\/"\)/);
+  assert.match(worker, /env\.ASSETS\.fetch\(request\)/);
 });
 
 test("desktop update feeds target the current release", () => {
@@ -66,13 +72,13 @@ test("desktop update feeds target the current release", () => {
 test("cimbar copy and camera behavior stay local and opt-in", () => {
   const page = text(resolve(appRoot, "page.tsx"));
   const client = text(resolve(appRoot, "cimbar-client.tsx"));
+  const home = text(resolve(websiteRoot, "app", "page.tsx"));
   const senderWrapper = text(resolve(assetRoot, "cimbar-send-bootstrap.js"));
   const receiverWrapper = text(resolve(assetRoot, "cimbar-receive-worker.js"));
 
-  assert.match(page, /彩色高速（实验）/);
-  assert.match(page, /mode B/);
-  assert.match(page, /106 KB\/s/);
-  assert.doesNotMatch(page, /200\s*KB\/s/);
+  // Old /cimbar bookmarks redirect into the main web-transfer mode switcher.
+  assert.match(page, /redirect\("\/#web-transfer"\)/);
+  assert.match(home, /彩色视觉码/);
   assert.match(client, /发送/);
   assert.match(client, /接收/);
   assert.match(client, /getUserMedia/);
@@ -94,10 +100,13 @@ test("cimbar view switches release the inactive transfer mode", () => {
   assert.match(changeView, /nextView === "receive"[\s\S]*stopSender\(\)/);
 });
 
-test("existing QR transfer exposes only the secondary cimbar entry", () => {
+test("web transfer switches cimbar inline with QR modes", () => {
   const webTransfer = text(resolve(websiteRoot, "app", "web-transfer.tsx"));
-  assert.match(webTransfer, /href="\/cimbar"/);
-  assert.match(webTransfer, /试用彩色高速实验/);
+  assert.match(webTransfer, /CimbarTransfer/);
+  assert.match(webTransfer, /"cimbar"/);
+  assert.match(webTransfer, /copy\.color/);
+  assert.doesNotMatch(webTransfer, /href="\/cimbar"/);
+  assert.doesNotMatch(webTransfer, /试用彩色高速实验/);
 });
 
 test("MPL-2.0 notice and full license are included", () => {

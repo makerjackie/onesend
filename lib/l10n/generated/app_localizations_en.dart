@@ -24,10 +24,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get modeReliable => 'Reliable';
 
   @override
-  String get modeTurboQr => 'Turbo QR (experimental)';
+  String get modeTurboQr => 'Turbo QR';
 
   @override
-  String get modeCimbar => 'CIMBAR color visual code (experimental)';
+  String get modeCimbar => 'Color code';
+
+  @override
+  String get modeQr => 'QR code';
 
   @override
   String get compatibilityMode => 'Compatibility';
@@ -179,10 +182,10 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get settingsIntroTitle => 'Tune the next transfer to your device.';
+  String get settingsIntroTitle => 'App settings';
 
   @override
-  String get settingsIntroBody => 'The default mode is used for new sends.';
+  String get settingsIntroBody => 'Choose transfer mode on the send screen.';
 
   @override
   String get transportSection => 'TRANSFER';
@@ -328,6 +331,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String newTransferStatus(Object mode, Object speed) {
     return 'New sends use $mode mode · theoretical rate about $speed';
   }
+
+  @override
+  String get transferModeLabel => 'Transfer mode';
+
+  @override
+  String get dropFilesHint => 'Or drag and drop a file here';
+
+  @override
+  String get dropFilesActive => 'Drop to send';
 
   @override
   String get reading => 'Reading…';

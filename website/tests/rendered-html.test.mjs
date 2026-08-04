@@ -31,50 +31,37 @@ test("server-renders the OneSend product page", async () => {
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
 
   const html = await response.text();
-  assert.match(html, /OneSend · 扫传/);
+  assert.match(html, /OneSend/);
   assert.match(html, /文件，/);
   assert.match(html, /用光传过去/);
-  assert.match(html, /OneSend · 快速模式/);
-  assert.match(html, /默认快，需要时更稳。/);
-  assert.match(html, /快速模式默认开启；环境不佳时，在设置中切换到兼容可靠模式。/);
-  assert.match(html, /快速模式/);
-  assert.match(html, /≈33 KB\/s/);
-  assert.match(html, /默认快速模式/);
-  assert.match(html, /≈4\.7 KB\/s/);
-  assert.match(html, /兼容可靠模式/);
-  assert.match(html, /约 33 KB\/s/);
-  assert.match(html, /可靠模式/);
-  assert.match(html, /适用环境/);
-  assert.match(html, /手持 · 普通屏幕/);
-  assert.match(html, /固定 · 清晰屏幕/);
-  assert.match(html, /默认设置/);
-  assert.match(html, /新传输自动使用/);
-  assert.match(html, /切换位置/);
-  assert.match(html, /设置/);
-  assert.doesNotMatch(html, /fps/i);
+  assert.match(html, /网页试用/);
+  assert.match(html, /下载 App/);
+  assert.match(html, /网页传输/);
+  assert.match(html, /开始发送/);
+  assert.match(html, /自动 · 快速/);
+  assert.match(html, /测试视频/);
+  assert.match(html, /预览/);
+  assert.match(html, /打开 \/ 新标签/);
+  assert.match(html, /保存/);
+  assert.match(html, /id="web-transfer"/);
+  assert.match(html, /id="download"/);
+  assert.match(html, /href="\/how"/);
+  assert.match(html, /href="\/privacy"/);
+  assert.match(html, /class="more-menu"/);
   assert.match(html, /onesend-android\.apk/);
   assert.match(html, /onesend-macos-universal\.dmg/);
-  assert.match(html, /onesend-windows-setup\.exe/);
-  assert.match(html, /onesend-linux-x64\.tar\.gz/);
-  assert.match(html, /网页，也能扫传/);
-  assert.match(html, /选择一个本地文件/);
-  assert.match(html, /开启摄像头/);
-  assert.match(html, /仅本地 \/ 不上传/);
-  assert.match(html, /WEB ↔ WEB \/ FLUTTER V2/);
-  assert.match(html, /id="web-transfer"/);
-  assert.match(html, /github\.com\/makerjackie\/onesend\/releases\/latest/);
   assert.match(html, /testflight\.apple\.com\/join\/n2t1KrCp/);
-  assert.match(html, /桌面自动更新/);
-  assert.match(html, /Ed25519/);
-  assert.match(html, /\/privacy/);
+  assert.doesNotMatch(html, /漏帧，不等于失败/);
+  assert.doesNotMatch(html, /默认快，需要时更稳/);
+  assert.doesNotMatch(html, /web-role-picker/);
   assert.doesNotMatch(html, /codex-preview|loading skeleton|Starter Project/i);
 });
 
-test("bundles the original silent demo asset", async () => {
+test("bundles the shared built-in optical test video", async () => {
   const demo = new URL("../public/onesend-optical-test.mp4", import.meta.url);
   const details = await stat(demo);
-  assert.ok(details.size > 20_000);
-  assert.ok(details.size < 40_000);
+  // Keep the fixture small enough for quick end-to-end optical tests.
+  assert.equal(details.size, 125_415);
 });
 
 test("server-renders the standalone privacy notice", async () => {

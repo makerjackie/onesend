@@ -198,6 +198,18 @@ class _StoredFileActionsState extends State<StoredFileActions> {
               spacing: 8,
               runSpacing: 8,
               children: [
+                Semantics(
+                  button: true,
+                  label: l10n.openFile,
+                  child: Tooltip(
+                    message: l10n.openFile,
+                    child: IconButton(
+                      key: const ValueKey<String>('stored-file-preview'),
+                      onPressed: _busy || _exists != true ? null : _open,
+                      icon: const Icon(Icons.visibility_outlined),
+                    ),
+                  ),
+                ),
                 OutlinedButton.icon(
                   key: const ValueKey<String>('stored-file-open'),
                   onPressed: _busy || _exists != true ? null : _open,

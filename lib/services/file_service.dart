@@ -73,6 +73,36 @@ Future<PickedTransfer?> pickTransferFile() async {
   }
 }
 
+/// Loads a transfer candidate from an absolute filesystem [path].
+///
+/// Used by desktop drag-and-drop so the same size and MIME rules apply as
+/// the file-picker path.
+Future<PickedTransfer?> loadTransferFileFromPath(String path) async {
+  try {
+    final file = File(path);
+    if (!await file.exists()) {
+      throw StateError('文件不存在。');
+    }
+    final length = await file.length();
+    if (length > maxTransferBytes) {
+      throw StateError('文件不能超过 64 MB。');
+    }
+    final bytes = await file.readAsBytes();
+    if (bytes.length > maxTransferBytes) {
+      throw StateError('文件不能超过 64 MB。');
+    }
+    final name = safeStorageFileName(p.basename(path));
+    return PickedTransfer(
+      name: name,
+      bytes: bytes,
+      mimeType: guessMimeType(name),
+      sourcePath: path,
+    );
+  } catch (error) {
+    throw _userError(error, fallback: '无法读取拖入的文件，请重试。');
+  }
+}
+
 Future<StoredTransfer> saveReceivedFile(
   TransferFile file, {
   Directory? baseDirectory,

@@ -24,10 +24,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get modeReliable => '可靠';
 
   @override
-  String get modeTurboQr => 'Turbo QR（实验）';
+  String get modeTurboQr => 'Turbo QR';
 
   @override
-  String get modeCimbar => 'CIMBAR 彩色视觉码（实验）';
+  String get modeCimbar => '彩色视觉码';
+
+  @override
+  String get modeQr => 'QR 视觉码';
 
   @override
   String get compatibilityMode => '兼容';
@@ -168,10 +171,10 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get settingsIntroTitle => '让之后的传输按你的设备来。';
+  String get settingsIntroTitle => '应用设置';
 
   @override
-  String get settingsIntroBody => '默认模式用于之后的新建发送。';
+  String get settingsIntroBody => '传输模式请在发送页选择。';
 
   @override
   String get transportSection => '传输';
@@ -311,6 +314,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String newTransferStatus(Object mode, Object speed) {
     return '新传输默认使用$mode模式 · 理论码流约 $speed';
   }
+
+  @override
+  String get transferModeLabel => '传输模式';
+
+  @override
+  String get dropFilesHint => '也可以把文件拖到这里';
+
+  @override
+  String get dropFilesActive => '松手即可发送';
 
   @override
   String get reading => '读取中…';
@@ -807,10 +819,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get modeReliable => '可靠';
 
   @override
-  String get modeTurboQr => 'Turbo QR（实验）';
+  String get modeTurboQr => 'Turbo QR';
 
   @override
-  String get modeCimbar => 'CIMBAR 彩色视觉码（实验）';
+  String get modeCimbar => '彩色视觉码';
+
+  @override
+  String get modeQr => 'QR 视觉码';
 
   @override
   String get compatibilityMode => '兼容';
@@ -951,10 +966,10 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   }
 
   @override
-  String get settingsIntroTitle => '让之后的传输按你的设备来。';
+  String get settingsIntroTitle => '应用设置';
 
   @override
-  String get settingsIntroBody => '默认模式用于之后的新建发送。';
+  String get settingsIntroBody => '传输模式请在发送页选择。';
 
   @override
   String get transportSection => '传输';
@@ -1094,6 +1109,15 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String newTransferStatus(Object mode, Object speed) {
     return '新传输默认使用$mode模式 · 理论码流约 $speed';
   }
+
+  @override
+  String get transferModeLabel => '传输模式';
+
+  @override
+  String get dropFilesHint => '也可以把文件拖到这里';
+
+  @override
+  String get dropFilesActive => '松手即可发送';
 
   @override
   String get reading => '读取中…';
@@ -1590,10 +1614,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get modeReliable => '可靠';
 
   @override
-  String get modeTurboQr => 'Turbo QR（實驗性）';
+  String get modeTurboQr => 'Turbo QR';
 
   @override
-  String get modeCimbar => 'CIMBAR 彩色視覺碼（實驗性）';
+  String get modeCimbar => '彩色視覺碼';
+
+  @override
+  String get modeQr => 'QR 視覺碼';
 
   @override
   String get compatibilityMode => '相容性';
@@ -1739,10 +1766,10 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   }
 
   @override
-  String get settingsIntroTitle => '將下一次傳輸調整至適合你的裝置。';
+  String get settingsIntroTitle => '應用設定';
 
   @override
-  String get settingsIntroBody => '新的傳送會使用預設模式。';
+  String get settingsIntroBody => '傳輸模式請在傳送頁選擇。';
 
   @override
   String get transportSection => '傳輸';
@@ -1882,6 +1909,15 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String newTransferStatus(Object mode, Object speed) {
     return '新的傳送會使用 $mode 模式 · 理論速率約 $speed';
   }
+
+  @override
+  String get transferModeLabel => '傳輸模式';
+
+  @override
+  String get dropFilesHint => '也可以把檔案拖到這裡';
+
+  @override
+  String get dropFilesActive => '放開即可傳送';
 
   @override
   String get reading => '讀取中…';

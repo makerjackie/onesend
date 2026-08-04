@@ -46,22 +46,34 @@ enum _CimbarStatus {
   requestingCamera,
 }
 
-/// Standalone libcimbar 0.6.7c mobile experiment.
+/// libcimbar 0.6.7c experiment embedded in the shared send/receive flow.
+///
+/// When [embedded] is true the parent route owns the app bar / mode switcher
+/// and this widget only renders the WebView + status panel.
 class CimbarTransferScreen extends StatefulWidget {
   const CimbarTransferScreen({
     required this.direction,
     required this.store,
+    this.embedded = false,
+    this.autoStartReceive = true,
     super.key,
   });
 
   final CimbarDirection direction;
   final TransferStore store;
 
+  /// Hide the standalone scaffold so send/receive can host this panel.
+  final bool embedded;
+
+  /// Start the camera as soon as the receive engine is ready (no extra tap).
+  final bool autoStartReceive;
+
   @override
   State<CimbarTransferScreen> createState() => _CimbarTransferScreenState();
 }
 
-class _CimbarTransferScreenState extends State<CimbarTransferScreen> {
+class _CimbarTransferScreenState extends State<CimbarTransferScreen>
+    with WidgetsBindingObserver {
   final CimbarBridge _bridge = CimbarBridge();
   WebViewController? _controller;
   Stopwatch? _receiveStopwatch;
@@ -75,6 +87,7 @@ class _CimbarTransferScreenState extends State<CimbarTransferScreen> {
   bool _pageReady = false;
   bool _sendPaused = false;
   bool _receiveStarted = false;
+  bool _receivePaused = false;
   bool _saving = false;
   bool _sendHistoryWritten = false;
   double? _decodeProgress;
@@ -90,6 +103,7 @@ class _CimbarTransferScreenState extends State<CimbarTransferScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     if (_supportedPlatform) {
       unawaited(_initializeWebView());
     }
@@ -97,6 +111,7 @@ class _CimbarTransferScreenState extends State<CimbarTransferScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     // Do not call a state-updating async helper from dispose. The JavaScript
     // cleanup is deliberately fire-and-forget and does not touch Flutter
     // state, so camera tracks and workers are still stopped during teardown.
@@ -108,6 +123,25 @@ class _CimbarTransferScreenState extends State<CimbarTransferScreen> {
       unawaited(_cleanupWebView(controller, stopAll: true));
     }
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.inactive &&
+        state != AppLifecycleState.paused &&
+        state != AppLifecycleState.detached &&
+        state != AppLifecycleState.hidden) {
+      return;
+    }
+    if (_isSending) {
+      if (!_sendPaused &&
+          (_status == _CimbarStatus.playing ||
+              _status == _CimbarStatus.broadcasting)) {
+        _toggleSendPause(true);
+      }
+    } else if (_receiveStarted && !_saving) {
+      unawaited(_pauseReceive());
+    }
   }
 
   Future<void> _initializeWebView() async {
@@ -187,6 +221,12 @@ class _CimbarTransferScreenState extends State<CimbarTransferScreen> {
         request.types.length == 1 &&
         request.types.contains(WebViewPermissionResourceType.camera);
     final allow = !_isSending && cameraOnly;
+    if (!allow && !_isSending) {
+      _setState(() {
+        _error = _l10n.cimbarCameraError;
+        _status = _CimbarStatus.transferFailed;
+      });
+    }
     unawaited(allow ? request.grant() : request.deny());
   }
 
@@ -258,11 +298,16 @@ class _CimbarTransferScreenState extends State<CimbarTransferScreen> {
         unawaited(_recordSendHistory());
       case 'receive-ready':
         if (_isSending) return;
+        final shouldAutoStart =
+            widget.autoStartReceive && !_receiveStarted && !_saving;
         _setState(() {
           _status = _receiveStarted
               ? _CimbarStatus.decoderReady
               : _CimbarStatus.decoderReadyStart;
         });
+        if (shouldAutoStart) {
+          unawaited(_startReceive());
+        }
       case 'receive-started':
         if (_isSending) return;
         _receiveStopwatch?.stop();
@@ -344,11 +389,7 @@ class _CimbarTransferScreenState extends State<CimbarTransferScreen> {
         final phase = event.stringValue('phase');
         final detail = event.stringValue('message') ?? 'unknown error';
         debugPrint('[OneSend CIMBAR] ${phase ?? 'engine'}: $detail');
-        var userMessage = _localizedBridgeError(phase);
-        assert(() {
-          userMessage = '$userMessage\n[$phase] $detail';
-          return true;
-        }());
+        final userMessage = _localizedBridgeError(phase);
         _handleBridgeFailure(userMessage);
     }
   }
@@ -373,6 +414,7 @@ class _CimbarTransferScreenState extends State<CimbarTransferScreen> {
       _error = _l10n.cimbarFileTooLarge(_maxSizeLabel(_l10n));
       _status = _CimbarStatus.transferFailed;
       _receiveStarted = false;
+      _receivePaused = false;
       _saving = false;
       _receivedBytes = 0;
       _expectedBytes = null;
@@ -389,6 +431,7 @@ class _CimbarTransferScreenState extends State<CimbarTransferScreen> {
       _error = message;
       _status = _CimbarStatus.transferFailed;
       _receiveStarted = false;
+      _receivePaused = false;
       _saving = false;
       _receivedBytes = 0;
       _expectedBytes = null;
@@ -513,10 +556,21 @@ class _CimbarTransferScreenState extends State<CimbarTransferScreen> {
     await _stopReceiveResources();
     _setState(() {
       _receiveStarted = true;
+      _receivePaused = false;
       _status = _CimbarStatus.requestingCamera;
       _error = null;
     });
     unawaited(_runWebViewScript('OneSendCimbar.startReceive();'));
+  }
+
+  Future<void> _pauseReceive() async {
+    if (_isSending || !_receiveStarted || _saving) return;
+    await _stopReceiveResources();
+    _setState(() {
+      _receiveStarted = false;
+      _receivePaused = true;
+      _status = _CimbarStatus.decoderReady;
+    });
   }
 
   void _chooseSendFile() {
@@ -572,6 +626,7 @@ class _CimbarTransferScreenState extends State<CimbarTransferScreen> {
       _receivedFile = null;
       _storedFile = null;
       _receiveStarted = false;
+      _receivePaused = false;
       _sendPaused = false;
       _pageReady = false;
       _status = _CimbarStatus.reloading;
@@ -614,22 +669,24 @@ class _CimbarTransferScreenState extends State<CimbarTransferScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = _l10n;
+    final body = !_supportedPlatform
+        ? _buildUnsupported(l10n)
+        : Column(
+            children: [
+              Expanded(child: _buildWebView()),
+              _buildStatusPanel(l10n),
+            ],
+          );
+    if (widget.embedded) {
+      return body;
+    }
     return Scaffold(
       appBar: AppBar(
         title: Text(
           _isSending ? l10n.cimbarSendTitle : l10n.cimbarReceiveTitle,
         ),
       ),
-      body: SafeArea(
-        child: !_supportedPlatform
-            ? _buildUnsupported(l10n)
-            : Column(
-                children: [
-                  Expanded(child: _buildWebView()),
-                  _buildStatusPanel(l10n),
-                ],
-              ),
-      ),
+      body: SafeArea(child: body),
     );
   }
 
@@ -725,8 +782,23 @@ class _CimbarTransferScreenState extends State<CimbarTransferScreen> {
                 if (_decodeProgress != null && progress == null)
                   LinearProgressIndicator(value: _decodeProgress),
                 Text(
+                  l10n.currentRate(formatTransferSpeed(measuredSpeed * 1000)),
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                Text(
                   l10n.cimbarReceiveRate(measuredSpeed.toStringAsFixed(1)),
                   style: theme.textTheme.bodySmall,
+                ),
+              ],
+              if (_isSending && _status == _CimbarStatus.broadcasting) ...[
+                const SizedBox(height: 6),
+                Text(
+                  l10n.theoreticalRate(formatTransferSpeed(106 * 1000)),
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
               ],
               if (_error != null) ...[
@@ -753,25 +825,40 @@ class _CimbarTransferScreenState extends State<CimbarTransferScreen> {
                       icon: const Icon(Icons.attach_file_rounded),
                       label: Text(l10n.chooseFile),
                     ),
-                    OutlinedButton(
-                      onPressed: _pageReady
-                          ? () => _toggleSendPause(true)
-                          : null,
-                      child: Text(l10n.pause),
-                    ),
-                    FilledButton(
-                      onPressed: _pageReady
-                          ? () => _toggleSendPause(false)
-                          : null,
-                      child: Text(l10n.resume),
-                    ),
+                    if (_error == null &&
+                        (_status == _CimbarStatus.playing ||
+                            _status == _CimbarStatus.broadcasting ||
+                            _status == _CimbarStatus.paused))
+                      OutlinedButton.icon(
+                        onPressed: _pageReady
+                            ? () => _toggleSendPause(!_sendPaused)
+                            : null,
+                        icon: Icon(
+                          _sendPaused
+                              ? Icons.play_arrow_rounded
+                              : Icons.pause_rounded,
+                        ),
+                        label: Text(_sendPaused ? l10n.resume : l10n.pause),
+                      ),
                   ] else ...[
-                    FilledButton(
-                      onPressed: _pageReady && !_receiveStarted && !_saving
-                          ? _startReceive
-                          : null,
-                      child: Text(l10n.cimbarStartReceive),
-                    ),
+                    if (_storedFile == null && !_saving)
+                      FilledButton.icon(
+                        onPressed: _pageReady
+                            ? (_receiveStarted ? _pauseReceive : _startReceive)
+                            : null,
+                        icon: Icon(
+                          _receiveStarted
+                              ? Icons.pause_rounded
+                              : Icons.play_arrow_rounded,
+                        ),
+                        label: Text(
+                          _receiveStarted
+                              ? l10n.pause
+                              : _receivePaused
+                              ? l10n.resume
+                              : l10n.cimbarStartReceive,
+                        ),
+                      ),
                   ],
                   if (_error != null)
                     OutlinedButton(

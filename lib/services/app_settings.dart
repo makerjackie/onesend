@@ -72,6 +72,7 @@ class AppSettings extends ChangeNotifier {
   TransferMode _transferMode;
   TransferAlgorithm _transferAlgorithm;
   String? _localeTag;
+  Future<void> _transferWriteTail = Future<void>.value();
 
   /// Loads settings from [preferences], or from the platform preferences.
   static Future<AppSettings> load({SharedPreferences? preferences}) async {
@@ -104,7 +105,7 @@ class AppSettings extends ChangeNotifier {
   /// The in-memory value is updated immediately so listening screens respond
   /// without waiting on platform I/O. If persistence fails, the previous mode
   /// is restored and the error is rethrown for the caller to surface.
-  Future<void> setTransferMode(TransferMode mode) async {
+  Future<void> setTransferMode(TransferMode mode) {
     final previousMode = _transferMode;
     final changed = previousMode != mode;
     if (changed) {
@@ -114,11 +115,12 @@ class AppSettings extends ChangeNotifier {
 
     final preferences = _preferences;
     if (preferences == null ||
-        preferences.getInt(transferModePreferenceKey) == mode.id) {
-      return;
+        (!changed &&
+            preferences.getInt(transferModePreferenceKey) == mode.id)) {
+      return Future<void>.value();
     }
 
-    try {
+    final operation = _enqueueTransferWrite(() async {
       final persisted = await preferences.setInt(
         transferModePreferenceKey,
         mode.id,
@@ -126,13 +128,14 @@ class AppSettings extends ChangeNotifier {
       if (!persisted) {
         throw StateError('无法保存默认传输模式。');
       }
-    } catch (_) {
+    });
+    return operation.catchError((Object error, StackTrace stackTrace) {
       if (changed && _transferMode == mode) {
         _transferMode = previousMode;
         notifyListeners();
       }
-      rethrow;
-    }
+      Error.throwWithStackTrace(error, stackTrace);
+    });
   }
 
   /// More explicit alias for integrations that call the setting a default.
@@ -142,7 +145,7 @@ class AppSettings extends ChangeNotifier {
   ///
   /// QR remains the default even when no preference store is available. A
   /// failed write restores the in-memory value, matching [setTransferMode].
-  Future<void> setTransferAlgorithm(TransferAlgorithm algorithm) async {
+  Future<void> setTransferAlgorithm(TransferAlgorithm algorithm) {
     final previousAlgorithm = _transferAlgorithm;
     final changed = previousAlgorithm != algorithm;
     if (changed) {
@@ -152,11 +155,13 @@ class AppSettings extends ChangeNotifier {
 
     final preferences = _preferences;
     if (preferences == null ||
-        preferences.getInt(transferAlgorithmPreferenceKey) == algorithm.id) {
-      return;
+        (!changed &&
+            preferences.getInt(transferAlgorithmPreferenceKey) ==
+                algorithm.id)) {
+      return Future<void>.value();
     }
 
-    try {
+    final operation = _enqueueTransferWrite(() async {
       final persisted = await preferences.setInt(
         transferAlgorithmPreferenceKey,
         algorithm.id,
@@ -164,13 +169,14 @@ class AppSettings extends ChangeNotifier {
       if (!persisted) {
         throw StateError('无法保存默认传输算法。');
       }
-    } catch (_) {
+    });
+    return operation.catchError((Object error, StackTrace stackTrace) {
       if (changed && _transferAlgorithm == algorithm) {
         _transferAlgorithm = previousAlgorithm;
         notifyListeners();
       }
-      rethrow;
-    }
+      Error.throwWithStackTrace(error, stackTrace);
+    });
   }
 
   Future<void> setDefaultAlgorithm(TransferAlgorithm algorithm) =>
@@ -216,6 +222,14 @@ class AppSettings extends ChangeNotifier {
   }
 
   Future<void> setLocale(String? localeTag) => setLocaleTag(localeTag);
+
+  Future<void> _enqueueTransferWrite(Future<void> Function() write) {
+    final operation = _transferWriteTail.then<void>((_) => write());
+    // A failed write must not poison later user selections. The individual
+    // operation still reports the original error to its caller.
+    _transferWriteTail = operation.then<void>((_) {}, onError: (_, _) {});
+    return operation;
+  }
 
   static String? _validateLocaleTag(String? localeTag) {
     if (localeTag == null) {

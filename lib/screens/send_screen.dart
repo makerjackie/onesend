@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
-import 'dart:typed_data';
-
+import 'package:desktop_drop/desktop_drop.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
@@ -17,6 +17,8 @@ import '../services/sample_file_service.dart';
 import '../services/transfer_store.dart';
 import '../widgets/file_tile.dart';
 import '../widgets/optical_qr.dart';
+import '../widgets/transfer_mode_selector.dart';
+import 'cimbar_transfer_screen.dart';
 
 class SendScreen extends StatefulWidget {
   const SendScreen({required this.store, this.settings, super.key});
@@ -29,7 +31,7 @@ class SendScreen extends StatefulWidget {
 }
 
 class _SendScreenState extends State<SendScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   _SendingFile? _file;
   OpticalSender? _sender;
   late final Ticker _playbackTicker;
@@ -39,21 +41,52 @@ class _SendScreenState extends State<SendScreen>
   DateTime? _startedAt;
   String? _error;
   bool _preparing = false;
+  bool _dragging = false;
   late TransferMode _mode;
+  late TransferAlgorithm _algorithm;
+
+  bool get _supportsDesktopDrop =>
+      !kIsWeb &&
+      (defaultTargetPlatform == TargetPlatform.macOS ||
+          defaultTargetPlatform == TargetPlatform.windows ||
+          defaultTargetPlatform == TargetPlatform.linux);
+
+  bool get _usesCimbar => _algorithm == TransferAlgorithm.cimbar;
 
   @override
   void initState() {
     super.initState();
     _mode = widget.settings?.defaultMode ?? AppSettings.defaultTransferMode;
+    _algorithm =
+        widget.settings?.transferAlgorithm ??
+        AppSettings.defaultTransferAlgorithm;
     _playbackTicker = createTicker(_onPlaybackTick);
+    WidgetsBinding.instance.addObserver(this);
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _playbackTicker.dispose();
     _sender?.dispose();
     unawaited(_disableWakelock());
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.inactive &&
+        state != AppLifecycleState.paused &&
+        state != AppLifecycleState.detached &&
+        state != AppLifecycleState.hidden) {
+      return;
+    }
+    final sender = _sender;
+    if (sender == null || sender.isPaused) return;
+    _playbackTicker.stop();
+    sender.pause();
+    unawaited(_disableWakelock());
+    if (mounted) setState(() {});
   }
 
   Future<void> _pickFile() async {
@@ -64,6 +97,64 @@ class _SendScreenState extends State<SendScreen>
   Future<void> _sendSampleVideo() async {
     if (_preparing) return;
     await _preparePickedFile(loadSampleVideo);
+  }
+
+  Future<void> _handleDroppedFiles(DropDoneDetails details) async {
+    if (_preparing || _file != null) return;
+    setState(() => _dragging = false);
+    final paths = details.files
+        .map((file) => file.path)
+        .where((path) => path.isNotEmpty)
+        .toList(growable: false);
+    if (paths.isEmpty) return;
+    await _preparePickedFile(() => loadTransferFileFromPath(paths.first));
+  }
+
+  Future<void> _selectMode(TransferMode mode) async {
+    if (_preparing || _file != null) return;
+    if (_algorithm == TransferAlgorithm.qr && _mode == mode) return;
+    setState(() {
+      _algorithm = TransferAlgorithm.qr;
+      _mode = mode;
+    });
+    final settings = widget.settings;
+    if (settings == null) return;
+    try {
+      if (settings.transferAlgorithm != TransferAlgorithm.qr) {
+        await settings.setDefaultAlgorithm(TransferAlgorithm.qr);
+      }
+      if (settings.defaultMode != mode) {
+        await settings.setDefaultMode(mode);
+      }
+    } catch (_) {
+      // Mode still applies to this send even if persistence fails.
+    }
+  }
+
+  Future<void> _selectCimbar() async {
+    if (_preparing || _file != null) return;
+    if (_algorithm == TransferAlgorithm.cimbar) return;
+    setState(() => _algorithm = TransferAlgorithm.cimbar);
+    final settings = widget.settings;
+    if (settings == null) return;
+    try {
+      if (settings.transferAlgorithm != TransferAlgorithm.cimbar) {
+        await settings.setDefaultAlgorithm(TransferAlgorithm.cimbar);
+      }
+    } catch (_) {
+      // Preference persistence is best effort.
+    }
+  }
+
+  Widget _buildModeChips({required bool enabled}) {
+    return TransferModeSelector(
+      algorithm: _algorithm,
+      mode: _mode,
+      enabled: enabled,
+      keyPrefix: 'send-mode',
+      onQrModeSelected: (mode) => unawaited(_selectMode(mode)),
+      onCimbarSelected: () => unawaited(_selectCimbar()),
+    );
   }
 
   Future<void> _preparePickedFile(
@@ -203,13 +294,42 @@ class _SendScreenState extends State<SendScreen>
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    if (_usesCimbar) {
+      return Scaffold(
+        appBar: AppBar(title: Text(l10n.sendFile)),
+        body: SafeArea(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [_buildModeChips(enabled: true)],
+                ),
+              ),
+              const Divider(height: 1),
+              Expanded(
+                child: CimbarTransferScreen(
+                  key: const ValueKey<String>('send-cimbar-panel'),
+                  direction: CimbarDirection.send,
+                  store: widget.store,
+                  embedded: true,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: Text(l10n.sendFile),
         actions: [
           IconButton(
             tooltip: l10n.chooseOtherFile,
-            onPressed: _preparing ? null : _pickFile,
+            onPressed: _preparing || _file != null ? null : _pickFile,
             icon: const Icon(Icons.attach_file_rounded),
           ),
         ],
@@ -222,91 +342,112 @@ class _SendScreenState extends State<SendScreen>
 
   Widget _buildPicker() {
     final l10n = AppLocalizations.of(context)!;
-    final theoretical = formatTransferSpeed(_mode.usefulBytesPerSecond);
-    return Center(
+    final content = Card(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 120),
+        decoration: BoxDecoration(
+          borderRadius: const BorderRadius.all(Radius.circular(6)),
+          color: _dragging ? const Color(0xffeef6d4) : Colors.white,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(
+                  color: oneSendLime,
+                  border: Border.all(color: oneSendInk, width: 2),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Icon(
+                  _dragging
+                      ? Icons.file_download_rounded
+                      : Icons.upload_file_rounded,
+                  size: 34,
+                ),
+              ),
+              const SizedBox(height: 18),
+              Text(
+                l10n.chooseAFile,
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                l10n.sendFileDescription(formatBytes(maxTransferBytes)),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 18),
+              _buildModeChips(enabled: !_preparing),
+              if (_supportsDesktopDrop) ...[
+                const SizedBox(height: 14),
+                Text(
+                  _dragging ? l10n.dropFilesActive : l10n.dropFilesHint,
+                  textAlign: TextAlign.center,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(color: oneSendMuted),
+                ),
+              ],
+              if (_error != null) ...[
+                const SizedBox(height: 14),
+                _ErrorText(message: _error!),
+              ],
+              const SizedBox(height: 18),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  key: const ValueKey<String>('send-pick-file'),
+                  onPressed: _preparing ? null : _pickFile,
+                  icon: _preparing
+                      ? const SizedBox.square(
+                          dimension: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.folder_open_rounded),
+                  label: Text(_preparing ? l10n.reading : l10n.chooseFile),
+                ),
+              ),
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  key: const ValueKey<String>('send-sample-video'),
+                  onPressed: _preparing ? null : _sendSampleVideo,
+                  icon: const Icon(Icons.movie_outlined),
+                  label: Text(l10n.sampleVideo),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    final body = Center(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 520),
-          child: Card(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 72,
-                    height: 72,
-                    decoration: BoxDecoration(
-                      color: oneSendLime,
-                      border: Border.all(color: oneSendInk, width: 2),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: const Icon(Icons.upload_file_rounded, size: 34),
-                  ),
-                  const SizedBox(height: 18),
-                  Text(
-                    l10n.chooseAFile,
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    l10n.sendFileDescription(formatBytes(maxTransferBytes)),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 16),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xffeef0e9),
-                      border: Border.all(color: oneSendInk, width: 2),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      l10n.newTransferStatus(
-                        _localizedModeLabel(l10n, _mode),
-                        theoretical,
-                      ),
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(fontWeight: FontWeight.w700),
-                    ),
-                  ),
-                  if (_error != null) ...[
-                    const SizedBox(height: 14),
-                    _ErrorText(message: _error!),
-                  ],
-                  const SizedBox(height: 18),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton.icon(
-                      key: const ValueKey<String>('send-pick-file'),
-                      onPressed: _preparing ? null : _pickFile,
-                      icon: _preparing
-                          ? const SizedBox.square(
-                              dimension: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.folder_open_rounded),
-                      label: Text(_preparing ? l10n.reading : l10n.chooseFile),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      key: const ValueKey<String>('send-sample-video'),
-                      onPressed: _preparing ? null : _sendSampleVideo,
-                      icon: const Icon(Icons.movie_outlined),
-                      label: Text(l10n.sampleVideo),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
+          child: content,
         ),
       ),
+    );
+
+    if (!_supportsDesktopDrop) return body;
+
+    return DropTarget(
+      enable: !_preparing && _file == null,
+      onDragEntered: (_) {
+        if (mounted) setState(() => _dragging = true);
+      },
+      onDragExited: (_) {
+        if (mounted) setState(() => _dragging = false);
+      },
+      onDragDone: (details) => unawaited(_handleDroppedFiles(details)),
+      child: body,
     );
   }
 
@@ -421,12 +562,27 @@ class _SendScreenState extends State<SendScreen>
                               ),
                             ],
                           ),
-                          const SizedBox(height: 10),
+                          const SizedBox(height: 12),
                           Align(
                             alignment: Alignment.centerLeft,
                             child: Text(
-                              '${l10n.theoreticalRate(formatTransferSpeed(_mode.usefulBytesPerSecond))} · '
-                              '${l10n.currentRate(formatTransferSpeed(currentRate))}',
+                              l10n.currentRate(
+                                formatTransferSpeed(currentRate),
+                              ),
+                              style: const TextStyle(
+                                color: oneSendInk,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              l10n.theoreticalRate(
+                                formatTransferSpeed(_mode.usefulBytesPerSecond),
+                              ),
                               style: const TextStyle(
                                 color: oneSendMuted,
                                 fontWeight: FontWeight.w700,
@@ -447,17 +603,18 @@ class _SendScreenState extends State<SendScreen>
                     spacing: 10,
                     runSpacing: 10,
                     children: [
-                      OutlinedButton.icon(
-                        onPressed: sender == null ? null : _togglePause,
-                        icon: Icon(
-                          sender?.isPaused == true
-                              ? Icons.play_arrow_rounded
-                              : Icons.pause_rounded,
+                      if (sender != null && _error == null)
+                        OutlinedButton.icon(
+                          onPressed: _togglePause,
+                          icon: Icon(
+                            sender.isPaused
+                                ? Icons.play_arrow_rounded
+                                : Icons.pause_rounded,
+                          ),
+                          label: Text(
+                            sender.isPaused ? l10n.resume : l10n.pause,
+                          ),
                         ),
-                        label: Text(
-                          sender?.isPaused == true ? l10n.resume : l10n.pause,
-                        ),
-                      ),
                       FilledButton.icon(
                         onPressed: _endTransfer,
                         icon: const Icon(Icons.stop_rounded),

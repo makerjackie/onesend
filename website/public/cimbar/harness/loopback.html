@@ -180,8 +180,8 @@
         const offscreen = senderCanvas.transferControlToOffscreen();
         sender.postMessage({ fun: "init_window", args: [offscreen] }, [offscreen]);
         await Promise.all([senderReady, receiverReady]);
-        sender.postMessage({ fun: "setMode", args: [68] });
-        sender.postMessage({ fun: "setFPS", args: [15] });
+        sender.postMessage({ fun: "setMode", args: [67] }); // mode Bm
+        sender.postMessage({ fun: "setFPS", args: [3] });
         sender.postMessage({
           type: "load",
           file: new File([sourceBytes], sourceName, { type: "application/octet-stream" }),

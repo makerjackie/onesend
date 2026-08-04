@@ -175,3 +175,48 @@ test("keeps reliable mode readable with systematic and repair frames", async () 
   const file = await decodeTransferFile(completed.payload);
   assert.deepEqual(file.bytes, original);
 });
+
+test("accepts turbo frames (blockLength 2921) and rateless recovery", async () => {
+  const original = bytesOf(12_000, 55);
+  const envelope = encodeTransferFile({
+    name: "turbo.bin",
+    mimeType: "application/octet-stream",
+    bytes: original,
+  });
+  const sender = new OpticalSender(envelope, "turbo", 0x55aa55aa);
+  assert.equal(sender.usesRatelessFountain, true);
+  assert.ok(sender.mode.blockLength > 2048);
+
+  const receiver = new OpticalReceiver();
+  let completed = null;
+  for (let index = 0; index < sender.blockCount * 8 && !completed; index += 1) {
+    const event = receiver.consume(sender.nextFrame().bytes);
+    assert.ok(event, "turbo frame must not be rejected by block-length limit");
+    if (event?.payload) completed = event;
+  }
+  assert.ok(completed?.verified);
+  const file = await decodeTransferFile(completed.payload);
+  assert.deepEqual(file.bytes, original);
+});
+
+test("extractScannerFrame recovers Latin-1 text when BYTE_SEGMENTS missing", () => {
+  const sender = new OpticalSender(
+    encodeTransferFile({
+      name: "latin1.bin",
+      mimeType: "application/octet-stream",
+      bytes: bytesOf(120, 3),
+    }),
+    "reliable",
+    0xabcdef01,
+  );
+  const frame = sender.nextFrame().bytes;
+  const text = Array.from(frame, (byte) => String.fromCharCode(byte)).join("");
+  assert.deepEqual(
+    extractScannerFrame({
+      getResultMetadata: () => new Map(),
+      getText: () => text,
+      getRawBytes: () => new Uint8Array(0),
+    }),
+    frame,
+  );
+});

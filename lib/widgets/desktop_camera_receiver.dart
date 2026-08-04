@@ -7,6 +7,8 @@ import 'package:camera_desktop/camera_desktop.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_zxing/flutter_zxing.dart' as zxing;
 
+import '../l10n/generated/app_localizations.dart';
+
 class DesktopCameraReceiver extends StatefulWidget {
   const DesktopCameraReceiver({
     required this.onFrame,
@@ -76,8 +78,8 @@ class _DesktopCameraReceiverState extends State<DesktopCameraReceiver> {
       }
       setState(() => _controller = controller);
       if (widget.enabled) await _startStream();
-    } catch (error) {
-      if (mounted) setState(() => _error = error.toString());
+    } catch (_) {
+      if (mounted) setState(() => _error = _cameraError());
     }
   }
 
@@ -93,8 +95,8 @@ class _DesktopCameraReceiverState extends State<DesktopCameraReceiver> {
     try {
       await controller.startImageStream(_onCameraImage);
       _streaming = true;
-    } catch (error) {
-      if (mounted) setState(() => _error = error.toString());
+    } catch (_) {
+      if (mounted) setState(() => _error = _cameraError());
     }
   }
 
@@ -116,6 +118,11 @@ class _DesktopCameraReceiverState extends State<DesktopCameraReceiver> {
     if (!mounted || !widget.enabled || _processingFrame) return;
     _processingFrame = true;
     unawaited(_decodeFrame(image));
+  }
+
+  String _cameraError() {
+    return AppLocalizations.of(context)?.cimbarCameraError ??
+        'Camera access or decoding failed. Check permission and try again.';
   }
 
   Future<void> _decodeFrame(CameraImage image) async {

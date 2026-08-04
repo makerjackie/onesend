@@ -9,9 +9,53 @@ const double _solitonC = 0.1;
 const double _solitonDelta = 0.5;
 const int sourceFramesPerGroup = 4;
 const int framesPerGroup = sourceFramesPerGroup + 1;
+// Keep decoder allocations bounded even when a caller constructs an FEC
+// session before it reaches the protocol-level receiver guards.
+const int maxFountainBlockCount = 110000;
 const int _maximumRepairDegree = 64;
 const int _seenSequenceWindow = 4096;
 const int _maximumPendingFrameLimit = 8192;
+
+int _validateFountainBlockCount(int value) {
+  if (value <= 0 || value > maxFountainBlockCount) {
+    throw ArgumentError.value(value, 'blockCount');
+  }
+  return value;
+}
+
+int _validateFountainBlockLength(int value) {
+  if (value <= 0 || value > 0xffff) {
+    throw ArgumentError.value(value, 'blockLength');
+  }
+  return value;
+}
+
+int _validateFountainSessionId(int value, {bool allowZero = false}) {
+  if ((allowZero ? value < 0 : value <= 0) || value > 0xffffffff) {
+    throw ArgumentError.value(value, 'sessionId');
+  }
+  return value;
+}
+
+int _validateFountainTotalLength(
+  int totalLength,
+  int blockCount,
+  int blockLength,
+) {
+  if (totalLength <= 0 || totalLength > 0xffffffff) {
+    throw ArgumentError.value(totalLength, 'totalLength');
+  }
+  final minimumLength = (blockCount - 1) * blockLength + 1;
+  final maximumLength = blockCount * blockLength;
+  if (totalLength < minimumLength || totalLength > maximumLength) {
+    throw ArgumentError.value(
+      totalLength,
+      'totalLength',
+      'must fit within the declared fountain geometry',
+    );
+  }
+  return totalLength;
+}
 
 bool isRepairSequence(int sequence) =>
     sequence % framesPerGroup == sourceFramesPerGroup;
@@ -181,6 +225,11 @@ class LTEncoder {
     if (blockLength <= 0 || blockLength > 0xffff) {
       throw ArgumentError.value(blockLength, 'blockLength');
     }
+    _validateFountainBlockCount(blockCount);
+    _validateFountainSessionId(
+      sessionId,
+      allowZero: protocolVersion < currentProtocolVersion,
+    );
     _cdf = _solitonCdf(blockCount);
   }
 
@@ -228,7 +277,36 @@ class _PendingFrame {
 }
 
 class LTDecoder {
-  LTDecoder({
+  factory LTDecoder({
+    required int blockCount,
+    required int blockLength,
+    required int sessionId,
+    required int totalLength,
+    int protocolVersion = currentProtocolVersion,
+    bool? systematicFrames,
+  }) {
+    final validatedBlockCount = _validateFountainBlockCount(blockCount);
+    final validatedBlockLength = _validateFountainBlockLength(blockLength);
+    final validatedSessionId = _validateFountainSessionId(
+      sessionId,
+      allowZero: protocolVersion < currentProtocolVersion,
+    );
+    final validatedTotalLength = _validateFountainTotalLength(
+      totalLength,
+      validatedBlockCount,
+      validatedBlockLength,
+    );
+    return LTDecoder._(
+      blockCount: validatedBlockCount,
+      blockLength: validatedBlockLength,
+      sessionId: validatedSessionId,
+      totalLength: validatedTotalLength,
+      protocolVersion: protocolVersion,
+      systematicFrames: systematicFrames,
+    );
+  }
+
+  LTDecoder._({
     required this.blockCount,
     required this.blockLength,
     required this.sessionId,
