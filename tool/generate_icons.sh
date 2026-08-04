@@ -156,9 +156,32 @@ CHECK_FILES=(
   windows/runner/resources/app_icon.ico
 )
 
+pixel_signature_manifest() {
+  local image="$1"
+
+  # Normalize decoded frames before hashing so container encoding, compression,
+  # and metadata differences do not look like visual drift. The frame index and
+  # dimensions make multi-frame ICO comparisons explicit and order-sensitive.
+  "$MAGICK_BIN" "$image" -alpha on -colorspace sRGB -depth 8 \
+    -format '%p|%w|%h|%#\n' info:
+}
+
+print_signature_manifest() {
+  local label="$1"
+  local manifest="$2"
+  local line
+
+  echo "  $label frame signatures:" >&2
+  while IFS= read -r line; do
+    echo "    $line" >&2
+  done <<< "$manifest"
+}
+
 check_outputs() {
   local expected_root="$1"
   local actual_root="$2"
+  local expected_signatures
+  local actual_signatures
   local relative
   local failed=0
 
@@ -166,8 +189,32 @@ check_outputs() {
     if [[ ! -f "$actual_root/$relative" ]]; then
       echo "Missing brand asset: $relative" >&2
       failed=1
-    elif ! cmp -s "$expected_root/$relative" "$actual_root/$relative"; then
-      echo "Brand asset drift: $relative" >&2
+      continue
+    fi
+
+    if [[ "$relative" == "website/public/favicon.svg" ]]; then
+      if ! cmp -s "$expected_root/$relative" "$actual_root/$relative"; then
+        echo "Brand asset byte drift: $relative (must match the canonical SVG)" >&2
+        failed=1
+      fi
+      continue
+    fi
+
+    if ! expected_signatures="$(pixel_signature_manifest "$expected_root/$relative")"; then
+      echo "Failed to decode generated brand asset: $relative" >&2
+      failed=1
+      continue
+    fi
+    if ! actual_signatures="$(pixel_signature_manifest "$actual_root/$relative")"; then
+      echo "Failed to decode checked-in brand asset: $relative" >&2
+      failed=1
+      continue
+    fi
+
+    if [[ "$expected_signatures" != "$actual_signatures" ]]; then
+      echo "Brand asset pixel drift: $relative" >&2
+      print_signature_manifest "expected" "$expected_signatures"
+      print_signature_manifest "checked-in" "$actual_signatures"
       failed=1
     fi
   done
