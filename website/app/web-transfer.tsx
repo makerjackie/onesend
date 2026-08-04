@@ -116,6 +116,80 @@ type ReceiverSnapshot = {
 };
 
 /**
+ * QR display policy for the live sender canvas.
+ *
+ * A QR module must stay an integer number of CSS pixels. Three pixels is the
+ * floor for dense optical QR on phone cameras; four is preferred when the
+ * viewport can spare it. The desktop budgets leave room for the surrounding
+ * workbench while the height budget prevents a short desktop viewport from
+ * producing a canvas taller than its useful display area.
+ */
+export const QR_DISPLAY_POLICY = {
+  quietZoneModules: 4,
+  minimumModulePx: 3,
+  preferredModulePx: 4,
+  desktopBreakpointPx: 840,
+  desktopWidthRatio: 0.44,
+  desktopHeightRatio: 0.46,
+  mobileWidthRatio: 0.94,
+  maximumDisplayPx: 640,
+  fallbackViewport: { width: 1024, height: 768 },
+} as const;
+
+export type QrDisplayViewport = {
+  width: number;
+  height: number;
+};
+
+export type QrDisplayMetrics = {
+  availableDisplayPx: number;
+  modulePx: number;
+  pixelSize: number;
+};
+
+/** Return deterministic integer-pixel sizing for a QR with the given extent. */
+export function getQrDisplayMetrics(
+  totalModules: number,
+  viewport: QrDisplayViewport,
+): QrDisplayMetrics {
+  const safeTotalModules = Math.max(1, Math.floor(totalModules));
+  const viewportWidth = Math.max(1, Math.floor(viewport.width));
+  const viewportHeight = Math.max(1, Math.floor(viewport.height));
+  const isDesktop =
+    viewportWidth >= QR_DISPLAY_POLICY.desktopBreakpointPx;
+  const widthBudget = Math.floor(
+    viewportWidth *
+      (isDesktop
+        ? QR_DISPLAY_POLICY.desktopWidthRatio
+        : QR_DISPLAY_POLICY.mobileWidthRatio),
+  );
+  const heightBudget = isDesktop
+    ? Math.floor(viewportHeight * QR_DISPLAY_POLICY.desktopHeightRatio)
+    : QR_DISPLAY_POLICY.maximumDisplayPx;
+  const availableDisplayPx = Math.max(
+    0,
+    Math.min(
+      QR_DISPLAY_POLICY.maximumDisplayPx,
+      widthBudget,
+      heightBudget,
+    ),
+  );
+  const modulePx = Math.max(
+    QR_DISPLAY_POLICY.minimumModulePx,
+    Math.min(
+      QR_DISPLAY_POLICY.preferredModulePx,
+      Math.floor(availableDisplayPx / safeTotalModules),
+    ),
+  );
+
+  return {
+    availableDisplayPx,
+    modulePx,
+    pixelSize: safeTotalModules * modulePx,
+  };
+}
+
+/**
  * Renders a OneSend QR so it stays camera-scannable on real phones.
  *
  * Critical: never let CSS bilinear-scale a dense QR down. Version-30 codes
@@ -136,34 +210,27 @@ function drawQr(
       maskPattern: maskPattern as 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7,
     },
   );
-  const marginModules = 4;
+  const marginModules = QR_DISPLAY_POLICY.quietZoneModules;
   const totalModules = symbol.modules.size + marginModules * 2;
-  // Desktop workbench reserves half a viewport for the code. Keep fast-mode
-  // symbols inside that pane without CSS downscaling; mobile may use its width.
-  const maxDisplay =
+  const viewport =
     typeof window !== "undefined"
-      ? window.innerWidth >= 840
-        ? Math.min(
-            360,
-            Math.floor(window.innerWidth * 0.34),
-            Math.floor(window.innerHeight * 0.46),
-          )
-        : Math.min(640, Math.floor(window.innerWidth * 0.94))
-      : 360;
-  const modulePx = Math.max(
-    2,
-    Math.min(6, Math.floor(maxDisplay / totalModules)),
+      ? { width: window.innerWidth, height: window.innerHeight }
+      : QR_DISPLAY_POLICY.fallbackViewport;
+  const { modulePx, pixelSize } = getQrDisplayMetrics(
+    totalModules,
+    viewport,
   );
-  const pixelSize = totalModules * modulePx;
   if (canvas.width !== pixelSize || canvas.height !== pixelSize) {
     canvas.width = pixelSize;
     canvas.height = pixelSize;
   }
   // Keep CSS size equal to the bitmap so modules are not bilinear-filtered.
-  canvas.style.width = `${pixelSize}px`;
-  canvas.style.height = `${pixelSize}px`;
-  canvas.style.maxWidth = "none";
-  canvas.style.imageRendering = "pixelated";
+  // The compact mobile stylesheet has a max-width !important rule, so these
+  // inline declarations must carry the same priority to preserve 1:1 pixels.
+  canvas.style.setProperty("width", `${pixelSize}px`, "important");
+  canvas.style.setProperty("height", `${pixelSize}px`, "important");
+  canvas.style.setProperty("max-width", "none", "important");
+  canvas.style.setProperty("image-rendering", "pixelated");
 
   const context = canvas.getContext("2d");
   if (!context) throw new Error("The browser cannot draw a visual code.");
