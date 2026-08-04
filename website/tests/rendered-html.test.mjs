@@ -34,27 +34,51 @@ test("server-renders the OneSend product page", async () => {
   assert.match(html, /OneSend/);
   assert.match(html, /文件，/);
   assert.match(html, /用光传过去/);
-  assert.match(html, /网页试用/);
-  assert.match(html, /下载 App/);
   assert.match(html, /网页传输/);
-  assert.match(html, /开始发送/);
-  assert.match(html, /自动 · 快速/);
-  assert.match(html, /测试视频/);
-  assert.match(html, /预览/);
-  assert.match(html, /打开 \/ 新标签/);
-  assert.match(html, /保存/);
-  assert.match(html, /id="web-transfer"/);
-  assert.match(html, /id="download"/);
+  assert.match(html, /接收文件/);
+  assert.match(html, /下载 OneSend/);
+  assert.doesNotMatch(html, /id="web-transfer"/);
+  assert.doesNotMatch(html, /开始发送/);
+  assert.doesNotMatch(html, /自动 · 快速/);
   assert.match(html, /href="\/how"/);
   assert.match(html, /href="\/privacy"/);
   assert.match(html, /class="more-menu"/);
+  assert.doesNotMatch(html, /漏帧，不等于失败/);
+  assert.doesNotMatch(html, /默认快，需要时更稳/);
+  assert.doesNotMatch(html, /codex-preview|loading skeleton|Starter Project/i);
+});
+
+test("server-renders independent send and receive surfaces without role tabs", async () => {
+  const [sendResponse, receiveResponse] = await Promise.all([
+    render("/send"),
+    render("/receive"),
+  ]);
+  assert.equal(sendResponse.status, 200);
+  assert.equal(receiveResponse.status, 200);
+
+  const [sendHtml, receiveHtml] = await Promise.all([
+    sendResponse.text(),
+    receiveResponse.text(),
+  ]);
+  assert.match(sendHtml, /发送文件/);
+  assert.match(sendHtml, /data-transfer-role="send"/);
+  assert.match(sendHtml, /开始发送/);
+  assert.doesNotMatch(sendHtml, /role="tablist"/);
+  assert.match(receiveHtml, /接收文件/);
+  assert.match(receiveHtml, /data-transfer-role="receive"/);
+  assert.match(receiveHtml, /开启摄像头/);
+  assert.doesNotMatch(receiveHtml, /role="tablist"/);
+});
+
+test("server-renders the standalone download page", async () => {
+  const response = await render("/download");
+  assert.equal(response.status, 200);
+  const html = await response.text();
+  assert.match(html, /把 OneSend 带到每台设备/);
   assert.match(html, /onesend-android\.apk/);
   assert.match(html, /onesend-macos-universal\.dmg/);
   assert.match(html, /testflight\.apple\.com\/join\/n2t1KrCp/);
-  assert.doesNotMatch(html, /漏帧，不等于失败/);
-  assert.doesNotMatch(html, /默认快，需要时更稳/);
-  assert.doesNotMatch(html, /web-role-picker/);
-  assert.doesNotMatch(html, /codex-preview|loading skeleton|Starter Project/i);
+  assert.doesNotMatch(html, /id="web-transfer"/);
 });
 
 test("bundles the shared built-in optical test video", async () => {

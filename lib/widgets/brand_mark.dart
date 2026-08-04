@@ -2,6 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../app.dart';
 
+/// Transparent source for the generated OneSend file-scan mark.
+const String oneSendBrandSourceAsset =
+    'assets/brand/onesend-file-scan-mark.png';
+
+/// Opaque warm off-white app icon generated from [oneSendBrandSourceAsset].
 const String oneSendBrandIconAsset = 'assets/brand/onesend-icon-1024.png';
 const String oneSendBrandName = 'OneSend';
 
@@ -14,26 +19,30 @@ class BrandIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final radius = BorderRadius.circular(borderRadius ?? size * 0.2);
     return ClipRRect(
-      borderRadius: BorderRadius.circular(borderRadius ?? size * 0.2),
-      child: Image.asset(
-        oneSendBrandIconAsset,
-        width: size,
-        height: size,
-        filterQuality: FilterQuality.medium,
-        errorBuilder: (context, error, stackTrace) {
-          return Container(
-            width: size,
-            height: size,
-            color: oneSendInk,
-            alignment: Alignment.center,
-            child: Icon(
-              Icons.qr_code_2_rounded,
-              color: Colors.white,
-              size: size * 0.55,
-            ),
-          );
-        },
+      borderRadius: radius,
+      child: ColoredBox(
+        color: oneSendPaper,
+        child: Image.asset(
+          oneSendBrandIconAsset,
+          width: size,
+          height: size,
+          filterQuality: FilterQuality.medium,
+          errorBuilder: (context, error, stackTrace) {
+            return SizedBox(
+              width: size,
+              height: size,
+              child: Center(
+                child: Icon(
+                  Icons.qr_code_2_rounded,
+                  color: oneSendInk,
+                  size: size * 0.55,
+                ),
+              ),
+            );
+          },
+        ),
       ),
     );
   }
@@ -41,8 +50,9 @@ class BrandIcon extends StatelessWidget {
 
 /// Product mark: official app icon + wordmark.
 ///
-/// Prefer the branded raster icon over a re-drawn silhouette so the home
-/// header matches the App Store / desktop launcher artwork.
+/// Prefer the generated raster icon over a re-drawn silhouette so the home
+/// header matches the App Store / desktop launcher artwork. The light plate
+/// keeps the black file visible when this mark is placed on dark UI chrome.
 class BrandMark extends StatelessWidget {
   const BrandMark({this.compact = false, super.key});
 

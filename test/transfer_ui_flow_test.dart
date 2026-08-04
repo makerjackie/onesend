@@ -64,7 +64,7 @@ void main() {
     await tester.pumpWidget(
       OneSendApp(store: TransferStore(), settings: settings),
     );
-    await tester.tap(find.byKey(const ValueKey<String>('home-settings')));
+    await tester.tap(find.byKey(const ValueKey<String>('home-tab-settings')));
     await tester.pumpAndSettle();
     await tester.tap(
       find.byKey(const ValueKey<String>('settings-transfer-mode')),

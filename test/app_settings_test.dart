@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -58,4 +59,23 @@ void main() {
       expect(settings.localeTag, isNull);
     },
   );
+
+  test('loads and persists the selected theme mode', () async {
+    SharedPreferences.setMockInitialValues(<String, Object>{
+      appSettingsThemeModeKey: 2,
+    });
+    final preferences = await SharedPreferences.getInstance();
+    final settings = AppSettings(preferences: preferences);
+    addTearDown(settings.dispose);
+
+    expect(settings.themeMode, ThemeMode.dark);
+
+    await settings.setThemeMode(ThemeMode.light);
+    expect(settings.themeMode, ThemeMode.light);
+    expect(preferences.getInt(appSettingsThemeModeKey), 1);
+
+    final reloaded = AppSettings(preferences: preferences);
+    addTearDown(reloaded.dispose);
+    expect(reloaded.themeMode, ThemeMode.light);
+  });
 }

@@ -66,6 +66,39 @@ class AppLocalizationsEn extends AppLocalizations {
   String get about => 'About OneSend';
 
   @override
+  String get transferTab => 'Transfer';
+
+  @override
+  String get filesTab => 'Files';
+
+  @override
+  String get filesTitle => 'Files';
+
+  @override
+  String get filesSubtitle => 'Manage transfer history and received files.';
+
+  @override
+  String get theme => 'Theme';
+
+  @override
+  String get themeSubtitle => 'System, light, or dark';
+
+  @override
+  String get themeSystem => 'Follow system';
+
+  @override
+  String get themeLight => 'Light';
+
+  @override
+  String get themeDark => 'Dark';
+
+  @override
+  String get themeSaveError => 'Could not save the theme setting. Try again.';
+
+  @override
+  String get aboutSubtitle => 'Release details, privacy, and open source.';
+
+  @override
   String get clearHistory => 'Clear history';
 
   @override
@@ -95,7 +128,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sendFile => 'Send a file';
 
   @override
-  String get receiveFile => 'Scan to receive';
+  String get receiveFile => 'Receive a file';
 
   @override
   String get sendCardDescription =>
@@ -446,6 +479,14 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get scanInstruction =>
       'Keep the visual code fully inside the frame and hold the device steady.';
+
+  @override
+  String get scannerBytesUnavailable =>
+      'QR detected, but the camera returned no data. Keep scanning.';
+
+  @override
+  String get scannerInvalidFrame =>
+      'A non-OneSend QR was detected. Keep scanning.';
 
   @override
   String get desktopCameraInstruction =>

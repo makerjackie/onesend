@@ -37,6 +37,8 @@ enum _ReceiveSavePhase {
 
 enum _BarcodeObservation { bytesUnavailable, invalidFrame }
 
+enum _ReceiveScanAction { togglePause, restart }
+
 class ReceiveScreen extends StatefulWidget {
   const ReceiveScreen({
     required this.store,
@@ -335,15 +337,41 @@ class ReceiveScreenState extends State<ReceiveScreen>
     return _approxReceivedBytes(snapshot) * 1000 / elapsed;
   }
 
-  Widget _buildModeChips({required bool enabled}) {
+  Widget _buildModeChips({required bool enabled, BuildContext? sheetContext}) {
     return TransferModeSelector(
       algorithm: _algorithm,
       mode: _mode,
       enabled: enabled,
       showQrProfiles: false,
+      dense: true,
       keyPrefix: 'receive-mode',
-      onQrModeSelected: (mode) => unawaited(_selectQrMode(mode)),
-      onCimbarSelected: () => unawaited(_selectCimbar()),
+      onQrModeSelected: (mode) {
+        if (sheetContext != null) Navigator.of(sheetContext).pop();
+        unawaited(_selectQrMode(mode));
+      },
+      onCimbarSelected: () {
+        if (sheetContext != null) Navigator.of(sheetContext).pop();
+        unawaited(_selectCimbar());
+      },
+    );
+  }
+
+  Future<void> _showReceiveModeSheet() async {
+    if (!mounted || _processing || _completed) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+            child: _buildModeChips(
+              enabled: !_processing && !_completed,
+              sheetContext: sheetContext,
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -391,12 +419,10 @@ class ReceiveScreenState extends State<ReceiveScreen>
     }
   }
 
-  String _barcodeObservationMessage() {
+  String _barcodeObservationMessage(AppLocalizations l10n) {
     return switch (_barcodeObservation) {
-      _BarcodeObservation.bytesUnavailable =>
-        'Scanner recognized a QR code but returned no payload bytes; continuing scan.',
-      _BarcodeObservation.invalidFrame =>
-        'Scanner recognized a QR code that is not a OneSend frame; continuing scan.',
+      _BarcodeObservation.bytesUnavailable => l10n.scannerBytesUnavailable,
+      _BarcodeObservation.invalidFrame => l10n.scannerInvalidFrame,
       null => '',
     };
   }
@@ -680,47 +706,51 @@ class ReceiveScreenState extends State<ReceiveScreen>
     final l10n = AppLocalizations.of(context)!;
     if (_usesCimbar && !_completed) {
       return Scaffold(
-        appBar: AppBar(title: Text(l10n.scanReceive)),
+        appBar: _buildReceiveAppBar(l10n),
         body: SafeArea(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [_buildModeChips(enabled: !_processing)],
-                ),
-              ),
-              const Divider(height: 1),
-              Expanded(
-                child: CimbarTransferScreen(
-                  key: const ValueKey<String>('receive-cimbar-panel'),
-                  direction: CimbarDirection.receive,
-                  store: widget.store,
-                  embedded: true,
-                  autoStartReceive: true,
-                ),
-              ),
-            ],
+          child: CimbarTransferScreen(
+            key: const ValueKey<String>('receive-cimbar-panel'),
+            direction: CimbarDirection.receive,
+            store: widget.store,
+            embedded: true,
+            autoStartReceive: true,
           ),
         ),
       );
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(l10n.scanReceive),
-        actions: [
-          if (_usesMobileScanner && !_usesCimbar)
-            IconButton(
-              tooltip: l10n.torch,
-              onPressed: _completed || _processing ? null : _toggleTorch,
-              icon: const Icon(Icons.flashlight_on_outlined),
-            ),
-        ],
-      ),
+      appBar: _buildReceiveAppBar(l10n),
       body: SafeArea(child: _completed ? _buildCompleted() : _buildScanner()),
+    );
+  }
+
+  PreferredSizeWidget _buildReceiveAppBar(AppLocalizations l10n) {
+    return AppBar(
+      toolbarHeight: 52,
+      titleSpacing: 16,
+      title: Text(
+        l10n.scanReceive,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      actions: [
+        if (!_completed)
+          IconButton(
+            key: const ValueKey<String>('receive-mode-menu'),
+            tooltip: l10n.transferModeLabel,
+            onPressed: _processing
+                ? null
+                : () => unawaited(_showReceiveModeSheet()),
+            icon: const Icon(Icons.tune_rounded),
+          ),
+        if (_usesMobileScanner && !_usesCimbar)
+          IconButton(
+            tooltip: l10n.torch,
+            onPressed: _completed || _processing ? null : _toggleTorch,
+            icon: const Icon(Icons.flashlight_on_outlined),
+          ),
+      ],
     );
   }
 
@@ -740,185 +770,306 @@ class ReceiveScreenState extends State<ReceiveScreen>
           );
     return LayoutBuilder(
       builder: (context, constraints) {
-        final cameraHeight = constraints.maxWidth >= 760
-            ? 440.0
-            : (constraints.maxWidth * 0.88).clamp(280.0, 520.0);
-        return SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
+        final compact = constraints.maxWidth < 760;
+        final contentWidth = constraints.maxWidth < 920
+            ? constraints.maxWidth
+            : 920.0;
+        final horizontalPadding = compact ? 16.0 : 24.0;
+        final verticalPadding = compact ? 8.0 : 16.0;
+
+        return SizedBox(
+          width: constraints.maxWidth,
+          height: constraints.maxHeight,
           child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 760),
-              child: Column(
-                children: [
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: _buildModeChips(
-                      enabled: !_processing && snapshot == null,
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  SizedBox(
-                    height: cameraHeight,
-                    width: double.infinity,
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(4),
-                      child: Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          _buildCamera(),
-                          IgnorePointer(
-                            child: CustomPaint(
-                              painter: _ScannerOverlayPainter(paused: _paused),
-                            ),
-                          ),
-                          if (_paused || _processing)
-                            Container(
-                              color: oneSendInk.withValues(alpha: 0.86),
-                              alignment: Alignment.center,
-                              child: Text(
-                                _processing ? l10n.verifying : l10n.paused,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.w700,
+            child: SizedBox(
+              width: contentWidth,
+              height: constraints.maxHeight,
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                  horizontalPadding,
+                  verticalPadding,
+                  horizontalPadding,
+                  verticalPadding,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      child: LayoutBuilder(
+                        builder: (context, cameraConstraints) {
+                          final cameraHeight = compact
+                              ? cameraConstraints.maxHeight
+                              : cameraConstraints.maxHeight < 440.0
+                              ? cameraConstraints.maxHeight
+                              : 440.0;
+                          return Align(
+                            alignment: compact
+                                ? Alignment.center
+                                : Alignment.topCenter,
+                            child: SizedBox(
+                              width: double.infinity,
+                              height: cameraHeight,
+                              child: KeyedSubtree(
+                                key: const ValueKey<String>(
+                                  'receive-camera-frame',
                                 ),
+                                child: _buildCameraFrame(l10n),
                               ),
                             ),
-                        ],
+                          );
+                        },
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(status, style: Theme.of(context).textTheme.titleMedium),
-                  const SizedBox(height: 5),
-                  Text(
-                    _usesMobileScanner
-                        ? l10n.scanInstruction
-                        : l10n.desktopCameraInstruction,
-                    style: Theme.of(context).textTheme.bodyMedium,
-                    textAlign: TextAlign.center,
-                  ),
-                  if (_barcodeObservation != null) ...[
-                    const SizedBox(height: 6),
-                    Text(
-                      _barcodeObservationMessage(),
-                      key: const ValueKey<String>(
-                        'receive-barcode-observation',
-                      ),
-                      style: Theme.of(
-                        context,
-                      ).textTheme.bodySmall?.copyWith(color: oneSendMuted),
-                      textAlign: TextAlign.center,
+                    SizedBox(height: compact ? 10 : 16),
+                    _buildScanReadout(
+                      l10n: l10n,
+                      status: status,
+                      progress: progress,
+                      currentRate: currentRate,
+                      snapshot: snapshot,
+                      compact: compact,
                     ),
-                  ],
-                  const SizedBox(height: 20),
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          LinearProgressIndicator(
-                            minHeight: 8,
-                            value: progress,
-                            backgroundColor: const Color(0xffe8ebe4),
-                            color: oneSendInk,
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            l10n.currentRate(formatTransferSpeed(currentRate)),
-                            style: const TextStyle(
-                              color: oneSendInk,
-                              fontSize: 20,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                          if (snapshot?.mode != null) ...[
-                            const SizedBox(height: 4),
-                            Text(
-                              l10n.theoreticalRate(
-                                formatTransferSpeed(
-                                  snapshot!.mode!.usefulBytesPerSecond,
-                                ),
-                              ),
-                              style: const TextStyle(
-                                color: oneSendMuted,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ],
-                          const SizedBox(height: 10),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  snapshot == null
-                                      ? l10n.waitingFirstFrame
-                                      : snapshot.usesRatelessFountain
-                                      ? l10n.fountainProgress(
-                                          snapshot.framesNew,
-                                        )
-                                      : l10n.blockProgress(
-                                          snapshot.blockCount,
-                                          snapshot.framesNew,
-                                          snapshot.solvedBlocks,
-                                        ),
-                                  style: Theme.of(context).textTheme.bodySmall,
-                                ),
-                              ),
-                              if (snapshot != null)
-                                Text(
-                                  l10n.modeAndSize(
-                                    _localizedReceiveModeLabel(
-                                      l10n,
-                                      snapshot.mode,
-                                    ),
-                                    formatBytes(snapshot.totalLength),
-                                  ),
-                                  style: Theme.of(context).textTheme.bodySmall,
-                                ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  if (_error != null) ...[
-                    const SizedBox(height: 14),
-                    _ReceiveError(message: _error!),
-                  ],
-                  const SizedBox(height: 14),
-                  Wrap(
-                    alignment: WrapAlignment.center,
-                    spacing: 10,
-                    runSpacing: 10,
-                    children: [
-                      if (_paused || snapshot != null)
-                        OutlinedButton.icon(
-                          onPressed: _processing ? null : _togglePause,
-                          icon: Icon(
-                            _paused
-                                ? Icons.play_arrow_rounded
-                                : Icons.pause_rounded,
-                          ),
-                          label: Text(
-                            _paused ? l10n.resumeScan : l10n.pauseScan,
-                          ),
-                        ),
-                      FilledButton.icon(
-                        onPressed: _processing ? null : _reset,
-                        icon: const Icon(Icons.refresh_rounded),
-                        label: Text(l10n.restart),
-                      ),
+                    if (_error != null) ...[
+                      const SizedBox(height: 6),
+                      _ReceiveError(message: _error!, compact: true),
                     ],
-                  ),
-                ],
+                    SizedBox(height: compact ? 8 : 16),
+                    _buildScannerControl(l10n: l10n, compact: compact),
+                  ],
+                ),
               ),
             ),
           ),
         );
       },
+    );
+  }
+
+  Widget _buildCameraFrame(AppLocalizations l10n) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(18),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          _buildCamera(),
+          IgnorePointer(
+            child: CustomPaint(
+              painter: _ScannerOverlayPainter(paused: _paused),
+            ),
+          ),
+          if (_paused || _processing)
+            Container(
+              color: oneSendInk.withValues(alpha: 0.86),
+              alignment: Alignment.center,
+              child: Text(
+                _processing ? l10n.verifying : l10n.paused,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildScanReadout({
+    required AppLocalizations l10n,
+    required String status,
+    required double? progress,
+    required double currentRate,
+    required ReceiverSnapshot? snapshot,
+    required bool compact,
+  }) {
+    final progressValue = progress?.clamp(0.0, 1.0).toDouble();
+    final progressPercent = ((progressValue ?? 0) * 100).round();
+    final detail = snapshot == null
+        ? l10n.waitingFirstFrame
+        : snapshot.usesRatelessFountain
+        ? l10n.fountainProgress(snapshot.framesNew)
+        : l10n.blockProgress(
+            snapshot.blockCount,
+            snapshot.framesNew,
+            snapshot.solvedBlocks,
+          );
+    final modeAndSize = snapshot == null
+        ? null
+        : l10n.modeAndSize(
+            _localizedReceiveModeLabel(l10n, snapshot.mode),
+            formatBytes(snapshot.totalLength),
+          );
+
+    return Column(
+      key: const ValueKey<String>('receive-scan-readout'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                status,
+                key: const ValueKey<String>('receive-scan-status'),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(
+                  context,
+                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              '$progressPercent%',
+              key: const ValueKey<String>('receive-progress-percent'),
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurface,
+                fontSize: 18,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(2),
+          child: LinearProgressIndicator(
+            key: const ValueKey<String>('receive-progress'),
+            minHeight: 6,
+            value: progressValue ?? 0,
+            backgroundColor: Theme.of(
+              context,
+            ).colorScheme.onSurface.withValues(alpha: 0.12),
+            color: oneSendLime,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                l10n.currentRate(formatTransferSpeed(currentRate)),
+                key: const ValueKey<String>('receive-current-rate'),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurface,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            if (!compact && snapshot?.mode != null) ...[
+              const SizedBox(width: 12),
+              Flexible(
+                child: Text(
+                  l10n.theoreticalRate(
+                    formatTransferSpeed(snapshot!.mode!.usefulBytesPerSecond),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.end,
+                  style: const TextStyle(
+                    color: oneSendMuted,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+        const SizedBox(height: 4),
+        Row(
+          children: [
+            Flexible(
+              child: Text(
+                detail,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ),
+            if (modeAndSize != null) ...[
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  modeAndSize,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.end,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ),
+            ],
+          ],
+        ),
+        const SizedBox(height: 3),
+        Text(
+          _usesMobileScanner
+              ? l10n.scanInstruction
+              : l10n.desktopCameraInstruction,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(color: oneSendMuted, fontSize: 11),
+        ),
+        if (_barcodeObservation != null) ...[
+          const SizedBox(height: 3),
+          Text(
+            _barcodeObservationMessage(l10n),
+            key: const ValueKey<String>('receive-barcode-observation'),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: oneSendMuted),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildScannerControl({
+    required AppLocalizations l10n,
+    required bool compact,
+  }) {
+    final toggleLabel = _paused ? l10n.resumeScan : l10n.pauseScan;
+    return Align(
+      alignment: compact ? Alignment.center : Alignment.center,
+      child: SizedBox(
+        width: compact ? double.infinity : 320,
+        height: 48,
+        child: PopupMenuButton<_ReceiveScanAction>(
+          key: const ValueKey<String>('receive-scan-control'),
+          enabled: !_processing,
+          tooltip: toggleLabel,
+          position: PopupMenuPosition.over,
+          offset: const Offset(0, -8),
+          onSelected: (action) {
+            switch (action) {
+              case _ReceiveScanAction.togglePause:
+                unawaited(_togglePause());
+              case _ReceiveScanAction.restart:
+                unawaited(_reset());
+            }
+          },
+          itemBuilder: (context) => [
+            PopupMenuItem<_ReceiveScanAction>(
+              value: _ReceiveScanAction.togglePause,
+              child: Text(toggleLabel),
+            ),
+            PopupMenuItem<_ReceiveScanAction>(
+              value: _ReceiveScanAction.restart,
+              child: Text(l10n.restart),
+            ),
+          ],
+          child: _ReceiveScanControlSurface(
+            label: toggleLabel,
+            paused: _paused,
+          ),
+        ),
+      ),
     );
   }
 
@@ -1081,24 +1232,77 @@ class _ScannerOverlayPainter extends CustomPainter {
       oldDelegate.paused != paused;
 }
 
+class _ReceiveScanControlSurface extends StatelessWidget {
+  const _ReceiveScanControlSurface({required this.label, required this.paused});
+
+  final String label;
+  final bool paused;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: oneSendInk,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              paused ? Icons.play_arrow_rounded : Icons.pause_rounded,
+              color: Colors.white,
+              size: 20,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(width: 6),
+            const Icon(
+              Icons.expand_more_rounded,
+              color: Colors.white70,
+              size: 19,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _ReceiveError extends StatelessWidget {
-  const _ReceiveError({required this.message});
+  const _ReceiveError({required this.message, this.compact = false});
 
   final String message;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(12),
+      padding: EdgeInsets.all(compact ? 8 : 12),
       decoration: BoxDecoration(
         color: const Color(0xffffe5e1),
-        border: Border.all(color: const Color(0xffa32820), width: 2),
+        border: Border.all(
+          color: const Color(0xffa32820),
+          width: compact ? 1 : 2,
+        ),
         borderRadius: BorderRadius.circular(4),
       ),
       child: Text(
         message,
-        style: const TextStyle(color: Color(0xff9e3025), fontSize: 13),
+        maxLines: compact ? 2 : null,
+        overflow: compact ? TextOverflow.ellipsis : null,
+        style: TextStyle(
+          color: const Color(0xff9e3025),
+          fontSize: compact ? 12 : 13,
+        ),
       ),
     );
   }

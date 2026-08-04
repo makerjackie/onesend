@@ -30,7 +30,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get modeCimbar => 'CIMBAR カラービジュアルコード（実験的）';
 
   @override
-  String get modeQr => 'QR code';
+  String get modeQr => 'QR コード';
 
   @override
   String get compatibilityMode => '互換性';
@@ -66,6 +66,39 @@ class AppLocalizationsJa extends AppLocalizations {
   String get about => 'OneSend について';
 
   @override
+  String get transferTab => '転送';
+
+  @override
+  String get filesTab => 'ファイル';
+
+  @override
+  String get filesTitle => 'ファイル';
+
+  @override
+  String get filesSubtitle => '転送履歴と受信ファイルを管理します。';
+
+  @override
+  String get theme => 'テーマ';
+
+  @override
+  String get themeSubtitle => 'システム、ライト、ダーク';
+
+  @override
+  String get themeSystem => 'システムに従う';
+
+  @override
+  String get themeLight => 'ライト';
+
+  @override
+  String get themeDark => 'ダーク';
+
+  @override
+  String get themeSaveError => 'テーマを保存できませんでした。もう一度お試しください。';
+
+  @override
+  String get aboutSubtitle => 'バージョン、プライバシー、オープンソース。';
+
+  @override
   String get clearHistory => '履歴を消去';
 
   @override
@@ -94,7 +127,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get sendFile => 'ファイルを送信';
 
   @override
-  String get receiveFile => 'スキャンして受信';
+  String get receiveFile => 'ファイルを受信';
 
   @override
   String get sendCardDescription => 'コードを画面に表示し、別の端末を向けてください。';
@@ -322,13 +355,13 @@ class AppLocalizationsJa extends AppLocalizations {
   }
 
   @override
-  String get transferModeLabel => 'Transfer mode';
+  String get transferModeLabel => '転送モード';
 
   @override
-  String get dropFilesHint => 'Or drag and drop a file here';
+  String get dropFilesHint => 'またはファイルをここにドラッグ＆ドロップ';
 
   @override
-  String get dropFilesActive => 'Drop to send';
+  String get dropFilesActive => 'ドロップして送信';
 
   @override
   String get reading => '読み取り中…';
@@ -432,6 +465,13 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get scanInstruction => 'ビジュアルコード全体をフレーム内に収め、端末を動かさないでください。';
+
+  @override
+  String get scannerBytesUnavailable =>
+      'QR コードを検出しましたが、カメラからデータを取得できませんでした。スキャンを続けます。';
+
+  @override
+  String get scannerInvalidFrame => 'OneSend データではない QR コードを検出しました。スキャンを続けます。';
 
   @override
   String get desktopCameraInstruction =>

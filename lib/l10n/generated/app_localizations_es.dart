@@ -30,7 +30,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get modeCimbar => 'Código visual de color CIMBAR (experimental)';
 
   @override
-  String get modeQr => 'QR code';
+  String get modeQr => 'Código QR';
 
   @override
   String get compatibilityMode => 'Compatibilidad';
@@ -66,6 +66,40 @@ class AppLocalizationsEs extends AppLocalizations {
   String get about => 'Acerca de OneSend';
 
   @override
+  String get transferTab => 'Transferir';
+
+  @override
+  String get filesTab => 'Archivos';
+
+  @override
+  String get filesTitle => 'Archivos';
+
+  @override
+  String get filesSubtitle => 'Gestiona el historial y los archivos recibidos.';
+
+  @override
+  String get theme => 'Tema';
+
+  @override
+  String get themeSubtitle => 'Sistema, claro u oscuro';
+
+  @override
+  String get themeSystem => 'Seguir sistema';
+
+  @override
+  String get themeLight => 'Claro';
+
+  @override
+  String get themeDark => 'Oscuro';
+
+  @override
+  String get themeSaveError =>
+      'No se pudo guardar el tema. Inténtalo de nuevo.';
+
+  @override
+  String get aboutSubtitle => 'Versión, privacidad y código abierto.';
+
+  @override
   String get clearHistory => 'Borrar historial';
 
   @override
@@ -95,7 +129,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get sendFile => 'Enviar un archivo';
 
   @override
-  String get receiveFile => 'Escanear para recibir';
+  String get receiveFile => 'Recibir un archivo';
 
   @override
   String get sendCardDescription =>
@@ -337,13 +371,13 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
-  String get transferModeLabel => 'Transfer mode';
+  String get transferModeLabel => 'Modo de transferencia';
 
   @override
-  String get dropFilesHint => 'Or drag and drop a file here';
+  String get dropFilesHint => 'O arrastra un archivo aquí';
 
   @override
-  String get dropFilesActive => 'Drop to send';
+  String get dropFilesActive => 'Suelta para enviar';
 
   @override
   String get reading => 'Leyendo…';
@@ -453,6 +487,14 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get scanInstruction =>
       'Mantén el código visual completamente dentro del encuadre y sujeta el dispositivo sin moverlo.';
+
+  @override
+  String get scannerBytesUnavailable =>
+      'Se detectó un QR, pero la cámara no devolvió datos. El escaneo continúa.';
+
+  @override
+  String get scannerInvalidFrame =>
+      'Se detectó un QR que no contiene datos de OneSend. El escaneo continúa.';
 
   @override
   String get desktopCameraInstruction =>

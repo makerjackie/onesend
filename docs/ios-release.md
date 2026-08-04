@@ -4,7 +4,7 @@ OneSend uses the bundle identifier `com.makerjackie.onesend`.
 
 ## Current version / 当前版本
 
-OneSend 1.5.1 (build 20) is the release target for this checklist. This checklist does not assert any
+OneSend 1.5.2 (build 21) is the release target for this checklist. This checklist does not assert any
 TestFlight processing, Beta App Review, or external tester availability status; check
 App Store Connect for the live status.
 
@@ -24,23 +24,23 @@ asc xcode archive \
   --scheme "Runner" \
   --configuration Release \
   --clean \
-  --archive-path "build/ios-testflight-1.5.1-20/OneSend.xcarchive" \
+  --archive-path "build/ios-testflight-1.5.2-21/OneSend.xcarchive" \
   --xcodebuild-flag=-destination \
   --xcodebuild-flag=generic/platform=iOS \
   --xcodebuild-flag=-allowProvisioningUpdates \
-  --xcodebuild-flag=FLUTTER_BUILD_NAME=1.5.1 \
-  --xcodebuild-flag=FLUTTER_BUILD_NUMBER=20 \
+  --xcodebuild-flag=FLUTTER_BUILD_NAME=1.5.2 \
+  --xcodebuild-flag=FLUTTER_BUILD_NUMBER=21 \
   --output json
 
 asc xcode export \
-  --archive-path "build/ios-testflight-1.5.1-20/OneSend.xcarchive" \
-  --ipa-path "build/ios-testflight-1.5.1-20/OneSend.ipa" \
+  --archive-path "build/ios-testflight-1.5.2-21/OneSend.xcarchive" \
+  --ipa-path "build/ios-testflight-1.5.2-21/OneSend.ipa" \
   --xcodebuild-flag=-allowProvisioningUpdates \
   --output json
 
 asc builds upload \
   --app "6797040758" \
-  --ipa "build/ios-testflight-1.5.1-20/OneSend.ipa" \
+  --ipa "build/ios-testflight-1.5.2-21/OneSend.ipa" \
   --wait \
   --output json
 ```

@@ -12,6 +12,7 @@ const sourcePaths = {
   how: resolve(appRoot, "how", "page.tsx"),
   privacy: resolve(appRoot, "privacy", "page.tsx"),
   layout: resolve(appRoot, "layout.tsx"),
+  favicon: resolve(websiteRoot, "public", "favicon.svg"),
   styles: resolve(appRoot, "globals.css"),
 };
 
@@ -53,6 +54,11 @@ test("brand source uses the icon asset and contains no text-1 logo", () => {
   assert.match(source.layout, /apple:\s*["']\/icon\.png["']/);
   assert.match(source.layout, /url:\s*["']\/og\.png["']/);
   assert.match(source.layout, /images:\s*\[\s*["']\/og\.png["']\]/);
+});
+
+test("favicon references the generated PNG without drawing a second mark", () => {
+  assert.match(source.favicon, /<image\b[^>]*href="\/icon\.png"/);
+  assert.doesNotMatch(source.favicon, /<(?:path|rect|polygon|circle|g)\b/);
 });
 
 async function render(pathname) {

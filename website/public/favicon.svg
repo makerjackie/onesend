@@ -1,17 +1,4 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
-  <title>OneSend optical transfer mark</title>
-  <desc>Two block-stepped optical beams carry data packets into a square receiver.</desc>
-
-  <rect width="1024" height="1024" fill="#000000"/>
-
-  <!-- A square optical source, followed by three grid-aligned data packets. -->
-  <path fill="#ffffff" fill-rule="evenodd" d="M160 400H384V624H160V400ZM224 464V560H320V464H224Z"/>
-  <g fill="#ffffff">
-    <rect x="416" y="480" width="80" height="80"/>
-    <rect x="512" y="416" width="80" height="80"/>
-    <rect x="608" y="352" width="80" height="80"/>
-
-    <!-- A hollow, hard-edged receiver arrow. -->
-    <path fill-rule="evenodd" d="M608 240H704L848 512L704 784H608L752 512L608 240ZM656 368H688L768 512L688 656H656L736 512L656 368Z"/>
-  </g>
+  <title>OneSend file scan mark</title>
+  <image href="/icon.png" width="1024" height="1024" preserveAspectRatio="xMidYMid meet" />
 </svg>

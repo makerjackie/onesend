@@ -226,6 +226,72 @@ abstract class AppLocalizations {
   /// **'About OneSend'**
   String get about;
 
+  /// No description provided for @transferTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Transfer'**
+  String get transferTab;
+
+  /// No description provided for @filesTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Files'**
+  String get filesTab;
+
+  /// No description provided for @filesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Files'**
+  String get filesTitle;
+
+  /// No description provided for @filesSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage transfer history and received files.'**
+  String get filesSubtitle;
+
+  /// No description provided for @theme.
+  ///
+  /// In en, this message translates to:
+  /// **'Theme'**
+  String get theme;
+
+  /// No description provided for @themeSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'System, light, or dark'**
+  String get themeSubtitle;
+
+  /// No description provided for @themeSystem.
+  ///
+  /// In en, this message translates to:
+  /// **'Follow system'**
+  String get themeSystem;
+
+  /// No description provided for @themeLight.
+  ///
+  /// In en, this message translates to:
+  /// **'Light'**
+  String get themeLight;
+
+  /// No description provided for @themeDark.
+  ///
+  /// In en, this message translates to:
+  /// **'Dark'**
+  String get themeDark;
+
+  /// No description provided for @themeSaveError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save the theme setting. Try again.'**
+  String get themeSaveError;
+
+  /// No description provided for @aboutSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Release details, privacy, and open source.'**
+  String get aboutSubtitle;
+
   /// No description provided for @clearHistory.
   ///
   /// In en, this message translates to:
@@ -283,7 +349,7 @@ abstract class AppLocalizations {
   /// No description provided for @receiveFile.
   ///
   /// In en, this message translates to:
-  /// **'Scan to receive'**
+  /// **'Receive a file'**
   String get receiveFile;
 
   /// No description provided for @sendCardDescription.
@@ -813,6 +879,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Keep the visual code fully inside the frame and hold the device steady.'**
   String get scanInstruction;
+
+  /// No description provided for @scannerBytesUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'QR detected, but the camera returned no data. Keep scanning.'**
+  String get scannerBytesUnavailable;
+
+  /// No description provided for @scannerInvalidFrame.
+  ///
+  /// In en, this message translates to:
+  /// **'A non-OneSend QR was detected. Keep scanning.'**
+  String get scannerInvalidFrame;
 
   /// No description provided for @desktopCameraInstruction.
   ///

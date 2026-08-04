@@ -2,14 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../core/release_info.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../widgets/brand_mark.dart';
-
-const Color _aboutInk = Color(0xff10130f);
-const Color _aboutPaper = Color(0xfff5f6f0);
-const Color _aboutPanel = Color(0xffffffff);
-const Color _aboutMuted = Color(0xff667066);
-const BorderRadius _aboutRadius = BorderRadius.all(Radius.circular(6));
 
 const String oneSendGithubUrl = 'https://github.com/makerjackie/onesend';
 final Uri oneSendGithubUri = Uri.parse(oneSendGithubUrl);
@@ -17,16 +12,18 @@ final Uri oneSendGithubUri = Uri.parse(oneSendGithubUrl);
 typedef AboutPackageInfoLoader = Future<PackageInfo> Function();
 typedef AboutUrlLauncher = Future<bool> Function(Uri url);
 
-/// About page with injectable platform seams for version loading and links.
-///
-/// The page owns neither the package info object nor navigation state, so it
-/// can be pushed directly from HomeScreen or embedded in a later settings
-/// route without introducing a second app-level dependency.
+/// About page entered from Settings.
 class AboutScreen extends StatefulWidget {
-  const AboutScreen({this.packageInfoLoader, this.urlLauncher, super.key});
+  const AboutScreen({
+    this.packageInfoLoader,
+    this.urlLauncher,
+    this.releaseInfo = oneSendReleaseInfo,
+    super.key,
+  });
 
   final AboutPackageInfoLoader? packageInfoLoader;
   final AboutUrlLauncher? urlLauncher;
+  final OneSendReleaseInfo releaseInfo;
 
   @override
   State<AboutScreen> createState() => _AboutScreenState();
@@ -34,7 +31,6 @@ class AboutScreen extends StatefulWidget {
 
 class _AboutScreenState extends State<AboutScreen> {
   PackageInfo? _packageInfo;
-  String? _versionError;
   String? _message;
   bool _openingGithub = false;
 
@@ -51,8 +47,7 @@ class _AboutScreenState extends State<AboutScreen> {
       if (!mounted) return;
       setState(() => _packageInfo = info);
     } catch (_) {
-      if (!mounted) return;
-      setState(() => _versionError = 'unavailable');
+      // The compile-time release metadata is enough to render the page.
     }
   }
 
@@ -79,49 +74,37 @@ class _AboutScreenState extends State<AboutScreen> {
     setState(() => _openingGithub = false);
   }
 
-  String _versionLabel(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    final info = _packageInfo;
-    if (info != null) {
-      return '${info.version} (${info.buildNumber})';
-    }
-    return _versionError == null
-        ? l10n.readingVersion
-        : l10n.versionUnavailable;
+  String _versionLabel() {
+    final packageVersion = _packageInfo?.version;
+    return formatOneSendReleaseLabel(
+      version: packageVersion ?? widget.releaseInfo.version,
+      publishedAt: widget.releaseInfo.publishedAt,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     return Scaffold(
-      backgroundColor: _aboutPaper,
-      appBar: AppBar(
-        title: Text(l10n.about),
-        backgroundColor: _aboutPaper,
-        foregroundColor: _aboutInk,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-      ),
+      appBar: AppBar(title: Text(l10n.about)),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 36),
+          padding: const EdgeInsets.fromLTRB(20, 10, 20, 36),
           child: Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 720),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _AboutHeader(version: _versionLabel(context), l10n: l10n),
-                  const SizedBox(height: 18),
+                  _AboutHeader(version: _versionLabel(), l10n: l10n),
+                  const SizedBox(height: 20),
                   Text(
                     l10n.experimentalVisualTransfer,
-                    style: TextStyle(
-                      color: _aboutInk,
-                      fontSize: 20,
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.w800,
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 20),
                   _AboutPanel(
                     title: l10n.workingPrinciple,
                     body: l10n.workingPrincipleBody,
@@ -145,11 +128,6 @@ class _AboutScreenState extends State<AboutScreen> {
                         ),
                         const SizedBox(height: 9),
                         _AboutInfoLine(label: l10n.license, value: 'MIT'),
-                        const SizedBox(height: 9),
-                        _AboutInfoLine(
-                          label: l10n.version,
-                          value: _versionLabel(context),
-                        ),
                       ],
                     ),
                   ),
@@ -159,9 +137,9 @@ class _AboutScreenState extends State<AboutScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const SelectableText(
+                        SelectableText(
                           oneSendGithubUrl,
-                          style: TextStyle(color: _aboutMuted, height: 1.45),
+                          style: Theme.of(context).textTheme.bodyMedium,
                         ),
                         const SizedBox(height: 14),
                         OutlinedButton.icon(
@@ -177,19 +155,6 @@ class _AboutScreenState extends State<AboutScreen> {
                               : const Icon(Icons.open_in_new_rounded, size: 18),
                           label: Text(
                             _openingGithub ? l10n.opening : l10n.openGithub,
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: _aboutInk,
-                            side: const BorderSide(color: _aboutInk, width: 2),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 12,
-                            ),
-                            shape: const RoundedRectangleBorder(
-                              borderRadius: BorderRadius.all(
-                                Radius.circular(4),
-                              ),
-                            ),
                           ),
                         ),
                         if (_message != null) ...[
@@ -208,7 +173,7 @@ class _AboutScreenState extends State<AboutScreen> {
                   Center(
                     child: Text(
                       l10n.aboutFooter,
-                      style: const TextStyle(color: _aboutMuted, fontSize: 13),
+                      style: Theme.of(context).textTheme.bodySmall,
                     ),
                   ),
                 ],
@@ -229,24 +194,24 @@ class _AboutHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     final brandTagline = _brandTagline(l10n);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(22),
-      decoration: const BoxDecoration(
-        color: _aboutInk,
-        border: Border.fromBorderSide(BorderSide(color: _aboutInk, width: 2)),
-        borderRadius: _aboutRadius,
+      decoration: BoxDecoration(
+        color: scheme.onSurface,
+        borderRadius: BorderRadius.circular(20),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const BrandIcon(size: 56, borderRadius: 12),
+          const BrandIcon(size: 56, borderRadius: 14),
           const SizedBox(height: 16),
-          const Text(
+          Text(
             oneSendBrandName,
             style: TextStyle(
-              color: Colors.white,
+              color: scheme.surface,
               fontSize: 36,
               fontWeight: FontWeight.w900,
               letterSpacing: -1.2,
@@ -256,8 +221,8 @@ class _AboutHeader extends StatelessWidget {
             const SizedBox(height: 2),
             Text(
               brandTagline,
-              style: const TextStyle(
-                color: Colors.white,
+              style: TextStyle(
+                color: scheme.surface,
                 fontSize: 22,
                 fontWeight: FontWeight.w800,
               ),
@@ -265,8 +230,8 @@ class _AboutHeader extends StatelessWidget {
           ],
           const SizedBox(height: 16),
           Text(
-            l10n.versionLabel(version),
-            style: const TextStyle(color: Color(0xffdfe5dc), height: 1.4),
+            version,
+            style: TextStyle(color: scheme.surface.withValues(alpha: 0.76)),
           ),
         ],
       ),
@@ -293,29 +258,23 @@ class _AboutPanel extends StatelessWidget {
     assert(body != null || child != null);
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: const BoxDecoration(
-        color: _aboutPanel,
-        border: Border.fromBorderSide(BorderSide(color: _aboutInk, width: 2)),
-        borderRadius: _aboutRadius,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(18),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             title,
-            style: const TextStyle(
-              color: _aboutInk,
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 8),
           if (body != null)
-            Text(
-              body!,
-              style: const TextStyle(color: _aboutMuted, height: 1.55),
-            )
+            Text(body!, style: Theme.of(context).textTheme.bodyMedium)
           else
             child!,
         ],
@@ -336,21 +295,16 @@ class _AboutInfoLine extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SizedBox(
-          width: 52,
-          child: Text(
-            label,
-            style: const TextStyle(color: _aboutMuted, height: 1.4),
-          ),
+          width: 64,
+          child: Text(label, style: Theme.of(context).textTheme.bodyMedium),
         ),
         const SizedBox(width: 12),
         Expanded(
           child: Text(
             value,
-            style: const TextStyle(
-              color: _aboutInk,
-              fontWeight: FontWeight.w700,
-              height: 1.4,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w700),
           ),
         ),
       ],

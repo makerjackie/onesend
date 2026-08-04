@@ -66,6 +66,39 @@ class AppLocalizationsZh extends AppLocalizations {
   String get about => '关于 OneSend';
 
   @override
+  String get transferTab => '传输';
+
+  @override
+  String get filesTab => '文件';
+
+  @override
+  String get filesTitle => '文件';
+
+  @override
+  String get filesSubtitle => '管理传输记录和已接收文件。';
+
+  @override
+  String get theme => '主题';
+
+  @override
+  String get themeSubtitle => '跟随系统、日间或夜间';
+
+  @override
+  String get themeSystem => '跟随系统';
+
+  @override
+  String get themeLight => '日间';
+
+  @override
+  String get themeDark => '夜间';
+
+  @override
+  String get themeSaveError => '无法保存主题设置，请稍后重试。';
+
+  @override
+  String get aboutSubtitle => '查看版本、隐私与开源信息。';
+
+  @override
   String get clearHistory => '清空记录';
 
   @override
@@ -93,7 +126,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get sendFile => '发送文件';
 
   @override
-  String get receiveFile => '扫描接收';
+  String get receiveFile => '接收文件';
 
   @override
   String get sendCardDescription => '把视觉码放到屏幕上，让另一台设备对准它。';
@@ -426,6 +459,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get scanInstruction => '把视觉码完整放进框内，保持设备稳定。';
+
+  @override
+  String get scannerBytesUnavailable => '识别到二维码，但相机未返回数据；正在继续扫描。';
+
+  @override
+  String get scannerInvalidFrame => '识别到的二维码不是 OneSend 数据；正在继续扫描。';
 
   @override
   String get desktopCameraInstruction => '桌面端使用摄像头截图解码，速度会比手机慢一些。';
@@ -861,6 +900,39 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get about => '关于 OneSend';
 
   @override
+  String get transferTab => '传输';
+
+  @override
+  String get filesTab => '文件';
+
+  @override
+  String get filesTitle => '文件';
+
+  @override
+  String get filesSubtitle => '管理传输记录和已接收文件。';
+
+  @override
+  String get theme => '主题';
+
+  @override
+  String get themeSubtitle => '跟随系统、日间或夜间';
+
+  @override
+  String get themeSystem => '跟随系统';
+
+  @override
+  String get themeLight => '日间';
+
+  @override
+  String get themeDark => '夜间';
+
+  @override
+  String get themeSaveError => '无法保存主题设置，请稍后重试。';
+
+  @override
+  String get aboutSubtitle => '查看版本、隐私与开源信息。';
+
+  @override
   String get clearHistory => '清空记录';
 
   @override
@@ -888,7 +960,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get sendFile => '发送文件';
 
   @override
-  String get receiveFile => '扫描接收';
+  String get receiveFile => '接收文件';
 
   @override
   String get sendCardDescription => '把视觉码放到屏幕上，让另一台设备对准它。';
@@ -1221,6 +1293,12 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get scanInstruction => '把视觉码完整放进框内，保持设备稳定。';
+
+  @override
+  String get scannerBytesUnavailable => '识别到二维码，但相机未返回数据；正在继续扫描。';
+
+  @override
+  String get scannerInvalidFrame => '识别到的二维码不是 OneSend 数据；正在继续扫描。';
 
   @override
   String get desktopCameraInstruction => '桌面端使用摄像头截图解码，速度会比手机慢一些。';
@@ -1656,6 +1734,39 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get about => '關於 OneSend';
 
   @override
+  String get transferTab => '傳輸';
+
+  @override
+  String get filesTab => '檔案';
+
+  @override
+  String get filesTitle => '檔案';
+
+  @override
+  String get filesSubtitle => '管理傳輸記錄與已接收檔案。';
+
+  @override
+  String get theme => '主題';
+
+  @override
+  String get themeSubtitle => '跟隨系統、日間或夜間';
+
+  @override
+  String get themeSystem => '跟隨系統';
+
+  @override
+  String get themeLight => '日間';
+
+  @override
+  String get themeDark => '夜間';
+
+  @override
+  String get themeSaveError => '無法儲存主題設定，請稍後再試。';
+
+  @override
+  String get aboutSubtitle => '查看版本、隱私與開源資訊。';
+
+  @override
   String get clearHistory => '清除歷史記錄';
 
   @override
@@ -1683,7 +1794,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get sendFile => '傳送檔案';
 
   @override
-  String get receiveFile => '掃描以接收';
+  String get receiveFile => '接收檔案';
 
   @override
   String get sendCardDescription => '將代碼顯示在螢幕上，並讓另一台裝置對準它。';
@@ -2021,6 +2132,12 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get scanInstruction => '讓視覺碼完整位於畫面內，並穩定握住裝置。';
+
+  @override
+  String get scannerBytesUnavailable => '已識別 QR 碼，但相機未傳回資料；正在繼續掃描。';
+
+  @override
+  String get scannerInvalidFrame => '識別到的 QR 碼不是 OneSend 資料；正在繼續掃描。';
 
   @override
   String get desktopCameraInstruction => '桌面相機解碼使用螢幕截圖，因此比行動裝置慢。';
