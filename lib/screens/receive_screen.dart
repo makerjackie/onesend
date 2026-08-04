@@ -20,17 +20,45 @@ import '../widgets/stored_file_actions.dart';
 import '../widgets/transfer_mode_selector.dart';
 import 'cimbar_transfer_screen.dart';
 
+typedef ReceivePayloadDecoder =
+    Future<TransferFile> Function(Uint8List payload);
+typedef ReceivedFileSaver = Future<StoredTransfer> Function(TransferFile file);
+
+enum _ReceiveSavePhase {
+  scanning,
+  recovering,
+  decoding,
+  readyToSave,
+  saving,
+  saved,
+  saveFailed,
+}
+
 class ReceiveScreen extends StatefulWidget {
-  const ReceiveScreen({required this.store, this.settings, super.key});
+  const ReceiveScreen({
+    required this.store,
+    this.settings,
+    this.payloadDecoder,
+    this.receivedFileSaver,
+    @visibleForTesting this.cameraBuilder,
+    super.key,
+  });
 
   final TransferStore store;
   final AppSettings? settings;
+  final ReceivePayloadDecoder? payloadDecoder;
+  final ReceivedFileSaver? receivedFileSaver;
+
+  /// Test seam that avoids constructing a native camera preview.
+  @visibleForTesting
+  final WidgetBuilder? cameraBuilder;
 
   @override
-  State<ReceiveScreen> createState() => _ReceiveScreenState();
+  State<ReceiveScreen> createState() => ReceiveScreenState();
 }
 
-class _ReceiveScreenState extends State<ReceiveScreen>
+@visibleForTesting
+class ReceiveScreenState extends State<ReceiveScreen>
     with WidgetsBindingObserver {
   final OpticalReceiver _receiver = OpticalReceiver();
   final MobileScannerController _mobileController = MobileScannerController(
@@ -45,18 +73,30 @@ class _ReceiveScreenState extends State<ReceiveScreen>
   StoredTransfer? _storedFile;
   String? _error;
   bool _paused = false;
-  bool _completed = false;
-  bool _processing = false;
-  bool _saving = false;
+  _ReceiveSavePhase _savePhase = _ReceiveSavePhase.scanning;
   DateTime? _receiveStartedAt;
   Timer? _speedTicker;
   late TransferAlgorithm _algorithm;
   late TransferMode _mode;
 
   bool get _usesMobileScanner =>
-      Platform.isAndroid || Platform.isIOS || Platform.isMacOS;
+      widget.cameraBuilder == null &&
+      (Platform.isAndroid || Platform.isIOS || Platform.isMacOS);
 
   bool get _usesCimbar => _algorithm == TransferAlgorithm.cimbar;
+
+  bool get _processing =>
+      _savePhase == _ReceiveSavePhase.recovering ||
+      _savePhase == _ReceiveSavePhase.decoding ||
+      _savePhase == _ReceiveSavePhase.saving;
+
+  bool get _saving => _savePhase == _ReceiveSavePhase.saving;
+
+  bool get _completed =>
+      _savePhase == _ReceiveSavePhase.readyToSave ||
+      _savePhase == _ReceiveSavePhase.saving ||
+      _savePhase == _ReceiveSavePhase.saved ||
+      _savePhase == _ReceiveSavePhase.saveFailed;
 
   @override
   void initState() {
@@ -230,33 +270,50 @@ class _ReceiveScreenState extends State<ReceiveScreen>
       _receiveStartedAt ??= DateTime.now();
     });
     if (event.error != null) {
-      setState(() => _processing = true);
+      setState(() => _savePhase = _ReceiveSavePhase.recovering);
       unawaited(_recoverFromFailure(event.error!));
       return;
     }
     final payload = event.payload;
-    if (payload != null && event.verified && !_completed) {
-      setState(() {
-        _processing = true;
-        _saving = true;
-      });
-      unawaited(_finishTransfer(payload));
+    if (payload != null && event.verified) {
+      unawaited(_acceptVerifiedPayload(payload));
     }
+  }
+
+  /// Direct state-machine entry for widget tests. Production enters through
+  /// [_handleReceiverEvent] after the optical receiver verifies a payload.
+  @visibleForTesting
+  Future<void> acceptVerifiedPayloadForTesting(Uint8List payload) =>
+      _acceptVerifiedPayload(payload);
+
+  Future<void> _acceptVerifiedPayload(Uint8List payload) async {
+    if (!mounted || _savePhase != _ReceiveSavePhase.scanning) return;
+    setState(() {
+      _savePhase = _ReceiveSavePhase.decoding;
+      _error = null;
+    });
+    await _finishTransfer(payload);
   }
 
   Future<void> _finishTransfer(Uint8List payload) async {
     try {
-      if (_usesMobileScanner) await _mobileController.stop();
-      final file = await decodeTransferFileInBackground(payload);
-      if (mounted) {
-        setState(() {
-          _receivedFile = file;
-          _completed = true;
-          _processing = false;
-          _saving = true;
-          _error = null;
-        });
+      if (_usesMobileScanner) {
+        try {
+          await _mobileController.stop();
+        } catch (_) {
+          // Camera cleanup must not prevent decoding an already verified file.
+        }
       }
+      final file =
+          await (widget.payloadDecoder ?? decodeTransferFileInBackground)(
+            payload,
+          );
+      if (!mounted || _savePhase != _ReceiveSavePhase.decoding) return;
+      setState(() {
+        _receivedFile = file;
+        _savePhase = _ReceiveSavePhase.readyToSave;
+        _error = null;
+      });
       await _saveDecodedFile();
     } catch (error) {
       await _recoverFromFailure(_friendlyReceiveError(error));
@@ -267,21 +324,20 @@ class _ReceiveScreenState extends State<ReceiveScreen>
   /// can be retried without asking the sender to replay the whole transfer.
   Future<void> _saveDecodedFile() async {
     final file = _receivedFile;
-    if (file == null || _saving || _storedFile != null) return;
-    if (mounted) {
-      setState(() {
-        _completed = true;
-        _processing = false;
-        _saving = true;
-        _error = null;
-      });
-    }
+    final canSave =
+        _savePhase == _ReceiveSavePhase.readyToSave ||
+        _savePhase == _ReceiveSavePhase.saveFailed;
+    if (!mounted || file == null || !canSave || _storedFile != null) return;
+    setState(() {
+      _savePhase = _ReceiveSavePhase.saving;
+      _error = null;
+    });
     try {
-      final stored = await saveReceivedFile(file);
-      if (!mounted) return;
+      final stored = await (widget.receivedFileSaver ?? saveReceivedFile)(file);
+      if (!mounted || _savePhase != _ReceiveSavePhase.saving) return;
       setState(() {
         _storedFile = stored;
-        _saving = false;
+        _savePhase = _ReceiveSavePhase.saved;
         _error = null;
       });
       try {
@@ -306,18 +362,13 @@ class _ReceiveScreenState extends State<ReceiveScreen>
           );
         }
       }
-      try {
-        await _disableWakelock();
-      } catch (_) {
-        // Wakelock is best effort and must not hide a successfully saved file.
-      }
+      // Cleanup is best effort and must not delay a successfully saved file.
+      unawaited(_disableWakelock());
     } catch (error) {
-      if (!mounted) return;
+      if (!mounted || _savePhase != _ReceiveSavePhase.saving) return;
       setState(() {
         _storedFile = null;
-        _completed = true;
-        _processing = false;
-        _saving = false;
+        _savePhase = _ReceiveSavePhase.saveFailed;
         _error = AppLocalizations.of(
           context,
         )!.saveFailed(_friendlyReceiveError(error));
@@ -326,7 +377,9 @@ class _ReceiveScreenState extends State<ReceiveScreen>
   }
 
   Future<void> _retrySave() async {
-    if (_saving || _receivedFile == null) return;
+    if (_savePhase != _ReceiveSavePhase.saveFailed || _receivedFile == null) {
+      return;
+    }
     await _saveDecodedFile();
   }
 
@@ -343,9 +396,9 @@ class _ReceiveScreenState extends State<ReceiveScreen>
     if (!mounted) return;
     setState(() {
       _snapshot = null;
-      _completed = false;
-      _processing = false;
-      _saving = false;
+      _receivedFile = null;
+      _storedFile = null;
+      _savePhase = _ReceiveSavePhase.scanning;
       _error = stableMessage;
       _receiveStartedAt = null;
     });
@@ -397,9 +450,7 @@ class _ReceiveScreenState extends State<ReceiveScreen>
       _receivedFile = null;
       _storedFile = null;
       _error = null;
-      _completed = false;
-      _processing = false;
-      _saving = false;
+      _savePhase = _ReceiveSavePhase.scanning;
       _paused = false;
       _receiveStartedAt = null;
     });
@@ -707,6 +758,8 @@ class _ReceiveScreenState extends State<ReceiveScreen>
   }
 
   Widget _buildCamera() {
+    final cameraBuilder = widget.cameraBuilder;
+    if (cameraBuilder != null) return cameraBuilder(context);
     if (_usesMobileScanner) {
       return MobileScanner(
         controller: _mobileController,
@@ -799,7 +852,7 @@ class _ReceiveScreenState extends State<ReceiveScreen>
                   SizedBox(
                     width: double.infinity,
                     child: FilledButton.icon(
-                      onPressed: _reset,
+                      onPressed: _saving ? null : _reset,
                       icon: const Icon(Icons.qr_code_scanner_rounded),
                       label: Text(l10n.continueReceiving),
                     ),

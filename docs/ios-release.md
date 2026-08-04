@@ -4,7 +4,7 @@ OneSend uses the bundle identifier `com.makerjackie.onesend`.
 
 ## Current version / 当前版本
 
-OneSend 1.5.0 (build 18) is the current release candidate. This checklist does not assert any
+OneSend 1.5.0 (build 19) is the current release candidate. This checklist does not assert any
 TestFlight processing, Beta App Review, or external tester availability status; check
 App Store Connect for the live status.
 
@@ -24,23 +24,23 @@ asc xcode archive \
   --scheme "Runner" \
   --configuration Release \
   --clean \
-  --archive-path "build/ios-testflight-1.5.0-18/OneSend.xcarchive" \
+  --archive-path "build/ios-testflight-1.5.0-19/OneSend.xcarchive" \
   --xcodebuild-flag=-destination \
   --xcodebuild-flag=generic/platform=iOS \
   --xcodebuild-flag=-allowProvisioningUpdates \
   --xcodebuild-flag=FLUTTER_BUILD_NAME=1.5.0 \
-  --xcodebuild-flag=FLUTTER_BUILD_NUMBER=18 \
+  --xcodebuild-flag=FLUTTER_BUILD_NUMBER=19 \
   --output json
 
 asc xcode export \
-  --archive-path "build/ios-testflight-1.5.0-18/OneSend.xcarchive" \
-  --ipa-path "build/ios-testflight-1.5.0-18/OneSend.ipa" \
+  --archive-path "build/ios-testflight-1.5.0-19/OneSend.xcarchive" \
+  --ipa-path "build/ios-testflight-1.5.0-19/OneSend.ipa" \
   --xcodebuild-flag=-allowProvisioningUpdates \
   --output json
 
 asc builds upload \
   --app "6797040758" \
-  --ipa "build/ios-testflight-1.5.0-18/OneSend.ipa" \
+  --ipa "build/ios-testflight-1.5.0-19/OneSend.ipa" \
   --wait \
   --output json
 ```
