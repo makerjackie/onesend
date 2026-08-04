@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.5.1 (build 20) - 2026-08-04
+
+### 中文
+
+- 将官网以及 Android、iOS、macOS、Windows、Linux 全端的官方标识统一为黑底白色光学标识，并增加品牌资源防漂移检查。
+- 简化官网结构与视觉呈现，抽取共享品牌组件，统一官网页面的品牌使用。
+- 围绕四种传输模式（可靠 QR、快速 QR、Turbo QR、CIMBAR 彩色视觉码）完成稳定性工作：未设置时仍默认稳定的快速 QR；Turbo QR 和 CIMBAR 仍需显式选择并保持实验边界；可靠 QR 保留兼容/高冗余边界。
+- 修复桌面端选择任意文件时的 `Invalid argument: object is unsendable` 问题。
+- 修复 QR 接收流程的真实落盘；落盘失败可直接重试而无需重新扫描，成功后提供保存位置、打开、分享和另存为操作。
+- 移动端只申请必要的 CAMERA 权限；桌面自动更新的网络访问边界保持不变。
+- 本版本不提供未经实测的速度承诺，也不把协议估算或上游参考基准写成 OneSend 真机实测；TestFlight 公测和审核状态以 App Store Connect 为准，本说明不宣称其已完成。
+
+### English
+
+- Unified the official brand mark across the website and Android, iOS, macOS, Windows, and Linux as the white optical mark on a black background, with a brand-asset drift check to keep variants aligned.
+- Simplified the website structure and presentation, and extracted shared brand components for consistent use across its pages.
+- Completed stability work across four transfer modes—Reliable QR, Fast QR, Turbo QR, and CIMBAR color visual code. Fast QR remains the stable default when no preference is set; Turbo QR and CIMBAR remain explicitly selected experiments; Reliable QR retains the compatibility/high-redundancy boundary.
+- Fixed desktop selection of arbitrary files failing with `Invalid argument: object is unsendable`.
+- Fixed QR reception so verified files are actually written to local disk. A failed write can be retried without rescanning, and successful reception exposes the saved location plus open, share, and save-as actions.
+- Mobile builds request only the necessary CAMERA permission; desktop automatic-update network boundaries are unchanged.
+- This release makes no unmeasured speed promise and does not present protocol estimates or upstream reference figures as measured OneSend camera results. TestFlight public-beta and review status remains subject to App Store Connect; this changelog does not claim completion.
+
 ## 1.5.0 - 2026-08-04
 
 ### 中文

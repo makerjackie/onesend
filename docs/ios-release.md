@@ -4,7 +4,7 @@ OneSend uses the bundle identifier `com.makerjackie.onesend`.
 
 ## Current version / 当前版本
 
-OneSend 1.5.0 (build 19) is the current release candidate. This checklist does not assert any
+OneSend 1.5.1 (build 20) is the release target for this checklist. This checklist does not assert any
 TestFlight processing, Beta App Review, or external tester availability status; check
 App Store Connect for the live status.
 
@@ -24,23 +24,23 @@ asc xcode archive \
   --scheme "Runner" \
   --configuration Release \
   --clean \
-  --archive-path "build/ios-testflight-1.5.0-19/OneSend.xcarchive" \
+  --archive-path "build/ios-testflight-1.5.1-20/OneSend.xcarchive" \
   --xcodebuild-flag=-destination \
   --xcodebuild-flag=generic/platform=iOS \
   --xcodebuild-flag=-allowProvisioningUpdates \
-  --xcodebuild-flag=FLUTTER_BUILD_NAME=1.5.0 \
-  --xcodebuild-flag=FLUTTER_BUILD_NUMBER=19 \
+  --xcodebuild-flag=FLUTTER_BUILD_NAME=1.5.1 \
+  --xcodebuild-flag=FLUTTER_BUILD_NUMBER=20 \
   --output json
 
 asc xcode export \
-  --archive-path "build/ios-testflight-1.5.0-19/OneSend.xcarchive" \
-  --ipa-path "build/ios-testflight-1.5.0-19/OneSend.ipa" \
+  --archive-path "build/ios-testflight-1.5.1-20/OneSend.xcarchive" \
+  --ipa-path "build/ios-testflight-1.5.1-20/OneSend.ipa" \
   --xcodebuild-flag=-allowProvisioningUpdates \
   --output json
 
 asc builds upload \
   --app "6797040758" \
-  --ipa "build/ios-testflight-1.5.0-19/OneSend.ipa" \
+  --ipa "build/ios-testflight-1.5.1-20/OneSend.ipa" \
   --wait \
   --output json
 ```
@@ -49,10 +49,11 @@ The archive must use the registered bundle identifier and an App Store distribut
 
 ## TestFlight external beta
 
-Public beta link: <https://testflight.apple.com/join/n2t1KrCp>
+TestFlight link (if configured): <https://testflight.apple.com/join/n2t1KrCp>
 
-The public link can be created while Beta App Review is pending. Testers can
-join after Apple approves at least one build in the external group.
+The link and group status may still be pending. This checklist does not claim
+that a public beta is available or that Beta App Review is complete; verify the
+current state in App Store Connect.
 
 1. Wait for the build to finish processing in App Store Connect.
 2. Create an external tester group, for example `Early Access`.

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
+import { Brand } from "../brand";
 
 export const metadata: Metadata = {
   title: "隐私说明",
@@ -11,17 +11,7 @@ export default function PrivacyPage() {
   return (
     <main className="privacy-page">
       <header className="site-header page-shell">
-        <Link className="brand" href="/" aria-label="返回 OneSend 首页">
-          <Image
-            className="brand-icon"
-            src="/icon.png"
-            alt=""
-            width={40}
-            height={40}
-            unoptimized
-          />
-          <span>OneSend</span>
-        </Link>
+        <Brand href="/" ariaLabel="返回 OneSend 首页" size={40} />
         <nav aria-label="隐私页面导航">
           <Link className="nav-github" href="/">
             返回首页 ↙

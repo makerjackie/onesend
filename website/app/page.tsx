@@ -1,4 +1,5 @@
 import { WebTransfer } from "./web-transfer";
+import { Brand } from "./brand";
 
 const releaseBase =
   "https://github.com/makerjackie/onesend/releases/latest/download";
@@ -95,15 +96,6 @@ const webTransferCopy = {
   errorPrefix: "错误：",
 } as const;
 
-function Brand() {
-  return (
-    <a className="brand" href="#top" aria-label="OneSend 首页">
-      <span className="brand-mark">1</span>
-      <span>OneSend</span>
-    </a>
-  );
-}
-
 function Arrow() {
   return <span aria-hidden="true">↗</span>;
 }
@@ -112,7 +104,7 @@ export default function Home() {
   return (
     <main id="top" className="site-compact">
       <header className="site-header page-shell">
-        <Brand />
+        <Brand href="#top" />
         <nav aria-label="主导航">
           <a href="#web-transfer">网页试用</a>
           <a href="#download">下载</a>
@@ -179,7 +171,7 @@ export default function Home() {
       </section>
 
       <footer className="site-footer page-shell">
-        <Brand />
+        <Brand href="#top" />
         <p>OneSend · 扫传 · MIT License</p>
       </footer>
     </main>

@@ -1599,7 +1599,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   AppLocalizationsZhHant() : super('zh_Hant');
 
   @override
-  String get appTitle => 'OneSend';
+  String get appTitle => 'OneSend · 掃傳';
 
   @override
   String get followSystem => '跟隨系統';

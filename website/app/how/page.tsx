@@ -1,25 +1,17 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Brand } from "../brand";
 
 export const metadata: Metadata = {
   title: "原理 · OneSend",
   description: "OneSend 如何用视觉码离线传文件。",
 };
 
-function Brand() {
-  return (
-    <Link className="brand" href="/" aria-label="OneSend 首页">
-      <span className="brand-mark">1</span>
-      <span>OneSend</span>
-    </Link>
-  );
-}
-
 export default function HowPage() {
   return (
     <main id="top">
       <header className="site-header page-shell">
-        <Brand />
+        <Brand href="/" />
         <nav aria-label="导航">
           <Link href="/#web-transfer">试用</Link>
           <Link href="/#download">下载</Link>
@@ -87,7 +79,7 @@ export default function HowPage() {
       </section>
 
       <footer className="site-footer page-shell">
-        <Brand />
+        <Brand href="/" />
         <p>OneSend · 扫传</p>
         <div>
           <Link href="/">首页</Link>

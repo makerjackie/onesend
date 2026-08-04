@@ -9,6 +9,14 @@ permissions:
   contents: read
 
 jobs:
+  brand-assets:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Verify brand assets
+        run: ./tool/generate_icons.sh --check
+
   flutter:
     runs-on: ubuntu-latest
     steps:
