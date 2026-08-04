@@ -7,6 +7,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../app.dart';
+import '../core/barcode_payload_adapter.dart';
 import '../core/envelope.dart';
 import '../core/optical_transfer.dart';
 import '../core/transfer_codec.dart';
@@ -33,6 +34,8 @@ enum _ReceiveSavePhase {
   saved,
   saveFailed,
 }
+
+enum _BarcodeObservation { bytesUnavailable, invalidFrame }
 
 class ReceiveScreen extends StatefulWidget {
   const ReceiveScreen({
@@ -62,7 +65,10 @@ class ReceiveScreenState extends State<ReceiveScreen>
     with WidgetsBindingObserver {
   final OpticalReceiver _receiver = OpticalReceiver();
   final MobileScannerController _mobileController = MobileScannerController(
-    autoStart: true,
+    // ReceiveScreen owns the controller lifecycle. Keeping autoStart off
+    // avoids a race with the persisted CIMBAR/QR selection and with our
+    // explicit stop/start transitions.
+    autoStart: false,
     detectionSpeed: DetectionSpeed.unrestricted,
     formats: <BarcodeFormat>[BarcodeFormat.qrCode],
     torchEnabled: false,
@@ -72,10 +78,14 @@ class ReceiveScreenState extends State<ReceiveScreen>
   TransferFile? _receivedFile;
   StoredTransfer? _storedFile;
   String? _error;
+  _BarcodeObservation? _barcodeObservation;
   bool _paused = false;
+  bool _pausedByLifecycle = false;
+  bool _isDisposing = false;
   _ReceiveSavePhase _savePhase = _ReceiveSavePhase.scanning;
   DateTime? _receiveStartedAt;
   Timer? _speedTicker;
+  Future<void> _mobileOperationTail = Future<void>.value();
   late TransferAlgorithm _algorithm;
   late TransferMode _mode;
 
@@ -107,8 +117,8 @@ class ReceiveScreenState extends State<ReceiveScreen>
     _mode = widget.settings?.defaultMode ?? AppSettings.defaultTransferMode;
     WidgetsBinding.instance.addObserver(this);
     if (!_usesCimbar) unawaited(_enableWakelock());
-    if (_algorithm == TransferAlgorithm.cimbar && _usesMobileScanner) {
-      unawaited(_mobileController.stop());
+    if (_usesMobileScanner && !_usesCimbar) {
+      _scheduleMobileScannerStart();
     }
     _speedTicker = Timer.periodic(const Duration(milliseconds: 400), (_) {
       if (!mounted || _completed || _snapshot == null || _paused) return;
@@ -118,6 +128,7 @@ class ReceiveScreenState extends State<ReceiveScreen>
 
   @override
   void dispose() {
+    _isDisposing = true;
     WidgetsBinding.instance.removeObserver(this);
     _speedTicker?.cancel();
     unawaited(_disposeMobileController());
@@ -127,25 +138,131 @@ class ReceiveScreenState extends State<ReceiveScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state != AppLifecycleState.inactive &&
-        state != AppLifecycleState.paused &&
-        state != AppLifecycleState.detached &&
-        state != AppLifecycleState.hidden) {
-      return;
+    switch (state) {
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.paused:
+      case AppLifecycleState.detached:
+      case AppLifecycleState.hidden:
+        unawaited(_pauseForLifecycle());
+      case AppLifecycleState.resumed:
+        unawaited(_resumeAfterLifecycle());
     }
-    unawaited(_pauseForLifecycle());
   }
 
   Future<void> _pauseForLifecycle() async {
-    if (_completed || _processing || _paused) return;
-    _paused = true;
-    if (_usesMobileScanner) {
-      try {
-        await _mobileController.stop();
-      } catch (_) {}
+    if (!_usesMobileScanner ||
+        _usesCimbar ||
+        _completed ||
+        _processing ||
+        _paused ||
+        _isDisposing) {
+      return;
     }
+    final controllerState = _mobileController.value;
+    // Permission prompts can emit inactive before the controller is attached
+    // or started. Do not turn that transient state into a dead scanner.
+    if (!controllerState.isRunning && !controllerState.isStarting) return;
+    _paused = true;
+    _pausedByLifecycle = true;
+    try {
+      await _stopMobileScanner();
+    } catch (_) {}
     await _disableWakelock();
     if (mounted) setState(() {});
+  }
+
+  Future<void> _resumeAfterLifecycle() async {
+    if (!_pausedByLifecycle ||
+        !_usesMobileScanner ||
+        _usesCimbar ||
+        _completed ||
+        _processing ||
+        _isDisposing ||
+        !mounted) {
+      return;
+    }
+    setState(() {
+      _paused = false;
+      _pausedByLifecycle = false;
+    });
+    await _enableWakelock();
+    final started = await _startMobileScanner();
+    if (!started && mounted && !_completed && !_processing) {
+      setState(() {
+        _paused = true;
+        _pausedByLifecycle = true;
+      });
+    }
+  }
+
+  void _scheduleMobileScannerStart() {
+    if (!_usesMobileScanner ||
+        _usesCimbar ||
+        _paused ||
+        _completed ||
+        _processing ||
+        _isDisposing) {
+      return;
+    }
+    // The MobileScanner child attaches the external controller during its
+    // initState. Start only after that attachment, never in the same turn as
+    // a QR/CIMBAR mode transition.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(_startMobileScanner());
+    });
+  }
+
+  Future<bool> _startMobileScanner() async {
+    if (!_usesMobileScanner ||
+        _usesCimbar ||
+        _paused ||
+        _completed ||
+        _processing ||
+        _isDisposing ||
+        !mounted) {
+      return false;
+    }
+    try {
+      await _enqueueMobileOperation(() async {
+        if (!_usesMobileScanner ||
+            _usesCimbar ||
+            _paused ||
+            _completed ||
+            _processing ||
+            _isDisposing ||
+            !mounted) {
+          return;
+        }
+        await _mobileController.start();
+      });
+      final started = _mobileController.value.isRunning;
+      if (!started && mounted && _mobileController.value.error != null) {
+        setState(
+          () => _error = _friendlyReceiveError(_mobileController.value.error!),
+        );
+      }
+      return started;
+    } catch (error) {
+      if (mounted && !_isDisposing) {
+        setState(() => _error = _friendlyReceiveError(error));
+      }
+      return false;
+    }
+  }
+
+  Future<void> _stopMobileScanner() async {
+    if (!_usesMobileScanner) return;
+    try {
+      await _enqueueMobileOperation(_mobileController.stop);
+    } catch (_) {
+      // The controller may already be stopped or still uninitialized.
+    }
+  }
+
+  Future<void> _enqueueMobileOperation(Future<void> Function() operation) {
+    final scheduled = _mobileOperationTail.then<void>((_) => operation());
+    _mobileOperationTail = scheduled.then<void>((_) {}, onError: (_, _) {});
+    return scheduled;
   }
 
   Future<void> _selectQrMode(TransferMode mode) async {
@@ -158,11 +275,11 @@ class ReceiveScreenState extends State<ReceiveScreen>
       _error = null;
       _receiveStartedAt = null;
       _paused = false;
+      _pausedByLifecycle = false;
+      _barcodeObservation = null;
     });
     if (_usesMobileScanner) {
-      try {
-        await _mobileController.start();
-      } catch (_) {}
+      _scheduleMobileScannerStart();
     }
     final settings = widget.settings;
     if (settings == null) return;
@@ -177,15 +294,18 @@ class ReceiveScreenState extends State<ReceiveScreen>
     if (_algorithm == TransferAlgorithm.cimbar) return;
     if (_usesMobileScanner) {
       try {
-        await _mobileController.stop();
+        await _stopMobileScanner();
       } catch (_) {}
     }
+    _receiver.reset();
     setState(() {
       _algorithm = TransferAlgorithm.cimbar;
       _snapshot = null;
       _error = null;
       _receiveStartedAt = null;
       _paused = false;
+      _pausedByLifecycle = false;
+      _barcodeObservation = null;
     });
     final settings = widget.settings;
     if (settings == null) return;
@@ -231,30 +351,54 @@ class ReceiveScreenState extends State<ReceiveScreen>
     if (error is! MobileScannerException || !mounted) return;
     setState(() {
       _paused = true;
+      _pausedByLifecycle = false;
       _error = AppLocalizations.of(context)!.cimbarCameraError;
     });
+    unawaited(_stopMobileScanner());
     unawaited(_disableWakelock());
   }
 
   void _onMobileCapture(BarcodeCapture capture) {
     if (_completed || _paused || _processing) return;
     ReceiverEvent? latest;
+    _BarcodeObservation? observation;
+    var sawUsableFrame = false;
     for (final barcode in capture.barcodes) {
-      final bytes = _barcodeBytes(barcode);
-      if (bytes == null) continue;
-      latest = _receiver.consume(bytes) ?? latest;
-      if (latest?.error != null || latest?.payload != null) break;
+      final payload = adaptBarcodePayload(barcode);
+      final bytes = payload.bytes;
+      if (bytes == null) {
+        observation ??= _BarcodeObservation.bytesUnavailable;
+        continue;
+      }
+      final event = _receiver.consume(bytes);
+      if (event == null) {
+        observation = _BarcodeObservation.invalidFrame;
+        continue;
+      }
+      sawUsableFrame = true;
+      latest = event;
+      if (event.error != null || event.payload != null) break;
     }
+    _setBarcodeObservation(sawUsableFrame ? null : observation);
     _handleReceiverEvent(latest);
   }
 
-  Uint8List? _barcodeBytes(Barcode barcode) {
-    final decoded = barcode.rawDecodedBytes;
-    if (decoded is DecodedBarcodeBytes) return decoded.bytes;
-    if (decoded is DecodedVisionBarcodeBytes) {
-      return decoded.bytes ?? decoded.rawBytes;
+  void _setBarcodeObservation(_BarcodeObservation? observation) {
+    if (_barcodeObservation == observation || !mounted) return;
+    setState(() => _barcodeObservation = observation);
+    if (observation != null) {
+      debugPrint('[OneSend QR scanner] ${observation.name}; continuing scan');
     }
-    return null;
+  }
+
+  String _barcodeObservationMessage() {
+    return switch (_barcodeObservation) {
+      _BarcodeObservation.bytesUnavailable =>
+        'Scanner recognized a QR code but returned no payload bytes; continuing scan.',
+      _BarcodeObservation.invalidFrame =>
+        'Scanner recognized a QR code that is not a OneSend frame; continuing scan.',
+      null => '',
+    };
   }
 
   void _consume(Uint8List bytes) {
@@ -286,6 +430,18 @@ class ReceiveScreenState extends State<ReceiveScreen>
   Future<void> acceptVerifiedPayloadForTesting(Uint8List payload) =>
       _acceptVerifiedPayload(payload);
 
+  /// Sends a deterministic native scanner capture through the production
+  /// adapter/receiver path without constructing a platform camera.
+  @visibleForTesting
+  void handleMobileCaptureForTesting(BarcodeCapture capture) =>
+      _onMobileCapture(capture);
+
+  @visibleForTesting
+  String? get barcodeObservationForTesting => _barcodeObservation?.name;
+
+  @visibleForTesting
+  bool get pausedForTesting => _paused;
+
   Future<void> _acceptVerifiedPayload(Uint8List payload) async {
     if (!mounted || _savePhase != _ReceiveSavePhase.scanning) return;
     setState(() {
@@ -298,11 +454,7 @@ class ReceiveScreenState extends State<ReceiveScreen>
   Future<void> _finishTransfer(Uint8List payload) async {
     try {
       if (_usesMobileScanner) {
-        try {
-          await _mobileController.stop();
-        } catch (_) {
-          // Camera cleanup must not prevent decoding an already verified file.
-        }
+        await _stopMobileScanner();
       }
       final file =
           await (widget.payloadDecoder ?? decodeTransferFileInBackground)(
@@ -386,11 +538,7 @@ class ReceiveScreenState extends State<ReceiveScreen>
   Future<void> _recoverFromFailure(String message) async {
     final stableMessage = _friendlyReceiveError(message);
     if (_usesMobileScanner) {
-      try {
-        await _mobileController.stop();
-      } catch (_) {
-        // The scanner may already be stopped after a completed decode.
-      }
+      await _stopMobileScanner();
     }
     _receiver.reset();
     if (!mounted) return;
@@ -401,6 +549,8 @@ class ReceiveScreenState extends State<ReceiveScreen>
       _savePhase = _ReceiveSavePhase.scanning;
       _error = stableMessage;
       _receiveStartedAt = null;
+      _barcodeObservation = null;
+      _pausedByLifecycle = false;
     });
     try {
       await _enableWakelock();
@@ -408,11 +558,7 @@ class ReceiveScreenState extends State<ReceiveScreen>
       // Camera progress remains usable if wakelock is unavailable.
     }
     if (_usesMobileScanner) {
-      try {
-        await _mobileController.start();
-      } catch (error) {
-        if (mounted) setState(() => _error = _friendlyReceiveError(error));
-      }
+      _scheduleMobileScannerStart();
     }
   }
 
@@ -420,15 +566,26 @@ class ReceiveScreenState extends State<ReceiveScreen>
     if (_completed || _processing) return;
     try {
       if (_paused) {
-        setState(() => _paused = false);
+        setState(() {
+          _paused = false;
+          _pausedByLifecycle = false;
+        });
         await _enableWakelock();
-        if (_usesMobileScanner) {
-          await _mobileController.start();
+        if (_usesMobileScanner && !_usesCimbar) {
+          final started = await _startMobileScanner();
+          if (!started && mounted) {
+            setState(() => _paused = true);
+          }
         }
       } else {
-        if (_usesMobileScanner) await _mobileController.stop();
+        if (_usesMobileScanner) await _stopMobileScanner();
         await _disableWakelock();
-        if (mounted) setState(() => _paused = true);
+        if (mounted) {
+          setState(() {
+            _paused = true;
+            _pausedByLifecycle = false;
+          });
+        }
       }
     } catch (error) {
       if (mounted) setState(() => _error = _friendlyReceiveError(error));
@@ -437,11 +594,7 @@ class ReceiveScreenState extends State<ReceiveScreen>
 
   Future<void> _reset() async {
     if (_usesMobileScanner) {
-      try {
-        await _mobileController.stop();
-      } catch (_) {
-        // A stopped controller is already in the state needed for reset.
-      }
+      await _stopMobileScanner();
     }
     _receiver.reset();
     if (!mounted) return;
@@ -452,15 +605,13 @@ class ReceiveScreenState extends State<ReceiveScreen>
       _error = null;
       _savePhase = _ReceiveSavePhase.scanning;
       _paused = false;
+      _pausedByLifecycle = false;
+      _barcodeObservation = null;
       _receiveStartedAt = null;
     });
     await _enableWakelock();
     if (_usesMobileScanner) {
-      try {
-        await _mobileController.start();
-      } catch (error) {
-        if (mounted) setState(() => _error = error.toString());
-      }
+      _scheduleMobileScannerStart();
     }
   }
 
@@ -517,6 +668,7 @@ class ReceiveScreenState extends State<ReceiveScreen>
 
   Future<void> _disposeMobileController() async {
     try {
+      await _stopMobileScanner();
       await _mobileController.dispose();
     } catch (_) {
       // Disposal is best effort during route teardown.
@@ -646,6 +798,19 @@ class ReceiveScreenState extends State<ReceiveScreen>
                     style: Theme.of(context).textTheme.bodyMedium,
                     textAlign: TextAlign.center,
                   ),
+                  if (_barcodeObservation != null) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      _barcodeObservationMessage(),
+                      key: const ValueKey<String>(
+                        'receive-barcode-observation',
+                      ),
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodySmall?.copyWith(color: oneSendMuted),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
                   const SizedBox(height: 20),
                   Card(
                     child: Padding(
