@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:camera/camera.dart';
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
@@ -13,6 +14,7 @@ import '../app.dart';
 import '../core/envelope.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../services/cimbar_bridge.dart';
+import '../services/cimbar_camera_frames.dart';
 import '../services/file_service.dart';
 import '../services/transfer_store.dart';
 import '../widgets/stored_file_actions.dart';
@@ -93,8 +95,11 @@ class _CimbarTransferScreenState extends State<CimbarTransferScreen>
     with WidgetsBindingObserver {
   final CimbarBridge _bridge = CimbarBridge();
   WebViewController? _controller;
+  CameraController? _nativeCamera;
   Stopwatch? _receiveStopwatch;
   Timer? _statusTimer;
+  DateTime? _lastNativeFeedAt;
+  bool _nativeFeedBusy = false;
 
   String? _error;
   _CimbarStatus _status = _CimbarStatus.loading;
@@ -117,6 +122,8 @@ class _CimbarTransferScreenState extends State<CimbarTransferScreen>
 
   bool get _supportedPlatform => Platform.isAndroid || Platform.isIOS;
   bool get _isSending => widget.direction == CimbarDirection.send;
+  /// Mobile receive uses the Flutter camera plugin + WASM workers in WebView.
+  bool get _useNativeCameraFeed => !_isSending && _supportedPlatform;
   AppLocalizations get _l10n => AppLocalizations.of(context)!;
 
   @override
@@ -151,6 +158,7 @@ class _CimbarTransferScreenState extends State<CimbarTransferScreen>
     // cleanup is deliberately fire-and-forget and does not touch Flutter
     // state, so camera tracks and workers are still stopped during teardown.
     _cancelReceiveResources();
+    unawaited(_stopNativeCamera());
     _bridge.reset();
     final controller = _controller;
     _controller = null;
@@ -525,6 +533,7 @@ class _CimbarTransferScreenState extends State<CimbarTransferScreen>
   Future<void> _stopReceiveResources({bool clearProgress = false}) async {
     if (_isSending) return;
     _cancelReceiveResources();
+    await _stopNativeCamera();
     if (clearProgress) _receiveStopwatch = null;
     _setState(() {
       _receiveStarted = false;
@@ -641,15 +650,127 @@ class _CimbarTransferScreenState extends State<CimbarTransferScreen>
       _error = null;
     });
     try {
-      await _runWebViewScript('OneSendCimbar.startReceive();');
-    } on Object catch (error) {
-      debugPrint('[OneSend CIMBAR] startReceive script failed: $error');
+      if (_useNativeCameraFeed) {
+        // 1) Open Flutter camera first so the UI leaves "opening camera"
+        //    and shows a real preview even before workers arm.
+        // 2) Arm WASM workers with nativeFrames (no WebView getUserMedia).
+        // 3) Stream downscaled RGBA into the workers.
+        await _startNativeCamera(startStream: false);
+        if (!mounted) return;
+        await _runWebViewScript(
+          'OneSendCimbar.startReceive({nativeFrames:true});',
+        );
+        await _startNativeImageStream();
+      } else {
+        await _runWebViewScript('OneSendCimbar.startReceive();');
+      }
+    } on Object catch (error, stack) {
+      debugPrint('[OneSend CIMBAR] startReceive failed: $error\n$stack');
+      await _stopNativeCamera();
       if (!mounted) return;
       _setState(() {
         _receiveStarted = false;
         _error = _l10n.cimbarCameraError;
         _status = _CimbarStatus.transferFailed;
       });
+    }
+  }
+
+  Future<void> _startNativeCamera({bool startStream = true}) async {
+    await _stopNativeCamera();
+    final cameras = await availableCameras().timeout(
+      const Duration(seconds: 8),
+      onTimeout: () => throw TimeoutException('availableCameras timeout'),
+    );
+    if (cameras.isEmpty) {
+      throw StateError('No camera available');
+    }
+    final camera = cameras.firstWhere(
+      (item) => item.lensDirection == CameraLensDirection.back,
+      orElse: () => cameras.first,
+    );
+    // Prefer low/medium — full HD frames as base64 will freeze WKWebView.
+    final controller = CameraController(
+      camera,
+      ResolutionPreset.low,
+      enableAudio: false,
+      imageFormatGroup: Platform.isIOS
+          ? ImageFormatGroup.bgra8888
+          : ImageFormatGroup.yuv420,
+    );
+    await controller.initialize().timeout(
+      const Duration(seconds: 15),
+      onTimeout: () => throw TimeoutException('CameraController.initialize'),
+    );
+    if (!mounted) {
+      await controller.dispose();
+      return;
+    }
+    setState(() {
+      _nativeCamera = controller;
+      _status = _CimbarStatus.cameraStarted;
+      _error = null;
+    });
+    if (startStream) {
+      await _startNativeImageStream();
+    }
+  }
+
+  Future<void> _startNativeImageStream() async {
+    final controller = _nativeCamera;
+    if (controller == null || !controller.value.isInitialized) {
+      throw StateError('Native camera not initialized');
+    }
+    if (controller.value.isStreamingImages) return;
+    await controller.startImageStream(_onNativeCameraImage);
+    debugPrint('[OneSend CIMBAR] native image stream started');
+  }
+
+  Future<void> _stopNativeCamera() async {
+    final controller = _nativeCamera;
+    _nativeCamera = null;
+    _nativeFeedBusy = false;
+    _lastNativeFeedAt = null;
+    if (controller == null) return;
+    try {
+      if (controller.value.isStreamingImages) {
+        await controller.stopImageStream();
+      }
+    } catch (_) {}
+    try {
+      await controller.dispose();
+    } catch (_) {}
+  }
+
+  void _onNativeCameraImage(CameraImage image) {
+    if (!_receiveStarted || _receivePaused || _nativeFeedBusy) return;
+    final now = DateTime.now();
+    final last = _lastNativeFeedAt;
+    // ~5 fps to WASM; base64 + JS bridge is expensive on device.
+    if (last != null &&
+        now.difference(last) < const Duration(milliseconds: 200)) {
+      return;
+    }
+    _lastNativeFeedAt = now;
+    _nativeFeedBusy = true;
+    unawaited(_feedNativeFrame(image));
+  }
+
+  Future<void> _feedNativeFrame(CameraImage image) async {
+    try {
+      final size = cameraImageRgbaSize(image);
+      final rgba = cameraImageToRgba(image);
+      if (rgba == null || _controller == null || !mounted) return;
+      if (rgba.length < size.width * size.height * 4) return;
+      final b64 = base64Encode(rgba);
+      // Escape is unnecessary for standard base64 alphabet.
+      await _runWebViewScript(
+        'OneSendCimbar.feedNativeFrame(${size.width},${size.height},"$b64");',
+      );
+    } catch (error) {
+      debugPrint('[OneSend CIMBAR] native frame feed failed: $error');
+    } finally {
+      _nativeFeedBusy = false;
     }
   }
 
@@ -802,6 +923,42 @@ class _CimbarTransferScreenState extends State<CimbarTransferScreen>
     final controller = _controller;
     if (controller == null) {
       return const Center(child: CircularProgressIndicator());
+    }
+    // Receive: Flutter camera is the visible preview. WebView must still be
+    // full-size in the tree — an 8×8 WKWebView often never finishes WASM /
+    // workers, which left the UI stuck on "正在打开摄像头".
+    if (_useNativeCameraFeed) {
+      final cam = _nativeCamera;
+      return ColoredBox(
+        color: oneSendInk,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // Full-size, nearly invisible WebView under the preview.
+            Positioned.fill(
+              child: IgnorePointer(
+                child: Opacity(
+                  opacity: 0.02,
+                  child: WebViewWidget(controller: controller),
+                ),
+              ),
+            ),
+            if (cam != null && cam.value.isInitialized)
+              FittedBox(
+                fit: BoxFit.cover,
+                child: SizedBox(
+                  width: cam.value.previewSize?.height ?? 720,
+                  height: cam.value.previewSize?.width ?? 1280,
+                  child: CameraPreview(cam),
+                ),
+              )
+            else
+              const Center(
+                child: CircularProgressIndicator(color: Colors.white),
+              ),
+          ],
+        ),
+      );
     }
     return ColoredBox(
       color: oneSendInk,

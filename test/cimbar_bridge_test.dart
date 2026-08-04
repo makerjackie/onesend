@@ -42,6 +42,16 @@ void main() {
       () => CimbarBridgeEvent.parse(_event(<String, Object?>{'type': 'nope'})),
       throwsA(isA<CimbarBridgeFormatException>()),
     );
+    // Camera-live must be allow-listed; otherwise receive dies right after open.
+    final live = CimbarBridgeEvent.parse(
+      _event(<String, Object?>{
+        'type': 'receive-camera-live',
+        'native': true,
+        'width': 480,
+        'height': 360,
+      }),
+    );
+    expect(live.type, 'receive-camera-live');
   });
 
   test('reassembles out-of-order chunks and sanitizes the filename', () {

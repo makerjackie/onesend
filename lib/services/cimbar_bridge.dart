@@ -223,6 +223,9 @@ const Set<String> _knownEventTypes = <String>{
   'send-complete',
   'receive-ready',
   'receive-started',
+  // Fired when WebView getUserMedia OR Flutter native camera is live.
+  // Missing this from the allow-list aborts receive right after start.
+  'receive-camera-live',
   'decode-progress',
   'receive-file-start',
   'receive-file-chunk',

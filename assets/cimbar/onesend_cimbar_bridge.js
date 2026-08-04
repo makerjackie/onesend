@@ -33,6 +33,9 @@
     pendingAnimationFrames: [],
     pausedRequestAnimationFrame: null,
     cameraCaptureInstalled: false,
+    nativeFrames: false,
+    nextNativeWorker: 0,
+    nativeFeedAnnounced: false,
   };
 
   function bridge(type, details) {
@@ -602,26 +605,38 @@
     }
   }
 
-  function startReceive() {
+  function startReceive(options) {
     if (state.receiveStarted) {
       return;
     }
+    options = options || {};
+    // nativeFrames: Flutter owns the camera preview (mobile). WebView only
+    // runs WASM workers — avoids black file:// getUserMedia sessions.
+    state.nativeFrames = options.nativeFrames === true;
     state.receiveStarted = true;
     state.receiveStartedAt = performance.now();
     state.receiveVideoStarted = false;
+    state.nextNativeWorker = 0;
+    state.nativeFeedAnnounced = false;
     try {
-      // Camera access is deliberately reached only from this native-button
-      // initiated call. The decoder workers are also created at this point.
       installReceiveWorkerTracking();
       global.Recv.init_ww(4);
       if (typeof global.Recv.setMode === 'function') {
         global.Recv.setMode(68);
       }
-      bridge('receive-started', { mode: 'B' });
-      initializeReceiveVideo();
+      bridge('receive-started', {
+        mode: 'B',
+        nativeFrames: state.nativeFrames,
+      });
+      if (state.nativeFrames) {
+        state.receiveVideoStarted = true;
+        bridge('receive-camera-live', { native: true });
+      } else {
+        initializeReceiveVideo();
+      }
     } catch (error) {
       state.receiveStarted = false;
-      // init_ww / worker construction failures are not camera permission issues.
+      state.nativeFrames = false;
       const text = error && error.message ? String(error.message) : String(error);
       const phase = /camera|mediaDevices|getUserMedia|permission|NotAllowed|NotFound/i.test(
         text,
@@ -629,6 +644,63 @@
         ? 'camera'
         : 'decode';
       fail(phase, error);
+    }
+  }
+
+  function base64ToBytes(base64) {
+    const binary = global.atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i += 1) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return bytes;
+  }
+
+  /**
+   * Ingest one RGBA frame from the Flutter camera plugin.
+   * width/height must match the pixel buffer (width*height*4 bytes).
+   */
+  function feedNativeFrame(width, height, rgbaBase64) {
+    if (!state.receiveStarted || !state.nativeFrames) return false;
+    if (!state.receiveWorkers || state.receiveWorkers.length === 0) return false;
+    const w = Number(width) | 0;
+    const h = Number(height) | 0;
+    if (w <= 0 || h <= 0 || typeof rgbaBase64 !== 'string' || !rgbaBase64) {
+      return false;
+    }
+    try {
+      const pixels = base64ToBytes(rgbaBase64);
+      if (pixels.length < w * h * 4) return false;
+      const index = state.nextNativeWorker % state.receiveWorkers.length;
+      state.nextNativeWorker = index + 1;
+      const worker = state.receiveWorkers[index];
+      // Copy into a transferable buffer for the worker.
+      const copy = pixels.slice(0, w * h * 4);
+      worker.postMessage(
+        {
+          type: 'proc',
+          pixels: copy,
+          format: 'RGBA',
+          width: w,
+          height: h,
+          mode: 68,
+        },
+        [copy.buffer],
+      );
+      // First successful feed: confirm live path (idempotent for Flutter status).
+      if (!state.nativeFeedAnnounced) {
+        state.nativeFeedAnnounced = true;
+        bridge('receive-camera-live', {
+          native: true,
+          width: w,
+          height: h,
+          fed: true,
+        });
+      }
+      return true;
+    } catch (error) {
+      console.warn('[onesend-cimbar] feedNativeFrame failed', error);
+      return false;
     }
   }
 
@@ -648,6 +720,9 @@
     state.receiveVideoStarted = false;
     state.receiveWasmReady = false;
     state.receiveStartedAt = 0;
+    state.nativeFrames = false;
+    state.nextNativeWorker = 0;
+    state.nativeFeedAnnounced = false;
     stopReceiveWorkers();
   }
 
@@ -703,6 +778,7 @@
     togglePause: togglePause,
     bootReceive: bootReceive,
     startReceive: startReceive,
+    feedNativeFrame: feedNativeFrame,
     stopReceive: stopReceive,
     stop: stop,
   };
