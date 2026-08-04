@@ -8,9 +8,9 @@ import '../services/file_service.dart';
 
 /// A compact, shared mode entry used by send, receive, and settings.
 ///
-/// QR profiles are shown as individual choices when [showQrProfiles] is true;
-/// receive can hide those profiles because the first received frame declares
-/// its profile. The color-code transport remains a peer choice in both cases.
+/// Default surface is two peers: QR (stable default Fast) and color code.
+/// Set [showQrProfiles] for settings so Reliable / Fast / Turbo stay available
+/// as advanced QR profiles without cluttering the main transfer path.
 class TransferModeSelector extends StatelessWidget {
   const TransferModeSelector({
     required this.algorithm,
@@ -19,7 +19,7 @@ class TransferModeSelector extends StatelessWidget {
     required this.onQrModeSelected,
     required this.onCimbarSelected,
     this.showLabel = true,
-    this.showQrProfiles = true,
+    this.showQrProfiles = false,
     this.dense = false,
     this.keyPrefix = 'transfer-mode',
     super.key,
@@ -60,7 +60,9 @@ class TransferModeSelector extends StatelessWidget {
           semanticLabel: l10n.modeQr,
           icon: Icons.qr_code_2_rounded,
           selected: algorithm == TransferAlgorithm.qr,
-          onSelected: () => onQrModeSelected(mode),
+          onSelected: () => onQrModeSelected(
+            algorithm == TransferAlgorithm.qr ? mode : TransferMode.fast,
+          ),
           key: ValueKey<String>('$keyPrefix-qr'),
         ),
       _buildChip(

@@ -11,8 +11,9 @@
 (function (global) {
   'use strict';
 
-  const MAX_INPUT_FILE_BYTES = 16 * 1024 * 1024;
-  const MAX_ENVELOPE_BYTES = MAX_INPUT_FILE_BYTES + 17 + 4096 + 256;
+  // Peak experimental ceiling: match libcimbar/envelope 33 MiB (iPhone tests).
+  const MAX_INPUT_FILE_BYTES = 33 * 1024 * 1024;
+  const MAX_ENVELOPE_BYTES = MAX_INPUT_FILE_BYTES;
   const CHUNK_BYTES = 128 * 1024;
   const BRIDGE_CHANNEL = 'OneSendCimbarBridge';
   const state = {
@@ -137,7 +138,7 @@
       throw new Error('没有选择有效文件。');
     }
     if (file.size > MAX_INPUT_FILE_BYTES) {
-      throw new Error('当前移动端 CIMBAR 实验上限为 16 MiB。');
+      throw new Error('当前移动端 CIMBAR 实验上限为 33 MiB。');
     }
 
     state.sendInFlight = true;
@@ -164,7 +165,7 @@
         bytes: rawBytes,
       });
       if (envelope.length > MAX_ENVELOPE_BYTES) {
-        throw new Error('文件加上 CIMBAR envelope 后超过 16 MiB 移动端上限。');
+        throw new Error('文件加上 CIMBAR envelope 后超过 33 MiB 移动端上限。');
       }
 
       global.Send.encode_init(file.name || 'selected.bin');
@@ -222,17 +223,17 @@
           // intentionally uses the main-thread API on mobile WebViews because
           // OffscreenCanvas support differs between Android WebView and WKWebView.
           global.Main.init(canvas);
-          // Mode Bm: more reliable on varied cameras (~70% of mode B peak).
+          // Mode B + 15 fps: peak upstream profile for high-end phone tests.
+          // (Bm/3fps was the conservative reliability profile.)
           if (typeof global.Main.setMode === 'function') {
-            global.Main.setMode('Bm');
+            global.Main.setMode('B');
           } else if (typeof global.Send.setMode === 'function') {
-            global.Send.setMode(67);
+            global.Send.setMode(68);
           }
-          // 3 fps: each color frame dwells longer for phone cameras.
-          global.Send.setFPS(3);
+          global.Send.setFPS(15);
           state.sendReady = true;
           setText('send-status', '请选择文件开始播放');
-          bridge('send-ready', { mode: 'Bm' });
+          bridge('send-ready', { mode: 'B' });
         } catch (error) {
           fail('send-init', error);
         }
@@ -267,7 +268,7 @@
       if (Array.isArray(report)) {
         bridge('decode-progress', {
           progress: report.map(function (value) { return Number(value); }),
-          mode: 'Bm',
+          mode: 'B',
         });
       }
       return originalProgress.apply(this, arguments);
@@ -305,7 +306,7 @@
         const sourceSize = Number(blob && blob.size);
         if (!Number.isSafeInteger(sourceSize) ||
             sourceSize < 0 || sourceSize > MAX_ENVELOPE_BYTES) {
-          throw new Error('解码结果超过 16 MiB 移动端上限或大小无效。');
+          throw new Error('解码结果超过 33 MiB 移动端上限或大小无效。');
         }
         const buffer = await blob.arrayBuffer();
         if (buffer.byteLength !== sourceSize) {
@@ -320,7 +321,7 @@
         const bytes = decoded.bytes;
         const size = bytes.length;
         if (size > MAX_INPUT_FILE_BYTES) {
-          throw new Error('解码文件超过 16 MiB 移动端上限。');
+          throw new Error('解码文件超过 33 MiB 移动端上限。');
         }
         if (receiveGeneration !== state.receiveGeneration ||
             !state.receiveStarted) {
@@ -444,12 +445,12 @@
       global.Module = global.Module || {};
       global.Module.onRuntimeInitialized = function () {
         state.receiveWasmReady = true;
-        // Match sender mode Bm (67). Auto (0) also works, but locking avoids
+        // Match sender mode B (68). Auto (0) also works, but locking avoids
         // wasteful mode cycling on empty frames.
         if (typeof global.Recv.setMode === 'function') {
-          global.Recv.setMode(67);
+          global.Recv.setMode(68);
         }
-        bridge('receive-ready', { decoder: 'upstream-worker', mode: 'Bm' });
+        bridge('receive-ready', { decoder: 'upstream-worker', mode: 'B' });
         initializeReceiveVideo();
       };
     } catch (error) {
@@ -470,9 +471,9 @@
       installReceiveWorkerTracking();
       global.Recv.init_ww(4);
       if (typeof global.Recv.setMode === 'function') {
-        global.Recv.setMode(67);
+        global.Recv.setMode(68);
       }
-      bridge('receive-started', { mode: 'Bm' });
+      bridge('receive-started', { mode: 'B' });
       initializeReceiveVideo();
     } catch (error) {
       state.receiveStarted = false;

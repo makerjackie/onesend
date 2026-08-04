@@ -21,6 +21,18 @@ void main() {
   testWidgets('home and about share the official brand icon asset', (
     WidgetTester tester,
   ) async {
+    final view = tester.view;
+    final oldSize = view.physicalSize;
+    final oldDevicePixelRatio = view.devicePixelRatio;
+    view
+      ..physicalSize = const Size(390, 844)
+      ..devicePixelRatio = 1;
+    addTearDown(() {
+      view
+        ..physicalSize = oldSize
+        ..devicePixelRatio = oldDevicePixelRatio;
+    });
+
     final settings = AppSettings(initialLocaleTag: 'zh-Hans');
     addTearDown(settings.dispose);
 

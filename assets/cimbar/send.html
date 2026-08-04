@@ -11,10 +11,9 @@
     html, body { margin: 0; min-height: 100%; background: #10130f; color: #f5f6f0; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
     body { display: flex; justify-content: center; padding: 12px; }
     main { width: min(100%, 760px); display: flex; flex-direction: column; gap: 12px; }
-    /* Keep canvas bitmap == CSS size. CSS-shrinking mode-B color cells makes
-       phone cameras fail to decode (same class of bug as web QR downscale). */
+    /* Peak Mode B: keep 1024×1024 bitmap == CSS size. Never CSS-downscale cells. */
     #canvas-shell { width: 100%; min-height: 48vh; display: grid; place-items: center; background: #000; border: 2px solid #d9f866; overflow: auto; padding: 8px; }
-    #canvas { display: block; width: auto; height: auto; max-width: none; background: #000; image-rendering: pixelated; }
+    #canvas { display: block; width: 1024px; height: 1024px; max-width: none; background: #000; image-rendering: pixelated; }
     #file_input { display: none; }
     #nav-container, #invisible_click { position: absolute; width: 1px; height: 1px; overflow: hidden; opacity: 0; pointer-events: none; }
     #nav-content { display: none; }

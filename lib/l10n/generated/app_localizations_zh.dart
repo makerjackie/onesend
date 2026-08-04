@@ -30,7 +30,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get modeCimbar => '彩色视觉码';
 
   @override
-  String get modeQr => 'QR 视觉码';
+  String get modeQr => '二维码';
 
   @override
   String get compatibilityMode => '兼容';
@@ -864,7 +864,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get modeCimbar => '彩色视觉码';
 
   @override
-  String get modeQr => 'QR 视觉码';
+  String get modeQr => '二维码';
 
   @override
   String get compatibilityMode => '兼容';
@@ -1698,7 +1698,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get modeCimbar => '彩色視覺碼';
 
   @override
-  String get modeQr => 'QR 視覺碼';
+  String get modeQr => '二維碼';
 
   @override
   String get compatibilityMode => '相容性';

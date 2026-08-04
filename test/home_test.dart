@@ -7,6 +7,7 @@ import 'package:onesend/screens/receive_screen.dart';
 import 'package:onesend/screens/send_screen.dart';
 import 'package:onesend/services/app_settings.dart';
 import 'package:onesend/services/transfer_store.dart';
+import 'package:onesend/widgets/brand_mark.dart';
 
 void main() {
   testWidgets('mobile shell exposes transfer, files, and settings tabs', (
@@ -25,7 +26,7 @@ void main() {
     expect(find.text('传输'), findsOneWidget);
     expect(find.text('发送文件'), findsOneWidget);
     expect(find.text('接收文件'), findsOneWidget);
-    expect(find.text('最近传输'), findsNothing);
+    expect(find.text('最近传输'), findsOneWidget);
     expect(find.byIcon(Icons.settings_outlined), findsOneWidget);
     expect(find.byIcon(Icons.info_outline_rounded), findsNothing);
   });
@@ -45,7 +46,7 @@ void main() {
       await tester.tap(find.text('文件'));
       await tester.pumpAndSettle();
       expect(find.text('管理传输记录和已接收文件。'), findsOneWidget);
-      expect(find.text('最近传输'), findsNothing);
+      expect(find.text('文件'), findsWidgets);
 
       await tester.tap(find.text('设置'));
       await tester.pumpAndSettle();
@@ -90,6 +91,25 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
     expect(find.byType(ReceiveScreen), findsOneWidget);
   });
+
+  testWidgets('desktop shell uses a navigation rail with brand and history', (
+    WidgetTester tester,
+  ) async {
+    _setDesktopSurface(tester);
+
+    final settings = AppSettings(initialLocaleTag: 'zh-Hans');
+    addTearDown(settings.dispose);
+    await tester.pumpWidget(
+      OneSendApp(store: TransferStore(), settings: settings),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(NavigationRail), findsOneWidget);
+    expect(find.byType(NavigationBar), findsNothing);
+    expect(find.byType(BrandIcon), findsWidgets);
+    expect(find.text('最近传输'), findsOneWidget);
+    expect(find.text('发送文件'), findsOneWidget);
+  });
 }
 
 void _setMobileSurface(WidgetTester tester) {
@@ -98,6 +118,20 @@ void _setMobileSurface(WidgetTester tester) {
   final oldDevicePixelRatio = view.devicePixelRatio;
   view
     ..physicalSize = const Size(390, 844)
+    ..devicePixelRatio = 1;
+  addTearDown(() {
+    view
+      ..physicalSize = oldSize
+      ..devicePixelRatio = oldDevicePixelRatio;
+  });
+}
+
+void _setDesktopSurface(WidgetTester tester) {
+  final view = tester.view;
+  final oldSize = view.physicalSize;
+  final oldDevicePixelRatio = view.devicePixelRatio;
+  view
+    ..physicalSize = const Size(1280, 720)
     ..devicePixelRatio = 1;
   addTearDown(() {
     view

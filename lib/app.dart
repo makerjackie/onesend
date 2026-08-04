@@ -8,10 +8,29 @@ import 'services/app_settings.dart';
 import 'services/transfer_store.dart';
 import 'services/update_service.dart';
 
-const Color oneSendInk = Color(0xff10130f);
-const Color oneSendLime = Color(0xffd9f866);
-const Color oneSendPaper = Color(0xfff5f6f0);
-const Color oneSendMuted = Color(0xff737970);
+// Shared brand tokens — keep aligned with website/app/globals.css.
+const Color oneSendInk = Color(0xff191d17);
+const Color oneSendLime = Color(0xffd9f46f);
+const Color oneSendPaper = Color(0xfffbfaf4);
+const Color oneSendSurface = Color(0xfffffefb);
+const Color oneSendSurfaceMuted = Color(0xfff2f3eb);
+const Color oneSendMuted = Color(0xff70776d);
+const Color oneSendLine = Color(0xffd9ded3);
+const Color oneSendLineStrong = Color(0xffb9c1b5);
+const Color oneSendFocus = Color(0xff789b16);
+
+const double oneSendRadiusCard = 12;
+const double oneSendRadiusControl = 10;
+const double oneSendRadiusBadge = 4;
+
+/// Phone bottom-nav → desktop rail / dialogs.
+const double oneSendWideBreakpoint = 760;
+
+/// Rail labels always visible at typical laptop widths.
+const double oneSendExtendedRailBreakpoint = 900;
+
+/// Two-column send/receive workbench (aligned with website desktop).
+const double oneSendWorkbenchBreakpoint = 900;
 
 class OneSendApp extends StatefulWidget {
   const OneSendApp({
@@ -49,24 +68,34 @@ class _OneSendAppState extends State<OneSendApp> {
   }
 
   Widget _buildMaterialApp(BuildContext context) {
-    const lightScheme = ColorScheme.light(
+    final lightScheme = ColorScheme.light(
       primary: oneSendInk,
-      onPrimary: Colors.white,
+      onPrimary: oneSendSurface,
       secondary: oneSendLime,
       onSecondary: oneSendInk,
       surface: oneSendPaper,
       onSurface: oneSendInk,
-      error: Color(0xffa32820),
-      onError: Colors.white,
+      surfaceContainerHighest: oneSendSurfaceMuted,
+      surfaceContainerHigh: oneSendSurface,
+      outline: oneSendLineStrong,
+      outlineVariant: oneSendLine,
+      onSurfaceVariant: oneSendMuted,
+      error: const Color(0xffa84437),
+      onError: oneSendSurface,
     );
-    const darkScheme = ColorScheme.dark(
+    final darkScheme = ColorScheme.dark(
       primary: oneSendLime,
       onPrimary: oneSendInk,
       secondary: oneSendLime,
       onSecondary: oneSendInk,
-      surface: Color(0xff121512),
+      surface: const Color(0xff121512),
       onSurface: oneSendPaper,
-      error: Color(0xffffaaa0),
+      surfaceContainerHighest: const Color(0xff1c211c),
+      surfaceContainerHigh: const Color(0xff181c18),
+      outline: const Color(0xff3d453c),
+      outlineVariant: const Color(0xff2a3029),
+      onSurfaceVariant: const Color(0xffa8b0a5),
+      error: const Color(0xffffaaa0),
       onError: oneSendInk,
     );
     return MaterialApp(
@@ -140,23 +169,38 @@ ThemeData _buildOneSendTheme(ColorScheme scheme) {
       centerTitle: false,
     ),
     cardTheme: CardThemeData(
-      color: scheme.surfaceContainerHighest,
+      color: scheme.surfaceContainerHigh,
       margin: EdgeInsets.zero,
       elevation: 0,
       shadowColor: Colors.transparent,
       surfaceTintColor: Colors.transparent,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.all(Radius.circular(18)),
+      shape: RoundedRectangleBorder(
+        borderRadius: const BorderRadius.all(
+          Radius.circular(oneSendRadiusCard),
+        ),
+        side: BorderSide(color: scheme.outlineVariant),
+      ),
+    ),
+    dialogTheme: DialogThemeData(
+      backgroundColor: scheme.surfaceContainerHigh,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: const BorderRadius.all(
+          Radius.circular(oneSendRadiusCard),
+        ),
+        side: BorderSide(color: scheme.outlineVariant),
       ),
     ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
         backgroundColor: scheme.primary,
         foregroundColor: scheme.onPrimary,
-        minimumSize: const Size(0, 48),
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 13),
+        minimumSize: const Size(0, 44),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.all(Radius.circular(16)),
+          borderRadius: BorderRadius.all(
+            Radius.circular(oneSendRadiusControl),
+          ),
         ),
         textStyle: const TextStyle(fontWeight: FontWeight.w700),
       ),
@@ -164,21 +208,25 @@ ThemeData _buildOneSendTheme(ColorScheme scheme) {
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
         foregroundColor: scheme.onSurface,
-        minimumSize: const Size(0, 48),
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 13),
+        minimumSize: const Size(0, 44),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         side: BorderSide(color: scheme.outline, width: 1.2),
         shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.all(Radius.circular(16)),
+          borderRadius: BorderRadius.all(
+            Radius.circular(oneSendRadiusControl),
+          ),
         ),
       ),
     ),
     textButtonTheme: TextButtonThemeData(
       style: TextButton.styleFrom(
         foregroundColor: scheme.primary,
-        minimumSize: const Size(0, 44),
+        minimumSize: const Size(0, 40),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.all(Radius.circular(12)),
+          borderRadius: BorderRadius.all(
+            Radius.circular(oneSendRadiusControl),
+          ),
         ),
       ),
     ),
@@ -188,21 +236,24 @@ ThemeData _buildOneSendTheme(ColorScheme scheme) {
       space: 1,
     ),
     popupMenuTheme: PopupMenuThemeData(
-      color: scheme.surfaceContainerHighest,
+      color: scheme.surfaceContainerHigh,
       elevation: 2,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.all(Radius.circular(16)),
+      shape: RoundedRectangleBorder(
+        borderRadius: const BorderRadius.all(
+          Radius.circular(oneSendRadiusCard),
+        ),
+        side: BorderSide(color: scheme.outlineVariant),
       ),
     ),
     navigationBarTheme: NavigationBarThemeData(
-      backgroundColor: scheme.surfaceContainerHighest,
+      backgroundColor: scheme.surface,
       indicatorColor: scheme.secondary,
       labelTextStyle: WidgetStatePropertyAll(
         TextStyle(color: scheme.onSurface, fontWeight: FontWeight.w700),
       ),
     ),
     navigationRailTheme: NavigationRailThemeData(
-      backgroundColor: scheme.surfaceContainerHighest,
+      backgroundColor: scheme.surface,
       indicatorColor: scheme.secondary,
       selectedIconTheme: IconThemeData(color: scheme.onSecondary),
       unselectedIconTheme: IconThemeData(color: scheme.onSurfaceVariant),

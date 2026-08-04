@@ -6,30 +6,26 @@ import styles from "./cimbar.module.css";
 
 const SEND_WORKER_URL = "/cimbar/node_modules/cimbar-send-bootstrap.js";
 const RECEIVE_WORKER_URL = "/cimbar/node_modules/cimbar-receive-worker.js";
-const MAX_INPUT_BYTES = 32 * 1024 * 1024;
 /**
- * Mode Bm (67) — libcimbar's compact config for broader camera reliability.
- * ~70% of mode B peak speed, but far fewer empty optical frames in practice.
- * Encode + decode must use the same mode.
+ * Peak experimental profile for high-end phones (e.g. two iPhones).
+ * Matches upstream libcimbar Mode B demo: full density + full display rate.
+ * Encode and decode must stay on the same mode id.
  */
-const CIMBAR_MODE = 67;
-const CIMBAR_MODE_LABEL = "Bm";
+const MAX_INPUT_BYTES = 33 * 1024 * 1024;
+const CIMBAR_MODE = 68;
+const CIMBAR_MODE_LABEL = "B";
+/** Upstream peak display rate (~106 KB/s reference conditions). */
+const CIMBAR_DISPLAY_FPS = 15;
 /**
- * Optical display rate. Color cells need long dwell on LCD for phone cameras;
- * 3 fps is much more reliable than 8–15 for real scans (upstream default is 15).
- * Theoretical KB/s drops; empty-frame rate drops far more.
+ * Sample the camera faster than the 15 fps display so dwell frames are
+ * more likely to be captured on iPhone-class sensors.
  */
-const CIMBAR_DISPLAY_FPS = 3;
-/** Cap camera samples so transitional video frames do not dominate empty stats. */
-const RECEIVE_CAPTURE_INTERVAL_MS = 120;
-/**
- * Bitmap size == CSS size (1:1). CSS-downscaling color cells is the same
- * class of bug that made web QR unscannable. Prefer large on-screen cells.
- */
+const RECEIVE_CAPTURE_INTERVAL_MS = 33;
+/** Full Mode B grid. Keep bitmap size == CSS size (no downscale). */
+const CIMBAR_CANVAS_SIZE = 1024;
+
 function resolveCimbarCanvasSize() {
-  if (typeof window === "undefined") return 720;
-  const limit = Math.min(window.innerWidth * 0.92, window.innerHeight * 0.58);
-  return Math.max(640, Math.min(1024, Math.floor(limit)));
+  return CIMBAR_CANVAS_SIZE;
 }
 
 function guessMimeFromName(name: string, fallback = "application/octet-stream") {
@@ -53,8 +49,18 @@ function guessMimeFromName(name: string, fallback = "application/octet-stream") 
 }
 
 type View = "send" | "receive";
-type SenderState = "idle" | "loading" | "sending" | "stopped" | "error";
+type SenderState =
+  | "idle"
+  | "loading"
+  | "ready"
+  | "sending"
+  | "paused"
+  | "error";
 type ReceiverState = "idle" | "starting" | "receiving" | "complete" | "error";
+
+const SAMPLE_VIDEO_URL = "/onesend-optical-test.mp4";
+const SAMPLE_VIDEO_NAME = "onesend-optical-test.mp4";
+const SAMPLE_VIDEO_MIME = "video/mp4";
 
 type ReceivedFile = {
   name: string;
@@ -170,10 +176,6 @@ function describeError(error: unknown) {
   return "浏览器无法完成这次本地实验。";
 }
 
-function tabClass(active: boolean) {
-  return `${styles.viewTab}${active ? ` ${styles.viewTabActive}` : ""}`;
-}
-
 type CimbarTransferProps = {
   /** When set, only this direction is shown (for embedding in the main web transfer UI). */
   direction?: View;
@@ -199,6 +201,7 @@ export function CimbarTransfer({
   const [canvasSize] = useState(() => resolveCimbarCanvasSize());
   const [scanStats, setScanStats] = useState({ noData: 0, decoded: 0 });
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(true);
 
   useEffect(() => {
     if (!direction || direction === view) return;
@@ -216,10 +219,14 @@ export function CimbarTransfer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [direction]);
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const senderCanvasRef = useRef<HTMLCanvasElement>(null);
   const senderWorkerRef = useRef<Worker | null>(null);
   const senderReadyRef = useRef(false);
   const pendingFileRef = useRef<File | null>(null);
+  const startWhenReadyRef = useRef(false);
+  const sampleAbortRef = useRef<AbortController | null>(null);
+  const sampleLoadedRef = useRef(false);
 
   const receiverVideoRef = useRef<HTMLVideoElement>(null);
   const captureCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -231,6 +238,34 @@ export function CimbarTransfer({
   const cameraStreamRef = useRef<MediaStream | null>(null);
   const lastCaptureAtRef = useRef(0);
   const previewUrlRef = useRef<string | null>(null);
+  const wakeLockRef = useRef<{ release: () => Promise<void> } | null>(null);
+
+  async function requestWakeLock() {
+    try {
+      const nav = navigator as Navigator & {
+        wakeLock?: {
+          request: (
+            type: "screen",
+          ) => Promise<{ release: () => Promise<void> }>;
+        };
+      };
+      if (!nav.wakeLock?.request) return;
+      wakeLockRef.current = await nav.wakeLock.request("screen");
+    } catch {
+      // Optional on browsers that deny or lack the API.
+    }
+  }
+
+  async function releaseWakeLock() {
+    const lock = wakeLockRef.current;
+    wakeLockRef.current = null;
+    if (!lock) return;
+    try {
+      await lock.release();
+    } catch {
+      // ignore
+    }
+  }
 
   function revokePreviewUrl() {
     if (previewUrlRef.current) {
@@ -275,31 +310,52 @@ export function CimbarTransfer({
     receiverWorkerRef.current = null;
     receiverWorkerReadyRef.current = false;
     receiverFramesInFlightRef.current = 0;
+    void releaseWakeLock();
   }
 
   useEffect(() => {
     return () => {
+      sampleAbortRef.current?.abort();
       senderWorkerRef.current?.terminate();
       stopReceiverResources();
       revokePreviewUrl();
+      void releaseWakeLock();
     };
   }, []);
+
+  function markSenderReady(file: File) {
+    pendingFileRef.current = file;
+    setSelectedFile(file);
+    setSenderFrames(0);
+    setSenderError(null);
+    setSenderState("ready");
+  }
 
   function postSenderFile(file: File) {
     pendingFileRef.current = file;
     const worker = senderWorkerRef.current;
-    if (!worker || !senderReadyRef.current) return;
+    if (!worker || !senderReadyRef.current) {
+      startWhenReadyRef.current = true;
+      setSenderState("loading");
+      ensureSenderWorker(file);
+      return;
+    }
+    startWhenReadyRef.current = false;
     setSenderState("sending");
     setSenderFrames(0);
     setSenderError(null);
+    void requestWakeLock();
     worker.postMessage({ type: "load", file });
   }
 
   function ensureSenderWorker(file: File) {
     pendingFileRef.current = file;
     if (senderWorkerRef.current) {
-      if (senderReadyRef.current) postSenderFile(file);
-      else setSenderState("loading");
+      if (senderReadyRef.current) {
+        markSenderReady(file);
+      } else {
+        setSenderState("loading");
+      }
       return;
     }
 
@@ -339,7 +395,13 @@ export function CimbarTransfer({
         }
         worker.postMessage({ fun: "setMode", args: [CIMBAR_MODE] });
         worker.postMessage({ fun: "setFPS", args: [CIMBAR_DISPLAY_FPS] });
-        if (pendingFileRef.current) postSenderFile(pendingFileRef.current);
+        // Prepare only — user presses 开始发送, same as QR modes.
+        // If they already pressed start while WASM was loading, begin now.
+        if (pendingFileRef.current && startWhenReadyRef.current) {
+          postSenderFile(pendingFileRef.current);
+        } else if (pendingFileRef.current) {
+          markSenderReady(pendingFileRef.current);
+        }
       }
     };
     worker.onerror = (event) => {
@@ -354,24 +416,91 @@ export function CimbarTransfer({
     );
   }
 
-  function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  function prepareSelectedFile(file: File) {
     if (file.size > MAX_INPUT_BYTES) {
       setSenderState("error");
-      setSenderError("这个浏览器实验目前支持不超过 32 MB 的文件。");
+      setSenderError("这个浏览器实验目前支持不超过 33 MB 的文件。");
       return;
     }
-    setSelectedFile(file);
+    // Stop any active broadcast before swapping files.
+    if (senderState === "sending" || senderState === "paused") {
+      senderWorkerRef.current?.postMessage({ type: "stop" });
+    }
+    markSenderReady(file);
     ensureSenderWorker(file);
   }
 
-  function stopSender() {
-    pendingFileRef.current = null;
+  function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    sampleLoadedRef.current = true;
+    prepareSelectedFile(file);
+  }
+
+  async function loadSampleVideo({ automatic = false } = {}) {
+    if (automatic && (sampleLoadedRef.current || selectedFile)) return;
+    sampleAbortRef.current?.abort();
+    const controller = new AbortController();
+    sampleAbortRef.current = controller;
+    try {
+      setSenderState("loading");
+      setSenderError(null);
+      const response = await fetch(SAMPLE_VIDEO_URL, {
+        signal: controller.signal,
+      });
+      if (!response.ok) {
+        throw new Error(`无法加载测试视频（${response.status}）。`);
+      }
+      const buffer = await response.arrayBuffer();
+      if (controller.signal.aborted) return;
+      if (automatic && sampleLoadedRef.current) return;
+      const file = new File([buffer], SAMPLE_VIDEO_NAME, {
+        type: SAMPLE_VIDEO_MIME,
+      });
+      sampleLoadedRef.current = true;
+      prepareSelectedFile(file);
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      setSenderState("error");
+      setSenderError(describeError(error));
+    } finally {
+      if (sampleAbortRef.current === controller) {
+        sampleAbortRef.current = null;
+      }
+    }
+  }
+
+  useEffect(() => {
+    if (view !== "send") return;
+    const timer = window.setTimeout(() => {
+      void loadSampleVideo({ automatic: true });
+    }, 0);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view]);
+
+  function startSender() {
+    const file = pendingFileRef.current ?? selectedFile;
+    if (!file) return;
+    postSenderFile(file);
+  }
+
+  function pauseSender() {
     senderWorkerRef.current?.postMessage({ type: "stop" });
-    setSenderState((state) =>
-      state === "loading" || state === "sending" ? "stopped" : state,
-    );
+    setSenderState((state) => (state === "sending" ? "paused" : state));
+    void releaseWakeLock();
+  }
+
+  function stopSender() {
+    senderWorkerRef.current?.postMessage({ type: "stop" });
+    void releaseWakeLock();
+    if (pendingFileRef.current || selectedFile) {
+      setSenderState("ready");
+      setSenderFrames(0);
+      return;
+    }
+    pendingFileRef.current = null;
+    setSenderState("idle");
   }
 
   function changeView(nextView: View) {
@@ -567,13 +696,14 @@ export function CimbarTransfer({
     });
 
     try {
+      // Peak receive path for modern phones: 1080p-class stream + 30 fps so
+      // the 15 fps color display is oversampled rather than under-sampled.
       const streamPromise = navigator.mediaDevices.getUserMedia({
         audio: false,
         video: {
           facingMode: { ideal: "environment" },
-          // 720p is enough for mode Bm cells and is easier for autofocus.
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
+          width: { min: 720, ideal: 1920 },
+          height: { min: 720, ideal: 1080 },
           frameRate: { ideal: 30, max: 30 },
         },
       });
@@ -599,6 +729,7 @@ export function CimbarTransfer({
       await video.play();
       receiverActiveRef.current = true;
       setReceiverState("receiving");
+      void requestWakeLock();
       scheduleVideoFrame();
     } catch (error) {
       stopReceiverResources();
@@ -623,247 +754,337 @@ export function CimbarTransfer({
     setReceiverState("idle");
   }
 
-  const receiverActive = receiverState === "starting" || receiverState === "receiving";
+  const receiverActive =
+    receiverState === "starting" || receiverState === "receiving";
+  const senderIsActive =
+    senderState === "sending" || senderState === "paused";
+  const senderReady =
+    senderState === "ready" ||
+    senderState === "paused" ||
+    (senderState === "loading" && !!selectedFile);
   const showTabs = !embedded && !direction;
+  const fileInputId = embedded
+    ? `cimbar-file-${direction ?? view}`
+    : "cimbar-file";
+
+  const senderStatusText =
+    senderState === "loading"
+      ? "准备中…"
+      : senderState === "sending"
+        ? `发送中 · ${senderFrames} 帧`
+        : senderState === "paused"
+          ? "已暂停"
+          : senderState === "ready"
+            ? "已就绪，点开始发送"
+            : senderError
+              ? `错误：${senderError}`
+              : "准备中…";
+
+  const receiverStatusText =
+    receiverState === "starting"
+      ? "准备摄像头…"
+      : receiverState === "receiving"
+        ? scanStats.decoded > 0
+          ? `接收中 · ${Math.round(receiverProgress * 100)}%`
+          : "接收中"
+        : receiverState === "complete" && receivedFile
+          ? `完成 · ${receivedFile.name}`
+          : receiverError
+            ? `错误：${receiverError}`
+            : "开启摄像头后对准发送端";
 
   return (
-    <div className={`${styles.lab}${embedded ? ` ${styles.labEmbedded}` : ""}`}>
+    <div className={embedded ? "web-cimbar-shell" : styles.lab}>
       {showTabs && (
-        <div className={styles.viewTabs} role="tablist" aria-label="彩色高速视图">
+        <div className="web-role-switch" role="tablist" aria-label="彩色视觉码">
           <button
-            className={tabClass(view === "send")}
             type="button"
             role="tab"
+            className={view === "send" ? "is-selected" : ""}
             aria-selected={view === "send"}
             onClick={() => changeView("send")}
           >
             发送
-            <small>显示动态 cimbar</small>
           </button>
           <button
-            className={tabClass(view === "receive")}
             type="button"
             role="tab"
+            className={view === "receive" ? "is-selected" : ""}
             aria-selected={view === "receive"}
             onClick={() => changeView("receive")}
           >
             接收
-            <small>点击后开启 camera</small>
           </button>
         </div>
       )}
 
-      <div className={styles.panelStack}>
-        <article
-          className={`${styles.panel} ${view === "send" ? styles.panelVisible : styles.panelHidden}`}
-          role="tabpanel"
-          aria-label="发送文件"
-          hidden={view !== "send"}
-        >
-          <div className={styles.panelHeader}>
-            <div>
-              <span className="mono-label">SENDER / MODE B</span>
-              <h3>把文件变成彩色高速流。</h3>
-            </div>
-            <span className={styles.liveBadge}>MODE {CIMBAR_MODE_LABEL}</span>
-          </div>
-          <label className={styles.filePicker} htmlFor="cimbar-file">
-            <span className={styles.filePickerMark} aria-hidden="true">＋</span>
-            <span>
-              <strong>{selectedFile?.name || "选择任意本地文件"}</strong>
-              <small>
-                {selectedFile
-                  ? `${formatBytes(selectedFile.size)} · ${selectedFile.type || "application/octet-stream"}`
-                  : "文件只在此设备读取，不上传服务器"}
-              </small>
-            </span>
-          </label>
-          <input
-            className="visually-hidden"
-            id="cimbar-file"
-            type="file"
-            onChange={handleFileChange}
-          />
-          <div className={styles.codeStage}>
-            <canvas
-              ref={senderCanvasRef}
-              className={styles.codeCanvas}
-              width={canvasSize}
-              height={canvasSize}
-              style={{ width: canvasSize, height: canvasSize }}
-              role="img"
-              aria-label="动态 cimbar 彩色视觉码"
-            />
-            {!selectedFile && <span className={styles.codePlaceholder}>等待本地文件</span>}
-          </div>
-          <div className={styles.metrics} aria-live="polite">
-            <span><small>模式</small><strong>{CIMBAR_MODE_LABEL}</strong></span>
-            <span><small>显示</small><strong>{canvasSize}px · {CIMBAR_DISPLAY_FPS}fps</strong></span>
-            <span><small>已输出</small><strong>{senderFrames} 帧</strong></span>
-          </div>
-          <div className={styles.actions}>
-            {senderState === "sending" && (
-              <button className="button button-secondary" type="button" onClick={stopSender}>
-                停止显示
-              </button>
-            )}
-            {senderState === "stopped" && selectedFile && (
-              <button
-                className="button button-primary"
-                type="button"
-                onClick={() => postSenderFile(selectedFile)}
-              >
-                继续显示 <span aria-hidden="true">↗</span>
-              </button>
-            )}
-          </div>
-          <p className={styles.status} aria-live="polite">
-            {senderState === "loading"
-              ? "正在准备本地 WASM 编码器…"
-              : senderState === "sending"
-                ? `正在播放彩色码（${CIMBAR_DISPLAY_FPS}fps · 模式 ${CIMBAR_MODE_LABEL}）。码尽量占满取景框，屏幕调最亮，另一端选「彩色视觉码」。`
-                : senderState === "stopped"
-                  ? "已停止显示；可以继续当前文件。"
-                  : senderError || "选择文件后，浏览器会在本地开始编码并自动播放。"}
-          </p>
-        </article>
+      {view === "send" && (
+        <div className="web-workbench web-workbench-send">
+          <div className="web-workbench-left">
+            <section className="web-task-block" aria-labelledby="cimbar-send-file-title">
+              <div className="web-task-heading">
+                <span className="web-task-index">1.</span>
+                <h3 id="cimbar-send-file-title">选择文件</h3>
+              </div>
+              <div className="web-toolbar">
+                <label className="web-file-picker web-file-picker-compact" htmlFor={fileInputId}>
+                  <span className="web-file-picker-mark" aria-hidden="true">
+                    ＋
+                  </span>
+                  <span>
+                    <strong>{selectedFile?.name ?? "选择文件"}</strong>
+                    <small>
+                      {selectedFile
+                        ? `${formatBytes(selectedFile.size)} · ${selectedFile.type || "application/octet-stream"}`
+                        : "未选文件"}
+                    </small>
+                  </span>
+                </label>
+                <input
+                  ref={fileInputRef}
+                  className="visually-hidden"
+                  id={fileInputId}
+                  type="file"
+                  onChange={handleFileChange}
+                />
+                <button
+                  className="button button-secondary button-compact"
+                  type="button"
+                  disabled={senderIsActive || senderState === "loading"}
+                  onClick={() => {
+                    void loadSampleVideo();
+                  }}
+                >
+                  测试视频
+                </button>
+              </div>
+            </section>
 
-        <article
-          className={`${styles.panel} ${view === "receive" ? styles.panelVisible : styles.panelHidden}`}
-          role="tabpanel"
-          aria-label="接收文件"
-          hidden={view !== "receive"}
-        >
-          <div className={styles.panelHeader}>
-            <div>
-              <span className="mono-label">RECEIVER / MODE B</span>
-              <h3>点击后，请 camera 看向彩色流。</h3>
-            </div>
-            <span className={styles.liveBadge}>LOCAL</span>
+            <section className="web-task-block web-send-controls" aria-labelledby="cimbar-send-action-title">
+              <div className="web-task-heading">
+                <span className="web-task-index">2.</span>
+                <h3 id="cimbar-send-action-title">准备发送</h3>
+              </div>
+              <div className="web-transfer-actions web-transfer-actions-primary">
+                {!senderIsActive && (
+                  <button
+                    className="button button-primary"
+                    type="button"
+                    disabled={!selectedFile || senderState === "loading"}
+                    onClick={startSender}
+                  >
+                    {senderState === "loading" ? "准备中…" : "开始发送"}
+                  </button>
+                )}
+                {senderState === "sending" && (
+                  <button
+                    className="button button-secondary"
+                    type="button"
+                    onClick={pauseSender}
+                  >
+                    暂停
+                  </button>
+                )}
+                {senderState === "paused" && (
+                  <button
+                    className="button button-primary"
+                    type="button"
+                    onClick={startSender}
+                  >
+                    继续
+                  </button>
+                )}
+                {senderIsActive && (
+                  <button
+                    className="button button-secondary"
+                    type="button"
+                    onClick={stopSender}
+                  >
+                    结束
+                  </button>
+                )}
+              </div>
+              <p className="web-status web-status-compact" aria-live="polite">
+                {senderStatusText}
+              </p>
+              <div className="web-transfer-stats web-transfer-stats-inline" aria-live="polite">
+                <span>
+                  速度<strong>—</strong>
+                </span>
+                <span>
+                  进度<strong>{senderIsActive ? "播放中" : senderReady ? "就绪" : "—"}</strong>
+                </span>
+                <span>
+                  帧<strong>{senderFrames}</strong>
+                </span>
+              </div>
+            </section>
           </div>
-          <div className={`${styles.cameraStage}${receiverActive ? ` ${styles.cameraActive}` : ""}`}>
-            <video
-              ref={receiverVideoRef}
-              className={styles.cameraVideo}
-              autoPlay
-              muted
-              playsInline
-              aria-label="cimbar 相机预览"
+
+          <section className="web-workbench-right" aria-labelledby="cimbar-send-code-title">
+            <div className="web-task-heading">
+              <span className="web-task-index">3.</span>
+              <h3 id="cimbar-send-code-title">扫码连接</h3>
+            </div>
+            <div className="web-code-stage web-code-stage-compact">
+              <canvas
+                ref={senderCanvasRef}
+                className="web-code-canvas"
+                width={canvasSize}
+                height={canvasSize}
+                style={{
+                  // Keep bitmap == CSS size; CSS downscaling breaks color cells.
+                  width: canvasSize,
+                  height: canvasSize,
+                  imageRendering: "pixelated",
+                }}
+                role="img"
+                aria-label="彩色视觉码"
+              />
+              {!selectedFile && (
+                <span className="web-code-placeholder">准备中…</span>
+              )}
+            </div>
+            <p className="web-stage-note">
+              峰值实验 · Mode {CIMBAR_MODE_LABEL} · {CIMBAR_DISPLAY_FPS}
+              fps · 请用另一台设备选「彩色视觉码」扫描，屏幕调最亮。
+            </p>
+          </section>
+        </div>
+      )}
+
+      {view === "receive" && (
+        <div className="web-workbench web-workbench-receive">
+          <section
+            className="web-workbench-left web-receive-controls"
+            aria-labelledby="cimbar-receive-action-title"
+          >
+            <div className="web-task-heading">
+              <span className="web-task-index">1.</span>
+              <h3 id="cimbar-receive-action-title">开启接收</h3>
+            </div>
+            <div className="web-transfer-actions web-transfer-actions-primary">
+              {!receiverActive && receiverState !== "complete" && (
+                <button
+                  className="button button-primary"
+                  type="button"
+                  onClick={startReceiver}
+                >
+                  开启摄像头
+                </button>
+              )}
+              {receiverActive && (
+                <button
+                  className="button button-secondary"
+                  type="button"
+                  onClick={stopReceiver}
+                >
+                  暂停
+                </button>
+              )}
+              {receiverState === "complete" && (
+                <button
+                  className="button button-secondary"
+                  type="button"
+                  onClick={receiveAgain}
+                >
+                  再收一次
+                </button>
+              )}
+            </div>
+            <p className="web-status web-status-compact" aria-live="polite">
+              {receiverStatusText}
+            </p>
+            <div className="web-transfer-stats web-transfer-stats-inline" aria-live="polite">
+              <span>
+                速度<strong>—</strong>
+              </span>
+              <span>
+                进度<strong>{Math.round(receiverProgress * 100)}%</strong>
+              </span>
+              <span>
+                帧<strong>{decodedFrames}</strong>
+              </span>
+            </div>
+            {receivedFile && receiverState === "complete" && (
+              <div className="web-received-actions">
+                <button
+                  className="button button-primary"
+                  type="button"
+                  onClick={() => openReceivedInBrowser(receivedFile)}
+                >
+                  打开 / 新标签
+                </button>
+                <button
+                  className="button button-secondary"
+                  type="button"
+                  onClick={() => downloadFile(receivedFile)}
+                >
+                  保存
+                </button>
+                {previewUrl && (
+                  <button
+                    className="button button-secondary"
+                    type="button"
+                    onClick={() => setPreviewOpen((open) => !open)}
+                  >
+                    {previewOpen ? "收起预览" : "预览"}
+                  </button>
+                )}
+                {verification && (
+                  <p className="web-stage-note">{verification}</p>
+                )}
+                {previewOpen && previewUrl && resolvedMime(receivedFile).startsWith("image/") && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={previewUrl}
+                    alt={receivedFile.name}
+                    className={styles.inlinePreview}
+                  />
+                )}
+                {previewOpen && previewUrl && resolvedMime(receivedFile).startsWith("video/") && (
+                  <video
+                    src={previewUrl}
+                    className={styles.inlinePreview}
+                    controls
+                    playsInline
+                  />
+                )}
+              </div>
+            )}
+          </section>
+
+          <section className="web-workbench-right" aria-labelledby="cimbar-receive-stage-title">
+            <div className="web-task-heading">
+              <span className="web-task-index">2.</span>
+              <h3 id="cimbar-receive-stage-title">扫码连接</h3>
+            </div>
+            <div
+              className={`web-camera-stage web-camera-stage-compact${
+                receiverActive ? " is-active" : ""
+              }`}
+            >
+              <video
+                ref={receiverVideoRef}
+                className="web-camera-video"
+                autoPlay
+                muted
+                playsInline
+                aria-label="相机预览"
+              />
+              {!receiverActive && (
+                <span className="web-camera-placeholder">开启摄像头后对准发送端</span>
+              )}
+            </div>
+            <canvas
+              ref={captureCanvasRef}
+              className={styles.captureCanvas}
+              aria-hidden="true"
             />
-            {!receiverActive && (
-              <div className={styles.cameraPlaceholder}>
-                <b>◎</b>
-                <span>尚未请求 camera</span>
-              </div>
-            )}
-            <span className={`${styles.cameraCorner} ${styles.cornerTopLeft}`} />
-            <span className={`${styles.cameraCorner} ${styles.cornerTopRight}`} />
-            <span className={`${styles.cameraCorner} ${styles.cornerBottomLeft}`} />
-            <span className={`${styles.cameraCorner} ${styles.cornerBottomRight}`} />
-          </div>
-          <canvas ref={captureCanvasRef} className={styles.captureCanvas} aria-hidden="true" />
-          <div className={styles.metrics} aria-live="polite">
-            <span><small>模式</small><strong>{CIMBAR_MODE_LABEL}</strong></span>
-            <span><small>恢复</small><strong>{Math.round(receiverProgress * 100)}%</strong></span>
-            <span>
-              <small>有效/空</small>
-              <strong>
-                {scanStats.decoded}/{scanStats.noData}
-                {scanStats.decoded + scanStats.noData > 0
-                  ? ` · ${Math.round(
-                      (100 * scanStats.decoded) /
-                        (scanStats.decoded + scanStats.noData),
-                    )}%`
-                  : ""}
-              </strong>
-            </span>
-          </div>
-          <div className={styles.actions}>
-            {!receiverActive && receiverState !== "complete" && (
-              <button className="button button-primary" type="button" onClick={startReceiver}>
-                开启摄像头 <span aria-hidden="true">↗</span>
-              </button>
-            )}
-            {receiverActive && (
-              <button className="button button-secondary" type="button" onClick={stopReceiver}>
-                停止接收
-              </button>
-            )}
-            {receivedFile && (
-              <>
-                <button
-                  className="button button-primary"
-                  type="button"
-                  onClick={() => openReceivedInBrowser(receivedFile)}
-                >
-                  在浏览器中打开
-                </button>
-                <button
-                  className="button button-secondary"
-                  type="button"
-                  onClick={() => downloadFile(receivedFile)}
-                >
-                  下载
-                </button>
-              </>
-            )}
-            {receiverState === "complete" && (
-              <button className="button button-secondary" type="button" onClick={receiveAgain}>
-                重新接收
-              </button>
-            )}
-          </div>
-          <p className={styles.status} aria-live="polite">
-            {receiverState === "starting"
-              ? "正在请求摄像头并加载本地解码 worker…"
-              : receiverState === "receiving"
-                ? scanStats.decoded > 0
-                  ? `正在恢复 · 有效 ${decodedFrames} · 空 ${scanStats.noData} · ${Math.round(receiverProgress * 100)}%`
-                  : `扫描中 · 空 ${scanStats.noData}。码需占满框、屏幕调最亮、两端都选「彩色视觉码」、稳定对准。`
-                : receiverState === "complete" && receivedFile
-                  ? `接收完成 · ${receivedFile.name} · 可在浏览器中打开`
-                  : receiverError || "点击「开启摄像头」后对准发送端。两端都必须选彩色视觉码。"}
-          </p>
-          {receivedFile && receiverState === "complete" && (
-            <div className={styles.receivedFile}>
-              <strong>{receivedFile.name}</strong>
-              <span>{formatBytes(receivedFile.bytes.length)} · {verification || "正在计算 SHA-256…"}</span>
-              {previewUrl && resolvedMime(receivedFile).startsWith("image/") && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={previewUrl}
-                  alt={receivedFile.name}
-                  className={styles.inlinePreview}
-                />
-              )}
-              {previewUrl && resolvedMime(receivedFile).startsWith("video/") && (
-                <video
-                  src={previewUrl}
-                  className={styles.inlinePreview}
-                  controls
-                  playsInline
-                />
-              )}
-              <div className={styles.actions} style={{ marginTop: 10 }}>
-                <button
-                  className="button button-primary"
-                  type="button"
-                  onClick={() => openReceivedInBrowser(receivedFile)}
-                >
-                  在浏览器中打开
-                </button>
-                <button
-                  className="button button-secondary"
-                  type="button"
-                  onClick={() => downloadFile(receivedFile)}
-                >
-                  下载
-                </button>
-              </div>
-            </div>
-          )}
-        </article>
-      </div>
+            <p className="web-stage-note">对准发送端的视觉码。</p>
+          </section>
+        </div>
+      )}
     </div>
   );
 }

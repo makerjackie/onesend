@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
 import 'package:webview_flutter_wkwebview/webview_flutter_wkwebview.dart';
@@ -18,9 +19,8 @@ import '../widgets/stored_file_actions.dart';
 
 enum CimbarDirection { send, receive }
 
-/// The mobile CIMBAR payload ceiling. The wire envelope may add its small
-/// metadata header, but the user-selected/recovered file is capped here.
-const int cimbarMobileMaxFileBytes = 16 * 1024 * 1024;
+/// Peak experimental ceiling aligned with libcimbar / web envelope (33 MiB).
+const int cimbarMobileMaxFileBytes = 33 * 1024 * 1024;
 
 enum _CimbarStatus {
   loading,
@@ -104,14 +104,30 @@ class _CimbarTransferScreenState extends State<CimbarTransferScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    unawaited(_enableWakelock());
     if (_supportedPlatform) {
       unawaited(_initializeWebView());
     }
   }
 
+  Future<void> _enableWakelock() async {
+    try {
+      await WakelockPlus.enable();
+    } catch (_) {
+      // Convenience only; unavailable in some test hosts.
+    }
+  }
+
+  Future<void> _disableWakelock() async {
+    try {
+      await WakelockPlus.disable();
+    } catch (_) {}
+  }
+
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    unawaited(_disableWakelock());
     // Do not call a state-updating async helper from dispose. The JavaScript
     // cleanup is deliberately fire-and-forget and does not touch Flutter
     // state, so camera tracks and workers are still stopped during teardown.

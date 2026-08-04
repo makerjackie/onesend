@@ -3,8 +3,8 @@
 /// The values can be replaced at build time with:
 ///
 /// ```text
-/// --dart-define=ONESEND_VERSION=1.5.2
-/// --dart-define=ONESEND_RELEASE_PUBLISHED_AT="2026-08-04 22:12"
+/// --dart-define=ONESEND_VERSION=1.5.3
+/// --dart-define=ONESEND_RELEASE_PUBLISHED_AT="2026-08-04 23:40"
 /// ```
 ///
 /// Build numbers are deliberately not part of this model or its display
@@ -21,12 +21,12 @@ class OneSendReleaseInfo {
 
 const String oneSendReleaseVersion = String.fromEnvironment(
   'ONESEND_VERSION',
-  defaultValue: '1.5.2',
+  defaultValue: '1.5.3',
 );
 
 const String oneSendReleasePublishedAt = String.fromEnvironment(
   'ONESEND_RELEASE_PUBLISHED_AT',
-  defaultValue: '2026-08-04 22:12',
+  defaultValue: '2026-08-04 23:40',
 );
 
 const OneSendReleaseInfo oneSendReleaseInfo = OneSendReleaseInfo(

@@ -455,6 +455,48 @@ summary:focus-visible {
   background: transparent;
 }
 
+.web-mode-switcher {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.web-mode-primary {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.web-mode-primary button {
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1.5px solid var(--ink);
+  border-radius: 999px;
+  background: var(--white);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.web-mode-primary button.is-selected {
+  background: var(--lime);
+}
+
+.web-mode-primary button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.web-mode-advanced {
+  margin-left: auto;
+  margin-bottom: 0;
+}
+
 .web-mode-menu {
   position: relative;
   z-index: 5;
@@ -935,7 +977,11 @@ summary:focus-visible {
 }
 
 .web-cimbar-embed {
-  margin-top: 12px;
+  margin-top: 0;
+}
+
+.web-cimbar-embed .web-workbench {
+  margin-top: 0;
 }
 
 /* Download route */
@@ -1556,6 +1602,7 @@ summary:focus-visible {
   .more-menu-popover,
   .web-mode-menu summary,
   .web-mode-options-compact,
+  .web-mode-primary button,
   .web-workbench,
   .web-file-picker,
   .platform-grid > a,
@@ -1567,7 +1614,8 @@ summary:focus-visible {
   .button-secondary:hover,
   .platform-grid > a:hover,
   .web-mode-options-compact button:hover,
-  .web-mode-options-compact button.is-selected {
+  .web-mode-options-compact button.is-selected,
+  .web-mode-primary button.is-selected {
     background: var(--surface-muted);
   }
 

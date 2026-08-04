@@ -36,6 +36,8 @@ export type WebTransferCopy = {
   sampleVideo: string;
   mode: string;
   modeSettings: string;
+  qr: string;
+  qrAdvanced: string;
   autoFast: string;
   fast: string;
   reliable: string;
@@ -95,10 +97,12 @@ export const webTransferCopy: WebTransferCopy = {
   sampleVideo: "测试视频",
   mode: "模式",
   modeSettings: "传输模式设置",
-  autoFast: "自动 · 快速",
+  qr: "二维码",
+  qrAdvanced: "二维码档位",
+  autoFast: "快速",
   fast: "快速",
   reliable: "可靠",
-  turbo: "Turbo QR",
+  turbo: "Turbo",
   color: "彩色视觉码",
   fastDetail: "",
   reliableDetail: "",
@@ -804,41 +808,77 @@ export function WebTransfer({
       senderState === "paused" ||
       receiverState === "starting" ||
       receiverState === "receiving";
-    const options: { id: TransferModeChoice; label: string }[] = [
-      { id: "fast", label: copy.autoFast },
+    const family: "qr" | "cimbar" = usesCimbar ? "cimbar" : "qr";
+    const qrProfileLabel =
+      mode === "reliable"
+        ? copy.reliable
+        : mode === "turbo"
+          ? copy.turbo
+          : copy.fast;
+    const qrProfiles: { id: QrModeChoice; label: string }[] = [
+      { id: "fast", label: copy.fast },
       { id: "reliable", label: copy.reliable },
       { id: "turbo", label: copy.turbo },
-      { id: "cimbar", label: copy.color },
     ];
-    const activeLabel =
-      mode === "fast"
-        ? copy.autoFast
-        : options.find((option) => option.id === mode)?.label ?? copy.autoFast;
     return (
-      <details className="web-mode-menu" ref={modeMenuRef}>
-        <summary aria-label={`${copy.modeSettings}: ${activeLabel}`}>
-          <span className="mono-label">{copy.mode}</span>
-          <strong>{activeLabel}</strong>
-          <span aria-hidden="true">⌄</span>
-        </summary>
-        <div className="web-mode-options web-mode-options-compact" role="group" aria-label={copy.modeSettings}>
-          {options.map((option) => (
-            <button
-              key={option.id}
-              className={mode === option.id ? "is-selected" : ""}
-              type="button"
-              aria-pressed={mode === option.id}
-              disabled={modeLocked}
-              onClick={() => {
-                handleModeChange(option.id);
-                modeMenuRef.current?.removeAttribute("open");
-              }}
-            >
-              {option.label}
-            </button>
-          ))}
+      <div className="web-mode-switcher">
+        <div
+          className="web-mode-primary"
+          role="group"
+          aria-label={copy.modeSettings}
+        >
+          <button
+            type="button"
+            className={family === "qr" ? "is-selected" : ""}
+            aria-pressed={family === "qr"}
+            disabled={modeLocked}
+            onClick={() =>
+              handleModeChange(isQrMode(mode) ? mode : "fast")
+            }
+          >
+            {copy.qr}
+          </button>
+          <button
+            type="button"
+            className={family === "cimbar" ? "is-selected" : ""}
+            aria-pressed={family === "cimbar"}
+            disabled={modeLocked}
+            onClick={() => handleModeChange("cimbar")}
+          >
+            {copy.color}
+          </button>
         </div>
-      </details>
+        {family === "qr" && (
+          <details className="web-mode-menu web-mode-advanced" ref={modeMenuRef}>
+            <summary aria-label={`${copy.qrAdvanced}: ${qrProfileLabel}`}>
+              <span className="mono-label">{copy.qrAdvanced}</span>
+              <strong>{qrProfileLabel}</strong>
+              <span aria-hidden="true">⌄</span>
+            </summary>
+            <div
+              className="web-mode-options web-mode-options-compact"
+              role="group"
+              aria-label={copy.qrAdvanced}
+            >
+              {qrProfiles.map((option) => (
+                <button
+                  key={option.id}
+                  className={mode === option.id ? "is-selected" : ""}
+                  type="button"
+                  aria-pressed={mode === option.id}
+                  disabled={modeLocked}
+                  onClick={() => {
+                    handleModeChange(option.id);
+                    modeMenuRef.current?.removeAttribute("open");
+                  }}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </details>
+        )}
+      </div>
     );
   }
 

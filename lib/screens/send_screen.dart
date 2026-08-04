@@ -342,98 +342,140 @@ class _SendScreenState extends State<SendScreen>
 
   Widget _buildPicker() {
     final l10n = AppLocalizations.of(context)!;
-    final content = Card(
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 120),
-        decoration: BoxDecoration(
-          borderRadius: const BorderRadius.all(Radius.circular(6)),
-          color: _dragging ? const Color(0xffeef6d4) : Colors.white,
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 72,
-                height: 72,
-                decoration: BoxDecoration(
-                  color: oneSendLime,
-                  border: Border.all(color: oneSendInk, width: 2),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Icon(
-                  _dragging
-                      ? Icons.file_download_rounded
-                      : Icons.upload_file_rounded,
-                  size: 34,
-                ),
-              ),
-              const SizedBox(height: 18),
-              Text(
-                l10n.chooseAFile,
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                l10n.sendFileDescription(formatBytes(maxTransferBytes)),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 18),
-              _buildModeChips(enabled: !_preparing),
-              if (_supportsDesktopDrop) ...[
-                const SizedBox(height: 14),
-                Text(
-                  _dragging ? l10n.dropFilesActive : l10n.dropFilesHint,
-                  textAlign: TextAlign.center,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodyMedium?.copyWith(color: oneSendMuted),
-                ),
-              ],
-              if (_error != null) ...[
-                const SizedBox(height: 14),
-                _ErrorText(message: _error!),
-              ],
-              const SizedBox(height: 18),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  key: const ValueKey<String>('send-pick-file'),
-                  onPressed: _preparing ? null : _pickFile,
-                  icon: _preparing
-                      ? const SizedBox.square(
-                          dimension: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.folder_open_rounded),
-                  label: Text(_preparing ? l10n.reading : l10n.chooseFile),
-                ),
-              ),
-              const SizedBox(height: 10),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  key: const ValueKey<String>('send-sample-video'),
-                  onPressed: _preparing ? null : _sendSampleVideo,
-                  icon: const Icon(Icons.movie_outlined),
-                  label: Text(l10n.sampleVideo),
-                ),
-              ),
-            ],
+    final scheme = Theme.of(context).colorScheme;
+    final body = LayoutBuilder(
+      builder: (context, constraints) {
+        final workbench = constraints.maxWidth >= oneSendWorkbenchBreakpoint;
+        final panel = AnimatedContainer(
+          duration: const Duration(milliseconds: 120),
+          width: double.infinity,
+          constraints: BoxConstraints(
+            minHeight: workbench
+                ? math.max(420.0, constraints.maxHeight - 32)
+                : 0,
           ),
-        ),
-      ),
-    );
+          decoration: BoxDecoration(
+            color: _dragging
+                ? oneSendLime.withValues(alpha: 0.28)
+                : scheme.surfaceContainerHigh,
+            borderRadius: BorderRadius.circular(oneSendRadiusCard),
+            border: Border.all(
+              color: _dragging ? oneSendInk : scheme.outlineVariant,
+              width: _dragging ? 2 : 1,
+            ),
+          ),
+          child: Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: workbench ? 36 : 24,
+              vertical: workbench ? 32 : 24,
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: workbench ? MainAxisSize.max : MainAxisSize.min,
+              children: [
+                Container(
+                  width: workbench ? 84 : 72,
+                  height: workbench ? 84 : 72,
+                  decoration: BoxDecoration(
+                    color: oneSendLime,
+                    border: Border.all(color: oneSendInk, width: 2),
+                    borderRadius: BorderRadius.circular(oneSendRadiusBadge),
+                  ),
+                  child: Icon(
+                    _dragging
+                        ? Icons.file_download_rounded
+                        : Icons.upload_file_rounded,
+                    size: workbench ? 38 : 34,
+                  ),
+                ),
+                SizedBox(height: workbench ? 22 : 18),
+                Text(
+                  l10n.chooseAFile,
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 8),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 420),
+                  child: Text(
+                    l10n.sendFileDescription(formatBytes(maxTransferBytes)),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+                const SizedBox(height: 18),
+                _buildModeChips(enabled: !_preparing),
+                if (_supportsDesktopDrop) ...[
+                  const SizedBox(height: 14),
+                  Text(
+                    _dragging ? l10n.dropFilesActive : l10n.dropFilesHint,
+                    textAlign: TextAlign.center,
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodyMedium?.copyWith(color: oneSendMuted),
+                  ),
+                ],
+                if (_error != null) ...[
+                  const SizedBox(height: 14),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 480),
+                    child: _ErrorText(message: _error!),
+                  ),
+                ],
+                const SizedBox(height: 18),
+                ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: workbench ? 360 : double.infinity,
+                  ),
+                  child: Column(
+                    children: [
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton.icon(
+                          key: const ValueKey<String>('send-pick-file'),
+                          onPressed: _preparing ? null : _pickFile,
+                          icon: _preparing
+                              ? const SizedBox.square(
+                                  dimension: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.folder_open_rounded),
+                          label: Text(
+                            _preparing ? l10n.reading : l10n.chooseFile,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          key: const ValueKey<String>('send-sample-video'),
+                          onPressed: _preparing ? null : _sendSampleVideo,
+                          icon: const Icon(Icons.movie_outlined),
+                          label: Text(l10n.sampleVideo),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
 
-    final body = Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 520),
-          child: content,
-        ),
-      ),
+        if (workbench) {
+          return Padding(padding: const EdgeInsets.all(16), child: panel);
+        }
+        return Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 520),
+              child: panel,
+            ),
+          ),
+        );
+      },
     );
 
     if (!_supportsDesktopDrop) return body;
@@ -461,8 +503,188 @@ class _SendScreenState extends State<SendScreen>
         ? '—'
         : _formatDuration(DateTime.now().difference(_startedAt!));
     final currentRate = _currentBytesPerSecond();
+    final scheme = Theme.of(context).colorScheme;
+
+    Widget qrStage(double qrSize) {
+      return Card(
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              SizedBox.square(
+                dimension: qrSize,
+                child: _frame == null
+                    ? const Center(child: CircularProgressIndicator())
+                    : OpticalQr(
+                        bytes: _frame!,
+                        size: qrSize,
+                        robust: _mode == TransferMode.reliable,
+                      ),
+              ),
+              const SizedBox(height: 14),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: oneSendLime,
+                  border: Border.all(color: oneSendInk, width: 2),
+                  borderRadius: BorderRadius.circular(oneSendRadiusBadge),
+                ),
+                child: Text(
+                  l10n.modeBadge(_localizedModeLabel(l10n, _mode)),
+                  style: const TextStyle(
+                    color: oneSendInk,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                sender?.isPaused == true
+                    ? l10n.pausedPlayback
+                    : l10n.broadcasting,
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 5),
+              Text(
+                l10n.cameraAim,
+                style: Theme.of(context).textTheme.bodyMedium,
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    Widget controlPanel({required bool dense}) {
+      return Card(
+        child: Padding(
+          padding: EdgeInsets.all(dense ? 16 : 18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              FileTile(
+                name: file.name,
+                bytes: file.bytes,
+                icon: Icons.north_east_rounded,
+              ),
+              const SizedBox(height: 16),
+              LinearProgressIndicator(
+                minHeight: 8,
+                value: progress,
+                backgroundColor: scheme.outlineVariant,
+                color: scheme.primary,
+              ),
+              const SizedBox(height: 10),
+              Wrap(
+                alignment: WrapAlignment.spaceBetween,
+                runSpacing: 4,
+                spacing: 18,
+                children: [
+                  Text(
+                    l10n.passAndFrames(_framesSent, pass),
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  Text(
+                    l10n.runningTime(elapsed),
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                l10n.currentRate(formatTransferSpeed(currentRate)),
+                style: TextStyle(
+                  color: scheme.onSurface,
+                  fontSize: dense ? 16 : 18,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                l10n.theoreticalRate(
+                  formatTransferSpeed(_mode.usefulBytesPerSecond),
+                ),
+                style: const TextStyle(
+                  color: oneSendMuted,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              if (_error != null) ...[
+                const SizedBox(height: 12),
+                _ErrorText(message: _error!),
+              ],
+              const SizedBox(height: 16),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  if (sender != null && _error == null)
+                    OutlinedButton.icon(
+                      onPressed: _togglePause,
+                      icon: Icon(
+                        sender.isPaused
+                            ? Icons.play_arrow_rounded
+                            : Icons.pause_rounded,
+                      ),
+                      label: Text(sender.isPaused ? l10n.resume : l10n.pause),
+                    ),
+                  FilledButton.icon(
+                    onPressed: _endTransfer,
+                    icon: const Icon(Icons.stop_rounded),
+                    label: Text(l10n.endTransfer),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton(
+                  onPressed: _preparing ? null : _pickFile,
+                  child: Text(l10n.sendAnother),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return LayoutBuilder(
       builder: (context, constraints) {
+        final workbench = constraints.maxWidth >= oneSendWorkbenchBreakpoint;
+        if (workbench) {
+          final qrSize = math.min(
+            400.0,
+            math.max(260.0, constraints.maxHeight - 120),
+          );
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  flex: 5,
+                  child: SingleChildScrollView(child: controlPanel(dense: true)),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  flex: 6,
+                  child: Align(
+                    alignment: Alignment.topCenter,
+                    child: qrStage(qrSize),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
         final qrSize = math.min(
           500.0,
           math.max(220.0, constraints.maxWidth - 40),
@@ -474,159 +696,9 @@ class _SendScreenState extends State<SendScreen>
               constraints: const BoxConstraints(maxWidth: 720),
               child: Column(
                 children: [
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(18),
-                      child: Column(
-                        children: [
-                          SizedBox.square(
-                            dimension: qrSize,
-                            child: _frame == null
-                                ? const Center(
-                                    child: CircularProgressIndicator(),
-                                  )
-                                : OpticalQr(
-                                    bytes: _frame!,
-                                    size: qrSize,
-                                    robust: _mode == TransferMode.reliable,
-                                  ),
-                          ),
-                          const SizedBox(height: 14),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              color: oneSendLime,
-                              border: Border.all(color: oneSendInk, width: 2),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              l10n.modeBadge(_localizedModeLabel(l10n, _mode)),
-                              style: const TextStyle(
-                                color: oneSendInk,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          Text(
-                            sender?.isPaused == true
-                                ? l10n.pausedPlayback
-                                : l10n.broadcasting,
-                            style: Theme.of(context).textTheme.titleMedium,
-                          ),
-                          const SizedBox(height: 5),
-                          Text(
-                            l10n.cameraAim,
-                            style: Theme.of(context).textTheme.bodyMedium,
-                            textAlign: TextAlign.center,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
+                  qrStage(qrSize),
                   const SizedBox(height: 14),
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(18),
-                      child: Column(
-                        children: [
-                          FileTile(
-                            name: file.name,
-                            bytes: file.bytes,
-                            icon: Icons.north_east_rounded,
-                          ),
-                          const SizedBox(height: 18),
-                          LinearProgressIndicator(
-                            minHeight: 8,
-                            value: progress,
-                            backgroundColor: const Color(0xffe2e5de),
-                            color: oneSendInk,
-                          ),
-                          const SizedBox(height: 10),
-                          Wrap(
-                            alignment: WrapAlignment.spaceBetween,
-                            runSpacing: 4,
-                            spacing: 18,
-                            children: [
-                              Text(
-                                l10n.passAndFrames(_framesSent, pass),
-                                style: Theme.of(context).textTheme.bodySmall,
-                              ),
-                              Text(
-                                l10n.runningTime(elapsed),
-                                style: Theme.of(context).textTheme.bodySmall,
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: Text(
-                              l10n.currentRate(
-                                formatTransferSpeed(currentRate),
-                              ),
-                              style: const TextStyle(
-                                color: oneSendInk,
-                                fontSize: 18,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: Text(
-                              l10n.theoreticalRate(
-                                formatTransferSpeed(_mode.usefulBytesPerSecond),
-                              ),
-                              style: const TextStyle(
-                                color: oneSendMuted,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  if (_error != null) ...[
-                    _ErrorText(message: _error!),
-                    const SizedBox(height: 10),
-                  ],
-                  Wrap(
-                    alignment: WrapAlignment.center,
-                    spacing: 10,
-                    runSpacing: 10,
-                    children: [
-                      if (sender != null && _error == null)
-                        OutlinedButton.icon(
-                          onPressed: _togglePause,
-                          icon: Icon(
-                            sender.isPaused
-                                ? Icons.play_arrow_rounded
-                                : Icons.pause_rounded,
-                          ),
-                          label: Text(
-                            sender.isPaused ? l10n.resume : l10n.pause,
-                          ),
-                        ),
-                      FilledButton.icon(
-                        onPressed: _endTransfer,
-                        icon: const Icon(Icons.stop_rounded),
-                        label: Text(l10n.endTransfer),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  TextButton(
-                    onPressed: _preparing ? null : _pickFile,
-                    child: Text(l10n.sendAnother),
-                  ),
+                  controlPanel(dense: false),
                 ],
               ),
             ),

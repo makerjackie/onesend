@@ -49,11 +49,14 @@ test("standalone routes reuse one locked WebTransfer component", () => {
   assert.match(transfer, /!roleIsLocked &&/);
 });
 
-test("web transfer keeps fast defaults, all modes, and completed-file actions", () => {
+test("web transfer keeps fast defaults, two primary modes, and completed-file actions", () => {
   assert.match(transfer, /useState<TransferModeChoice>\("fast"\)/);
   assert.match(transfer, /useRef<TransferModeChoice>\("fast"\)/);
-  assert.match(transfer, /className="web-mode-menu"/);
-  assert.match(transfer, /copy\.autoFast/);
+  assert.match(transfer, /className="web-mode-switcher"/);
+  assert.match(transfer, /className="web-mode-primary"/);
+  assert.match(transfer, /copy\.qr/);
+  assert.match(transfer, /copy\.qrAdvanced/);
+  assert.match(transfer, /copy\.fast/);
   assert.match(transfer, /copy\.reliable/);
   assert.match(transfer, /copy\.turbo/);
   assert.match(transfer, /copy\.color/);

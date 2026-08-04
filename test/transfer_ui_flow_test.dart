@@ -17,7 +17,7 @@ import 'package:onesend/services/transfer_store.dart';
 import 'package:onesend/widgets/stored_file_actions.dart';
 
 void main() {
-  testWidgets('send flow opens in fast mode with all four mode entries', (
+  testWidgets('send flow opens with QR + color modes only', (
     WidgetTester tester,
   ) async {
     final settings = AppSettings(initialLocaleTag: 'zh-Hans');
@@ -32,18 +32,22 @@ void main() {
     expect(
       tester
           .widget<ChoiceChip>(
-            find.byKey(const ValueKey<String>('send-mode-fast')),
+            find.byKey(const ValueKey<String>('send-mode-qr')),
           )
           .selected,
       isTrue,
     );
     expect(
+      find.byKey(const ValueKey<String>('send-mode-fast')),
+      findsNothing,
+    );
+    expect(
       find.byKey(const ValueKey<String>('send-mode-reliable')),
-      findsOneWidget,
+      findsNothing,
     );
     expect(
       find.byKey(const ValueKey<String>('send-mode-turbo')),
-      findsOneWidget,
+      findsNothing,
     );
     expect(
       find.byKey(const ValueKey<String>('send-mode-cimbar')),

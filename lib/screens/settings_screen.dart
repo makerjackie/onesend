@@ -3,11 +3,13 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '../app.dart';
 import '../core/optical_transfer.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../l10n/locale_support.dart';
 import '../services/app_settings.dart';
 import '../services/update_service.dart';
+import '../widgets/adaptive_sheet.dart';
 import '../widgets/transfer_mode_selector.dart';
 import '../widgets/update_ui.dart';
 import 'about_screen.dart';
@@ -20,6 +22,7 @@ class SettingsScreen extends StatefulWidget {
     this.onLanguageTap,
     this.onAboutTap,
     this.isDesktop,
+    this.embedded = false,
     super.key,
   });
 
@@ -30,6 +33,9 @@ class SettingsScreen extends StatefulWidget {
 
   /// Overrides platform detection in previews and tests.
   final bool? isDesktop;
+
+  /// When true, the screen is a shell tab and omits its own AppBar.
+  final bool embedded;
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -52,9 +58,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     const systemValue = '__system__';
     final l10n = AppLocalizations.of(context)!;
-    final selected = await showModalBottomSheet<String>(
+    final selected = await showOneSendSheet<String>(
       context: context,
       showDragHandle: true,
+      maxDialogWidth: 420,
       builder: (context) {
         final currentTag = widget.settings.localeTag;
         return SafeArea(
@@ -63,7 +70,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             padding: const EdgeInsets.only(bottom: 12),
             children: [
               Padding(
-                padding: const EdgeInsets.fromLTRB(20, 4, 20, 10),
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 10),
                 child: Text(
                   l10n.languagePickerTitle,
                   style: Theme.of(context).textTheme.titleLarge,
@@ -100,16 +107,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _openThemeEntry() async {
     final l10n = AppLocalizations.of(context)!;
-    final selected = await showModalBottomSheet<ThemeMode>(
+    final selected = await showOneSendSheet<ThemeMode>(
       context: context,
       showDragHandle: true,
+      maxDialogWidth: 420,
       builder: (context) {
         return SafeArea(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Padding(
-                padding: const EdgeInsets.fromLTRB(20, 4, 20, 10),
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 10),
                 child: Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
@@ -177,59 +185,57 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _openTransferModeEntry() async {
-    await showModalBottomSheet<void>(
+    await showOneSendSheet<void>(
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
+      maxDialogWidth: 520,
       builder: (sheetContext) => SafeArea(
         child: AnimatedBuilder(
           animation: widget.settings,
           builder: (context, _) => SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 620),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      AppLocalizations.of(context)!.defaultTransferAlgorithm,
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      AppLocalizations.of(context)!.algorithmDescription,
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                    const SizedBox(height: 16),
-                    TransferModeSelector(
-                      key: const ValueKey<String>('settings-mode-selector'),
-                      algorithm: widget.settings.transferAlgorithm,
-                      mode: widget.settings.transferMode,
-                      enabled: !_savingMode,
-                      dense: true,
-                      keyPrefix: 'settings',
-                      onQrModeSelected: (mode) => unawaited(
-                        _selectTransfer(
-                          sheetContext,
-                          algorithm: TransferAlgorithm.qr,
-                          mode: mode,
-                        ),
-                      ),
-                      onCimbarSelected: () => unawaited(
-                        _selectTransfer(
-                          sheetContext,
-                          algorithm: TransferAlgorithm.cimbar,
-                        ),
-                      ),
-                    ),
-                    if (_savingMode) ...[
-                      const SizedBox(height: 14),
-                      const LinearProgressIndicator(minHeight: 3),
-                    ],
-                  ],
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  AppLocalizations.of(context)!.defaultTransferAlgorithm,
+                  style: Theme.of(context).textTheme.titleLarge,
                 ),
-              ),
+                const SizedBox(height: 8),
+                Text(
+                  AppLocalizations.of(context)!.algorithmDescription,
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                const SizedBox(height: 16),
+                TransferModeSelector(
+                  key: const ValueKey<String>('settings-mode-selector'),
+                  algorithm: widget.settings.transferAlgorithm,
+                  mode: widget.settings.transferMode,
+                  enabled: !_savingMode,
+                  dense: true,
+                  showQrProfiles: true,
+                  keyPrefix: 'settings',
+                  onQrModeSelected: (mode) => unawaited(
+                    _selectTransfer(
+                      sheetContext,
+                      algorithm: TransferAlgorithm.qr,
+                      mode: mode,
+                    ),
+                  ),
+                  onCimbarSelected: () => unawaited(
+                    _selectTransfer(
+                      sheetContext,
+                      algorithm: TransferAlgorithm.cimbar,
+                    ),
+                  ),
+                ),
+                if (_savingMode) ...[
+                  const SizedBox(height: 14),
+                  const LinearProgressIndicator(minHeight: 3),
+                ],
+              ],
             ),
           ),
         ),
@@ -266,7 +272,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.settings)),
+      appBar: widget.embedded
+          ? null
+          : AppBar(title: Text(l10n.settings)),
       body: SafeArea(
         child: AnimatedBuilder(
           animation: widget.settings,
@@ -279,13 +287,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget _buildContent(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(20, 10, 20, 36),
+      padding: EdgeInsets.fromLTRB(
+        20,
+        widget.embedded ? 20 : 10,
+        20,
+        36,
+      ),
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 720),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (widget.embedded) ...[
+                Text(
+                  l10n.settings,
+                  style: Theme.of(context).textTheme.headlineMedium,
+                ),
+                const SizedBox(height: 8),
+              ],
               Text(
                 l10n.settingsIntroTitle,
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
@@ -423,10 +443,12 @@ class _SettingsPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(18),
+        color: scheme.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(oneSendRadiusCard),
+        border: Border.all(color: scheme.outlineVariant),
       ),
       child: child,
     );
@@ -508,7 +530,7 @@ class _SettingRow extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(oneSendRadiusCard),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
           child: Row(

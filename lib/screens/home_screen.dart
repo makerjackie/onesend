@@ -7,14 +7,13 @@ import '../services/app_settings.dart';
 import '../services/file_service.dart';
 import '../services/transfer_store.dart';
 import '../services/update_service.dart';
+import '../widgets/adaptive_sheet.dart';
 import '../widgets/brand_mark.dart';
 import '../widgets/stored_file_actions.dart';
 import '../widgets/update_ui.dart';
 import 'receive_screen.dart';
 import 'send_screen.dart';
 import 'settings_screen.dart';
-
-const double oneSendWideBreakpoint = 760;
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
@@ -161,42 +160,52 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildNavigationRail(BuildContext context, AppLocalizations l10n) {
-    final extended = MediaQuery.sizeOf(context).width >= 1040;
-    return NavigationRail(
-      selectedIndex: _selectedTab,
-      onDestinationSelected: _selectTab,
-      extended: extended,
-      groupAlignment: -0.8,
-      leading: Padding(
-        padding: const EdgeInsets.only(bottom: 28),
-        child: const SizedBox.square(dimension: 34),
+    final extended =
+        MediaQuery.sizeOf(context).width >= oneSendExtendedRailBreakpoint;
+    final scheme = Theme.of(context).colorScheme;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        border: Border(right: BorderSide(color: scheme.outlineVariant)),
       ),
-      destinations: [
-        NavigationRailDestination(
-          icon: const Icon(
-            Icons.swap_horiz_rounded,
-            key: ValueKey<String>('home-tab-transfer'),
-          ),
-          selectedIcon: const Icon(Icons.swap_horiz_rounded),
-          label: Text(l10n.transferTab),
+      child: NavigationRail(
+        selectedIndex: _selectedTab,
+        onDestinationSelected: _selectTab,
+        extended: extended,
+        groupAlignment: -0.9,
+        minExtendedWidth: 168,
+        leading: Padding(
+          padding: EdgeInsets.fromLTRB(extended ? 12 : 0, 8, extended ? 12 : 0, 20),
+          child: extended
+              ? const BrandMark(compact: false)
+              : const BrandIcon(size: 34, borderRadius: 8),
         ),
-        NavigationRailDestination(
-          icon: const Icon(
-            Icons.folder_outlined,
-            key: ValueKey<String>('home-tab-files'),
+        destinations: [
+          NavigationRailDestination(
+            icon: const Icon(
+              Icons.swap_horiz_rounded,
+              key: ValueKey<String>('home-tab-transfer'),
+            ),
+            selectedIcon: const Icon(Icons.swap_horiz_rounded),
+            label: Text(l10n.transferTab),
           ),
-          selectedIcon: const Icon(Icons.folder_rounded),
-          label: Text(l10n.filesTab),
-        ),
-        NavigationRailDestination(
-          icon: const Icon(
-            Icons.settings_outlined,
-            key: ValueKey<String>('home-tab-settings'),
+          NavigationRailDestination(
+            icon: const Icon(
+              Icons.folder_outlined,
+              key: ValueKey<String>('home-tab-files'),
+            ),
+            selectedIcon: const Icon(Icons.folder_rounded),
+            label: Text(l10n.filesTab),
           ),
-          selectedIcon: const Icon(Icons.settings_rounded),
-          label: Text(l10n.settings),
-        ),
-      ],
+          NavigationRailDestination(
+            icon: const Icon(
+              Icons.settings_outlined,
+              key: ValueKey<String>('home-tab-settings'),
+            ),
+            selectedIcon: const Icon(Icons.settings_rounded),
+            label: Text(l10n.settings),
+          ),
+        ],
+      ),
     );
   }
 
@@ -204,65 +213,157 @@ class _HomeScreenState extends State<HomeScreen> {
     return switch (_selectedTab) {
       0 => _buildTransferTab(context),
       1 => _buildFilesTab(context),
-      _ => SettingsScreen(settings: _settings, updates: widget.updates),
+      _ => SettingsScreen(
+        settings: _settings,
+        updates: widget.updates,
+        embedded: true,
+      ),
     };
   }
 
   Widget _buildTransferTab(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final records = widget.store.records;
     return LayoutBuilder(
       builder: (context, constraints) {
+        final workbench = constraints.maxWidth >= oneSendWorkbenchBreakpoint;
         final horizontal = constraints.maxWidth >= 700;
+        final actions = Flex(
+          direction: horizontal && !workbench
+              ? Axis.horizontal
+              : Axis.vertical,
+          crossAxisAlignment: horizontal && !workbench
+              ? CrossAxisAlignment.start
+              : CrossAxisAlignment.stretch,
+          children: [
+            ExpandedIf(
+              enabled: horizontal && !workbench,
+              child: _TransferEntry(
+                key: const ValueKey<String>('home-send'),
+                icon: Icons.north_east_rounded,
+                title: l10n.sendFile,
+                description: l10n.sendCardDescription,
+                primary: true,
+                onTap: () => _open(_sendRoute()),
+              ),
+            ),
+            SizedBox(
+              width: horizontal && !workbench ? 16 : 0,
+              height: horizontal && !workbench ? 0 : 12,
+            ),
+            ExpandedIf(
+              enabled: horizontal && !workbench,
+              child: _TransferEntry(
+                key: const ValueKey<String>('home-receive'),
+                icon: Icons.south_west_rounded,
+                title: l10n.receiveFile,
+                description: l10n.receiveCardDescription,
+                onTap: () => _open(_receiveRoute()),
+              ),
+            ),
+          ],
+        );
+
+        final historySection = Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    l10n.recentTransfers,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+                if (records.isNotEmpty)
+                  TextButton(
+                    key: const ValueKey<String>('home-clear-history-inline'),
+                    onPressed: _clearHistory,
+                    child: Text(l10n.clearHistory),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            if (records.isEmpty)
+              const _EmptyHistory()
+            else
+              _HistoryList(records: records.take(6).toList(growable: false)),
+          ],
+        );
+
         return SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(24, 24, 24, 36),
+          padding: EdgeInsets.fromLTRB(
+            workbench ? 32 : 24,
+            workbench ? 28 : 20,
+            workbench ? 32 : 24,
+            36,
+          ),
           child: Center(
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 720),
+              constraints: BoxConstraints(
+                maxWidth: workbench ? 1080 : 720,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildBrandMark(context),
-                  SizedBox(height: horizontal ? 88 : 64),
+                  if (!workbench) ...[
+                    _buildBrandMark(context),
+                    SizedBox(height: horizontal ? 36 : 28),
+                  ],
                   Text(
                     l10n.homeHeadline,
                     style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      fontSize: horizontal ? 54 : 42,
-                      height: 1.04,
+                      fontSize: workbench ? 40 : (horizontal ? 42 : 36),
+                      height: 1.05,
                     ),
                   ),
-                  const SizedBox(height: 28),
-                  Flex(
-                    direction: horizontal ? Axis.horizontal : Axis.vertical,
-                    crossAxisAlignment: horizontal
-                        ? CrossAxisAlignment.start
-                        : CrossAxisAlignment.stretch,
-                    children: [
-                      ExpandedIf(
-                        enabled: horizontal,
-                        child: _TransferEntry(
-                          key: const ValueKey<String>('home-send'),
-                          icon: Icons.north_east_rounded,
-                          title: l10n.sendFile,
-                          description: l10n.sendCardDescription,
-                          primary: true,
-                          onTap: () => _open(_sendRoute()),
+                  const SizedBox(height: 10),
+                  Text(
+                    l10n.homeSubtitle,
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                  SizedBox(height: workbench ? 28 : 22),
+                  if (workbench)
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          flex: 5,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              _TransferEntry(
+                                key: const ValueKey<String>('home-send'),
+                                icon: Icons.north_east_rounded,
+                                title: l10n.sendFile,
+                                description: l10n.sendCardDescription,
+                                primary: true,
+                                onTap: () => _open(_sendRoute()),
+                              ),
+                              const SizedBox(height: 12),
+                              _TransferEntry(
+                                key: const ValueKey<String>('home-receive'),
+                                icon: Icons.south_west_rounded,
+                                title: l10n.receiveFile,
+                                description: l10n.receiveCardDescription,
+                                onTap: () => _open(_receiveRoute()),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                      SizedBox(
-                        width: horizontal ? 16 : 0,
-                        height: horizontal ? 0 : 14,
-                      ),
-                      ExpandedIf(
-                        enabled: horizontal,
-                        child: _TransferEntry(
-                          key: const ValueKey<String>('home-receive'),
-                          icon: Icons.south_west_rounded,
-                          title: l10n.receiveFile,
-                          description: l10n.receiveCardDescription,
-                          onTap: () => _open(_receiveRoute()),
-                        ),
-                      ),
-                    ],
+                        const SizedBox(width: 24),
+                        Expanded(flex: 6, child: historySection),
+                      ],
+                    )
+                  else ...[
+                    actions,
+                    const SizedBox(height: 28),
+                    historySection,
+                  ],
+                  const SizedBox(height: 20),
+                  Text(
+                    l10n.historyFooter,
+                    style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ],
               ),
@@ -371,34 +472,43 @@ class _TransferEntry extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final background = primary
-        ? scheme.primary
-        : scheme.surfaceContainerHighest;
+    final background = primary ? scheme.primary : scheme.surfaceContainerHigh;
     final foreground = primary ? scheme.onPrimary : scheme.onSurface;
     return Semantics(
       button: true,
       label: '$title. $description',
       child: Material(
         color: background,
-        borderRadius: const BorderRadius.all(Radius.circular(18)),
+        shape: RoundedRectangleBorder(
+          borderRadius: const BorderRadius.all(
+            Radius.circular(oneSendRadiusCard),
+          ),
+          side: BorderSide(
+            color: primary ? scheme.primary : scheme.outlineVariant,
+          ),
+        ),
         child: InkWell(
           onTap: onTap,
-          borderRadius: const BorderRadius.all(Radius.circular(18)),
+          borderRadius: const BorderRadius.all(
+            Radius.circular(oneSendRadiusCard),
+          ),
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 18, 18, 18),
+            padding: const EdgeInsets.fromLTRB(18, 16, 16, 16),
             child: Row(
               children: [
                 DecoratedBox(
                   decoration: BoxDecoration(
-                    color: foreground.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(14),
+                    color: primary
+                        ? foreground.withValues(alpha: 0.14)
+                        : oneSendLime.withValues(alpha: 0.55),
+                    borderRadius: BorderRadius.circular(oneSendRadiusControl),
                   ),
                   child: Padding(
-                    padding: const EdgeInsets.all(13),
-                    child: Icon(icon, color: foreground, size: 25),
+                    padding: const EdgeInsets.all(12),
+                    child: Icon(icon, color: foreground, size: 22),
                   ),
                 ),
-                const SizedBox(width: 16),
+                const SizedBox(width: 14),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -491,10 +601,11 @@ class _EmptyHistory extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(22),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: scheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(18),
+        color: scheme.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(oneSendRadiusCard),
+        border: Border.all(color: scheme.outlineVariant),
       ),
       child: Row(
         children: [
@@ -595,44 +706,40 @@ class _HistoryRow extends StatelessWidget {
       bytes: record.bytes,
       path: record.path ?? '',
     );
-    await showModalBottomSheet<void>(
+    await showOneSendSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Theme.of(context).colorScheme.surface,
+      maxDialogWidth: 520,
       builder: (context) => SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 620),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          l10n.receivedFileActions,
-                          style: Theme.of(context).textTheme.titleLarge,
-                        ),
-                      ),
-                      IconButton(
-                        tooltip: l10n.close,
-                        onPressed: () => Navigator.of(context).pop(),
-                        icon: const Icon(Icons.close_rounded),
-                      ),
-                    ],
+                  Expanded(
+                    child: Text(
+                      l10n.receivedFileActions,
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
                   ),
-                  const SizedBox(height: 10),
-                  Text(
-                    record.fileName,
-                    style: Theme.of(context).textTheme.titleMedium,
+                  IconButton(
+                    tooltip: l10n.close,
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close_rounded),
                   ),
-                  const SizedBox(height: 12),
-                  StoredFileActions(file: stored),
                 ],
               ),
-            ),
+              const SizedBox(height: 10),
+              Text(
+                record.fileName,
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 12),
+              StoredFileActions(file: stored),
+            ],
           ),
         ),
       ),

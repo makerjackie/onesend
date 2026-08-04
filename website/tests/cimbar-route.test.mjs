@@ -79,9 +79,17 @@ test("cimbar copy and camera behavior stay local and opt-in", () => {
   // Old /cimbar bookmarks redirect into the main web-transfer mode switcher.
   assert.match(page, /redirect\("\/#web-transfer"\)/);
   assert.match(webTransfer, /彩色视觉码/);
-  assert.match(client, /发送/);
-  assert.match(client, /接收/);
+  assert.match(client, /选择文件/);
+  assert.match(client, /测试视频/);
+  assert.match(client, /开始发送/);
+  assert.match(client, /扫码连接/);
+  assert.match(client, /web-workbench/);
   assert.match(client, /getUserMedia/);
+  // Peak experimental profile for high-end phones (Mode B + 15 fps).
+  assert.match(client, /const CIMBAR_MODE = 68/);
+  assert.match(client, /const CIMBAR_DISPLAY_FPS = 15/);
+  assert.match(client, /const CIMBAR_CANVAS_SIZE = 1024/);
+  assert.match(client, /ideal: 1920/);
   assert.ok(client.indexOf("async function startReceiver") < client.indexOf("getUserMedia"));
   assert.doesNotMatch(`${page}\n${client}\n${senderWrapper}\n${receiverWrapper}`, /serviceWorker\.register/);
   assert.doesNotMatch(`${senderWrapper}\n${receiverWrapper}`, /https?:\/\//);

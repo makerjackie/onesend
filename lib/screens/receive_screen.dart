@@ -15,6 +15,7 @@ import '../l10n/generated/app_localizations.dart';
 import '../services/app_settings.dart';
 import '../services/file_service.dart';
 import '../services/transfer_store.dart';
+import '../widgets/adaptive_sheet.dart';
 import '../widgets/desktop_camera_receiver.dart';
 import '../widgets/file_tile.dart';
 import '../widgets/stored_file_actions.dart';
@@ -118,7 +119,8 @@ class ReceiveScreenState extends State<ReceiveScreen>
         AppSettings.defaultTransferAlgorithm;
     _mode = widget.settings?.defaultMode ?? AppSettings.defaultTransferMode;
     WidgetsBinding.instance.addObserver(this);
-    if (!_usesCimbar) unawaited(_enableWakelock());
+    // QR and CIMBAR both keep the screen awake while the receive route is open.
+    unawaited(_enableWakelock());
     if (_usesMobileScanner && !_usesCimbar) {
       _scheduleMobileScannerStart();
     }
@@ -358,13 +360,14 @@ class ReceiveScreenState extends State<ReceiveScreen>
 
   Future<void> _showReceiveModeSheet() async {
     if (!mounted || _processing || _completed) return;
-    await showModalBottomSheet<void>(
+    await showOneSendSheet<void>(
       context: context,
       showDragHandle: true,
+      maxDialogWidth: 420,
       builder: (sheetContext) {
         return SafeArea(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
             child: _buildModeChips(
               enabled: !_processing && !_completed,
               sheetContext: sheetContext,
@@ -770,12 +773,34 @@ class ReceiveScreenState extends State<ReceiveScreen>
           );
     return LayoutBuilder(
       builder: (context, constraints) {
-        final compact = constraints.maxWidth < 760;
-        final contentWidth = constraints.maxWidth < 920
+        final compact = constraints.maxWidth < oneSendWideBreakpoint;
+        final workbench = constraints.maxWidth >= oneSendWorkbenchBreakpoint;
+        final contentWidth = constraints.maxWidth < 1100
             ? constraints.maxWidth
-            : 920.0;
-        final horizontalPadding = compact ? 16.0 : 24.0;
-        final verticalPadding = compact ? 8.0 : 16.0;
+            : 1100.0;
+        final horizontalPadding = compact ? 16.0 : 20.0;
+        final verticalPadding = compact ? 8.0 : 14.0;
+
+        final readout = _buildScanReadout(
+          l10n: l10n,
+          status: status,
+          progress: progress,
+          currentRate: currentRate,
+          snapshot: snapshot,
+          compact: compact,
+        );
+        final controls = Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            readout,
+            if (_error != null) ...[
+              const SizedBox(height: 8),
+              _ReceiveError(message: _error!, compact: true),
+            ],
+            SizedBox(height: compact ? 8 : 14),
+            _buildScannerControl(l10n: l10n, compact: compact),
+          ],
+        );
 
         return SizedBox(
           width: constraints.maxWidth,
@@ -791,52 +816,48 @@ class ReceiveScreenState extends State<ReceiveScreen>
                   horizontalPadding,
                   verticalPadding,
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Expanded(
-                      child: LayoutBuilder(
-                        builder: (context, cameraConstraints) {
-                          final cameraHeight = compact
-                              ? cameraConstraints.maxHeight
-                              : cameraConstraints.maxHeight < 440.0
-                              ? cameraConstraints.maxHeight
-                              : 440.0;
-                          return Align(
-                            alignment: compact
-                                ? Alignment.center
-                                : Alignment.topCenter,
-                            child: SizedBox(
-                              width: double.infinity,
-                              height: cameraHeight,
-                              child: KeyedSubtree(
-                                key: const ValueKey<String>(
-                                  'receive-camera-frame',
+                child: workbench
+                    ? Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Expanded(
+                            flex: 7,
+                            child: KeyedSubtree(
+                              key: const ValueKey<String>(
+                                'receive-camera-frame',
+                              ),
+                              child: _buildCameraFrame(l10n),
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            flex: 4,
+                            child: SingleChildScrollView(
+                              child: Card(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(16),
+                                  child: controls,
                                 ),
-                                child: _buildCameraFrame(l10n),
                               ),
                             ),
-                          );
-                        },
+                          ),
+                        ],
+                      )
+                    : Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Expanded(
+                            child: KeyedSubtree(
+                              key: const ValueKey<String>(
+                                'receive-camera-frame',
+                              ),
+                              child: _buildCameraFrame(l10n),
+                            ),
+                          ),
+                          SizedBox(height: compact ? 10 : 12),
+                          controls,
+                        ],
                       ),
-                    ),
-                    SizedBox(height: compact ? 10 : 16),
-                    _buildScanReadout(
-                      l10n: l10n,
-                      status: status,
-                      progress: progress,
-                      currentRate: currentRate,
-                      snapshot: snapshot,
-                      compact: compact,
-                    ),
-                    if (_error != null) ...[
-                      const SizedBox(height: 6),
-                      _ReceiveError(message: _error!, compact: true),
-                    ],
-                    SizedBox(height: compact ? 8 : 16),
-                    _buildScannerControl(l10n: l10n, compact: compact),
-                  ],
-                ),
               ),
             ),
           ),
@@ -847,7 +868,7 @@ class ReceiveScreenState extends State<ReceiveScreen>
 
   Widget _buildCameraFrame(AppLocalizations l10n) {
     return ClipRRect(
-      borderRadius: BorderRadius.circular(18),
+      borderRadius: BorderRadius.circular(oneSendRadiusCard),
       child: Stack(
         fit: StackFit.expand,
         children: [
