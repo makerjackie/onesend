@@ -107,4 +107,22 @@ void main() {
     expect(bridge, contains('OneSendCimbarInlineReceiveWorkerSource'));
     expect(bridge, contains("type: 'onesend-wasm-init'"));
   });
+
+  test(
+    'native camera feed uses worker backpressure and throttled progress',
+    () async {
+      final bridge = await rootBundle.loadString(
+        'assets/cimbar/onesend_cimbar_bridge.js',
+      );
+
+      expect(bridge, contains('nativeWorkersBusy'));
+      expect(bridge, contains('if (index < 0) return false'));
+      expect(bridge, contains('state.nativeWorkersBusy[index] = true'));
+      expect(
+        bridge,
+        contains('state.nativeWorkersBusy[nativeWorkerId] = false'),
+      );
+      expect(bridge, contains('now - state.lastDecodeProgressBridgeAt >= 200'));
+    },
+  );
 }

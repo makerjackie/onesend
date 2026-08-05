@@ -93,6 +93,7 @@ test("cimbar copy and camera behavior stay local and opt-in", () => {
   assert.match(client, /实测/);
   assert.match(client, /explainReceiveGap/);
   assert.match(client, /ideal: 1920/);
+  assert.match(client, /setReceiverProgress\(\(current\) => Math\.max\(current, nextProgress\)\)/);
   // Visible size fits the workbench; the backing bitmap remains crisp.
   assert.match(client, /CIMBAR_DISPLAY_POLICY/);
   assert.match(client, /maximumDisplayPx: 560/);

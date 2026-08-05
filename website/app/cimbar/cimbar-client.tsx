@@ -821,7 +821,10 @@ export function CimbarTransfer({
             setScanStats({ ...scanStatsRef.current });
           }
           if (typeof data.progress === "number") {
-            setReceiverProgress(data.progress);
+            const nextProgress = Math.max(0, Math.min(1, data.progress));
+            // Decoder reports can finish out of order; recovered data never
+            // moves backwards, so neither should the user-facing progress.
+            setReceiverProgress((current) => Math.max(current, nextProgress));
           }
           refreshReceiveHints({ receiving: true });
           return;

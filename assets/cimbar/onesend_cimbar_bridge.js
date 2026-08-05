@@ -41,8 +41,10 @@
     cameraCaptureInstalled: false,
     nativeFrames: false,
     nextNativeWorker: 0,
+    nativeWorkersBusy: [],
     nativeFeedAnnounced: false,
     decodedOpticalBytes: 0,
+    lastDecodeProgressBridgeAt: 0,
   };
 
   function bridge(type, details) {
@@ -277,14 +279,26 @@
     const originalProgress = global.Recv.render_progress;
     global.Recv.render_progress = function (report) {
       if (Array.isArray(report)) {
-        bridge('decode-progress', {
-          progress: report.map(function (value) { return Number(value); }),
-          mode: 'B',
-          decodedBytes: state.decodedOpticalBytes,
-          elapsedMs: state.receiveStartedAt > 0
-            ? Math.max(0, performance.now() - state.receiveStartedAt)
-            : 0,
+        const progress = report.map(function (value) { return Number(value); });
+        const now = performance.now();
+        const terminal = progress.some(function (value) {
+          return Number.isFinite(value) && value >= 1;
         });
+        // Worker reports can arrive in bursts and out of order. Flutter owns
+        // the monotonic progress surface, so cap bridge/UI churn at ~5 Hz while
+        // always forwarding completion immediately.
+        if (terminal || state.lastDecodeProgressBridgeAt === 0 ||
+            now - state.lastDecodeProgressBridgeAt >= 200) {
+          state.lastDecodeProgressBridgeAt = now;
+          bridge('decode-progress', {
+            progress: progress,
+            mode: 'B',
+            decodedBytes: state.decodedOpticalBytes,
+            elapsedMs: state.receiveStartedAt > 0
+              ? Math.max(0, now - state.receiveStartedAt)
+              : 0,
+          });
+        }
       }
       return originalProgress.apply(this, arguments);
     };
@@ -311,6 +325,11 @@
 
     const originalDecode = global.Recv.on_decode;
     global.Recv.on_decode = function (workerId, data) {
+      const nativeWorkerId = Number(workerId);
+      if (Number.isInteger(nativeWorkerId) && nativeWorkerId >= 0 &&
+          nativeWorkerId < state.nativeWorkersBusy.length) {
+        state.nativeWorkersBusy[nativeWorkerId] = false;
+      }
       if (data && data.type === 'startWasm' && data.error === 'no wasm') {
         // A frame reached this worker during its asynchronous WASM startup.
         // It is a transient readiness signal, not a corrupt transfer.
@@ -741,12 +760,15 @@
     state.receiveStartedAt = performance.now();
     state.receiveVideoStarted = false;
     state.nextNativeWorker = 0;
+    state.nativeWorkersBusy = [];
     state.nativeFeedAnnounced = false;
     state.decodedOpticalBytes = 0;
+    state.lastDecodeProgressBridgeAt = 0;
     try {
       installReceiveWorkerTracking();
       const receiveGeneration = state.receiveGeneration;
       const workerCount = 4;
+      state.nativeWorkersBusy = new Array(workerCount).fill(false);
       const workersReady = prepareReceiveWorkers(
         workerCount,
         receiveGeneration,
@@ -817,8 +839,20 @@
     try {
       const pixels = base64ToBytes(rgbaBase64);
       if (pixels.length < w * h * 4) return false;
-      const index = state.nextNativeWorker % state.receiveWorkers.length;
-      state.nextNativeWorker = index + 1;
+      let index = -1;
+      for (let offset = 0; offset < state.receiveWorkers.length; offset += 1) {
+        const candidate =
+          (state.nextNativeWorker + offset) % state.receiveWorkers.length;
+        if (!state.nativeWorkersBusy[candidate]) {
+          index = candidate;
+          break;
+        }
+      }
+      // Never queue stale camera frames behind a slow decode. Fountain coding
+      // tolerates dropped frames; a growing worker queue hurts both stability
+      // and effective throughput.
+      if (index < 0) return false;
+      state.nextNativeWorker = (index + 1) % state.receiveWorkers.length;
       const worker = state.receiveWorkers[index];
       // Copy into a transferable buffer for the worker.
       const copy = pixels.slice(0, w * h * 4);
@@ -833,6 +867,7 @@
         },
         [copy.buffer],
       );
+      state.nativeWorkersBusy[index] = true;
       // First successful feed: confirm live path (idempotent for Flutter status).
       if (!state.nativeFeedAnnounced) {
         state.nativeFeedAnnounced = true;
@@ -906,8 +941,10 @@
     state.receiveStartedAt = 0;
     state.nativeFrames = false;
     state.nextNativeWorker = 0;
+    state.nativeWorkersBusy = [];
     state.nativeFeedAnnounced = false;
     state.decodedOpticalBytes = 0;
+    state.lastDecodeProgressBridgeAt = 0;
     stopReceiveWorkers();
   }
 

@@ -136,7 +136,10 @@ class _DesktopCameraReceiverState extends State<DesktopCameraReceiver> {
           format: zxing.Format.qrCode,
           width: image.width,
           height: image.height,
-          tryHarder: false,
+          // High-density V30/V40 transfer frames benefit more from a thorough
+          // search than from attempting every webcam frame. The in-flight
+          // guard above already provides decoder backpressure.
+          tryHarder: true,
           tryRotate: true,
           tryDownscale: true,
         ),

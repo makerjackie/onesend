@@ -37,6 +37,22 @@ enum _ReceiveSavePhase {
 
 enum _BarcodeObservation { bytesUnavailable, invalidFrame }
 
+/// Whether a scanner event contains progress worth rebuilding the receive UI.
+///
+/// Cameras commonly report the same displayed QR several times. The fountain
+/// decoder still consumes those reports, but duplicate-only snapshots should
+/// not force a full Flutter rebuild at camera frame rate.
+@visibleForTesting
+bool receiverSnapshotHasUsefulChange(
+  ReceiverSnapshot? current,
+  ReceiverSnapshot next,
+) {
+  if (current == null) return true;
+  return next.sessionId != current.sessionId ||
+      next.framesNew > current.framesNew ||
+      next.solvedBlocks > current.solvedBlocks;
+}
+
 class ReceiveScreen extends StatefulWidget {
   const ReceiveScreen({
     required this.store,
@@ -411,6 +427,11 @@ class ReceiveScreenState extends State<ReceiveScreen>
 
   void _handleReceiverEvent(ReceiverEvent? event) {
     if (event == null || !mounted) return;
+    if (event.error == null &&
+        event.payload == null &&
+        !receiverSnapshotHasUsefulChange(_snapshot, event.snapshot)) {
+      return;
+    }
     setState(() {
       _snapshot = event.snapshot;
       _error = event.error;
