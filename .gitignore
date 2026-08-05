@@ -33,6 +33,7 @@ migrate_working_dir/
 /build/
 /coverage/
 /dist/
+/.asc/
 .release-credentials/
 
 # Symbolication related
