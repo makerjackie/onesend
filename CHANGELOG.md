@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.5.4 (build 23) - 2026-08-05
+## 1.5.4（202608051240）
 
 ### 中文
 
@@ -9,6 +9,7 @@
 - 修复 iOS 彩色接收依赖 `127.0.0.1` 本地 HTTP 服务的问题；WASM 与解码 worker 现在全部从应用内离线资源启动，不创建网络套接字，也不声明本地网络访问。
 - 接收页只保留一条 Flutter 进度条，并按已达到的最高解码进度单调推进；不再因多个 worker 的异步报告前后变化而抖动或倒退。
 - 彩色接收完成前即可按真实已解码光学字节显示有效速度，文件大小上限提示修正为 33 MiB。
+- 用户可见版本统一为语义版本加十二位发布时间戳，不再显示内部顺序构建号。
 - 补齐离线资源摘要、iOS 无网络路径、进度单调性、网页帧调度与高分辨率画布测试；通过 Flutter 全量测试、网页构建/测试及 iOS 18.5、26.5 模拟器回归。
 
 ### English
@@ -18,6 +19,7 @@
 - Removed the iOS color receiver's `127.0.0.1` HTTP asset server. WASM and decoder workers now start entirely from offline bundled assets, with no network socket or local-network declaration.
 - Reduced reception to one Flutter-owned progress bar that advances monotonically to the furthest decoded point, preventing asynchronous worker reports from shaking or moving it backward.
 - Added live effective optical-byte speed before file completion and corrected the color-mode size limit label to 33 MiB.
+- Replaced user-visible sequential build numbers with a twelve-digit release timestamp.
 - Added checks for offline asset digests, the network-free iOS path, monotonic progress, web frame scheduling, and the high-resolution canvas; the full Flutter suite, website build/tests, and iOS 18.5/26.5 simulator regressions pass.
 
 ## 1.5.2 (build 21) - 2026-08-04

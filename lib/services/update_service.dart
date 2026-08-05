@@ -13,6 +13,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../core/release_info.dart';
 import '../core/update_manifest.dart';
 
 const _updateManifestUrl = 'https://onesend.01mvp.com/updates/latest.json';
@@ -238,7 +239,10 @@ class DesktopUpdateManager extends UpdateManager {
   String get currentVersionLabel {
     final info = _packageInfo;
     if (info == null) return '读取中';
-    return '${info.version} (${info.buildNumber})';
+    return formatOneSendReleaseLabel(
+      version: info.version,
+      publishedAt: oneSendReleasePublishedAt,
+    );
   }
 
   @override

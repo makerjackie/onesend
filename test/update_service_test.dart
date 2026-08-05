@@ -70,7 +70,7 @@ void main() {
       addTearDown(manager.dispose);
 
       await manager.initialize();
-      expect(manager.currentVersionLabel, '1.3.0 (9)');
+      expect(manager.currentVersionLabel, '1.3.0（202608051240）');
       expect(manager.automaticChecksEnabled, isFalse);
 
       expect(
@@ -98,7 +98,7 @@ void main() {
 
       await manager.initialize();
 
-      expect(manager.currentVersionLabel, '1.3.0 (9)');
+      expect(manager.currentVersionLabel, '1.3.0（202608051240）');
       expect(manager.automaticChecksEnabled, isTrue);
       expect(
         await manager.checkForUpdates(),

@@ -46,7 +46,7 @@ void main() {
       find.byKey(const ValueKey<String>('settings-version-footer')),
       findsOneWidget,
     );
-    expect(find.text('1.5.4（2026-08-05 10:43）'), findsOneWidget);
+    expect(find.text('1.5.4（202608051240）'), findsOneWidget);
   });
 
   testWidgets(
@@ -128,7 +128,7 @@ void main() {
     expect(find.text('OneSend'), findsOneWidget);
     expect(find.text('扫传'), findsOneWidget);
     expect(find.text('实验性离线视觉传输'), findsOneWidget);
-    expect(find.text('1.4.0（2026-08-04 21:30）'), findsOneWidget);
+    expect(find.text('1.4.0（202608042130）'), findsOneWidget);
     expect(find.text('开源致谢'), findsOneWidget);
     expect(find.textContaining('decimen-optical-transfer'), findsOneWidget);
     expect(find.textContaining('libcimbar'), findsOneWidget);

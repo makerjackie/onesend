@@ -4,7 +4,7 @@
 ///
 /// ```text
 /// --dart-define=ONESEND_VERSION=1.5.3
-/// --dart-define=ONESEND_RELEASE_PUBLISHED_AT="2026-08-04 23:40"
+/// --dart-define=ONESEND_RELEASE_PUBLISHED_AT=202608042340
 /// ```
 ///
 /// Build numbers are deliberately not part of this model or its display
@@ -26,7 +26,7 @@ const String oneSendReleaseVersion = String.fromEnvironment(
 
 const String oneSendReleasePublishedAt = String.fromEnvironment(
   'ONESEND_RELEASE_PUBLISHED_AT',
-  defaultValue: '2026-08-05 10:43',
+  defaultValue: '202608051240',
 );
 
 const OneSendReleaseInfo oneSendReleaseInfo = OneSendReleaseInfo(
@@ -34,15 +34,23 @@ const OneSendReleaseInfo oneSendReleaseInfo = OneSendReleaseInfo(
   publishedAt: oneSendReleasePublishedAt,
 );
 
-/// Formats a semantic version and release timestamp without exposing a build
-/// number. A package version occasionally arrives with a `+build` suffix, so
-/// the suffix is removed before it reaches the UI.
+/// Formats a semantic version and compact release timestamp without exposing
+/// an internal build number. A package version occasionally arrives with a
+/// `+build` suffix, so the suffix is removed before it reaches the UI.
 String formatOneSendReleaseLabel({
   required String version,
   required String publishedAt,
 }) {
   final semanticVersion = _semanticVersion(version);
-  return '$semanticVersion（$publishedAt）';
+  final timestamp = publishedAt.replaceAll(RegExp(r'\D'), '');
+  if (!RegExp(r'^\d{12}$').hasMatch(timestamp)) {
+    throw ArgumentError.value(
+      publishedAt,
+      'publishedAt',
+      'must contain a yyyyMMddHHmm release timestamp',
+    );
+  }
+  return '$semanticVersion（$timestamp）';
 }
 
 String _semanticVersion(String value) {
