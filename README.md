@@ -5,7 +5,13 @@
 </p>
 
 <p align="center">
-  <a href="#中文">中文</a> · <a href="#english">English</a>
+  <a href="#english"><strong>English</strong></a> · <a href="#中文">中文</a>
+</p>
+
+<p align="center">
+  <strong>English UI included in every download.</strong><br>
+  OneSend automatically follows your device language; no separate English package is required.<br>
+  每个安装包均内置英文版，并自动检测设备语言，无需单独下载。
 </p>
 
 [GitHub Releases / latest](https://github.com/makerjackie/onesend/releases/latest) ·
@@ -19,10 +25,10 @@ OneSend（扫传）是一款实验性的、纯视觉的跨设备文件传输工�
 发送设备把文件编码为持续变化的视觉码并显示在屏幕上，接收设备用摄像头连续扫描，
 在本地还原并保存文件。
 
-它不需要账号、配对、服务器或文件网络传输；只需要一块屏幕和一枚摄像头。v1.5.2
-（build 21）仍为实验性版本，以下内容描述当前确定的 v1.5.2 范围。
+它不需要账号、配对、服务器或文件网络传输；只需要一块屏幕和一枚摄像头。v1.5.4
+（202608051240）仍为实验性版本，以下内容描述当前确定的 v1.5.4 范围。
 
-### v1.5.2 功能
+### v1.5.4 功能
 
 - 支持任意文件，单文件上限为 **64 MB**。
 - 官网与 Android、iOS、macOS、Windows、Linux 全端统一使用“文件 + 二维码 + 扫描框 + 扫线”标识，并增加品牌资源防漂移检查。
@@ -72,7 +78,7 @@ Français、Deutsch、Português。首次启动会自动检测系统语言，也
 OneSend 不是加密工具：能看到完整二维码流的人或摄像头可能重建文件。传输敏感资料时，
 请控制屏幕和摄像头的物理可见范围，或先使用你信任的加密工具。
 
-v1.5.2 不宣称已达到 200 KB/s，也不把上游 106 KB/s 基准写成 OneSend 真机实测；音频传输仍未实现。
+v1.5.4 不宣称已达到 200 KB/s，也不把上游 106 KB/s 基准写成 OneSend 真机实测；音频传输仍未实现。
 
 ### 下载
 
@@ -120,9 +126,11 @@ screen. The receiving device uses its camera to scan the stream, reconstructs th
 and saves it locally.
 
 It needs no account, pairing, server, or network file transfer—only a screen and a camera.
-Version 1.5.2 (build 21) remains experimental; the details below describe the current v1.5.2 scope.
+Every download includes the English interface, and OneSend automatically follows the device
+language on first launch. Version 1.5.4 (202608051240) remains experimental; the details below
+describe the current v1.5.4 scope.
 
-### v1.5.2 features
+### v1.5.4 features
 
 - Any file up to **64 MB** per file.
 - The file + QR + scanner-frame + scan-line mark is shared across the website and Android, iOS, macOS, Windows, and Linux, with a brand-asset drift check.
@@ -193,7 +201,7 @@ OneSend is not an encryption tool: anyone who can see the complete QR stream may
 reconstruct the file. Limit the physical visibility of the screen and camera, or encrypt
 sensitive material with a tool you trust first.
 
-Version 1.5.2 does not claim 200 KB/s or present the upstream 106 KB/s benchmark as a measured
+Version 1.5.4 does not claim 200 KB/s or present the upstream 106 KB/s benchmark as a measured
 OneSend result. Audio transfer is still not implemented.
 
 ### Downloads
