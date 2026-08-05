@@ -138,8 +138,7 @@ Uint8List downscaleRgbaForTest(
   int srcH,
   int dstW,
   int dstH,
-) =>
-    _downscaleRgba(src, srcW, srcH, dstW, dstH);
+) => _downscaleRgba(src, srcW, srcH, dstW, dstH);
 
 Uint8List _downscaleRgba(
   Uint8List src,

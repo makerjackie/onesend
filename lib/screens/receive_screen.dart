@@ -1070,9 +1070,7 @@ class ReceiveScreenState extends State<ReceiveScreen>
         child: FilledButton.icon(
           key: const ValueKey<String>('receive-scan-control'),
           onPressed: _processing ? null : () => unawaited(_togglePause()),
-          icon: Icon(
-            _paused ? Icons.play_arrow_rounded : Icons.pause_rounded,
-          ),
+          icon: Icon(_paused ? Icons.play_arrow_rounded : Icons.pause_rounded),
           label: Text(toggleLabel),
           style: FilledButton.styleFrom(
             backgroundColor: _paused ? oneSendLime : oneSendInk,

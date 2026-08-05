@@ -45,18 +45,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('传输模式'), findsOneWidget);
-    expect(
-      find.byKey(const ValueKey<String>('send-mode-qr')),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(const ValueKey<String>('send-mode-fast')),
-      findsNothing,
-    );
-    expect(
-      find.byKey(const ValueKey<String>('send-mode-turbo')),
-      findsNothing,
-    );
+    expect(find.byKey(const ValueKey<String>('send-mode-qr')), findsOneWidget);
+    expect(find.byKey(const ValueKey<String>('send-mode-fast')), findsNothing);
+    expect(find.byKey(const ValueKey<String>('send-mode-turbo')), findsNothing);
     expect(
       find.byKey(const ValueKey<String>('send-mode-cimbar')),
       findsOneWidget,

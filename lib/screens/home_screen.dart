@@ -35,6 +35,7 @@ class _HomeScreenState extends State<HomeScreen> {
   int _selectedTab = 0;
   String? _presentedUpdateVersion;
   AppSettings? _fallbackSettings;
+
   /// Built once so the settings tab keeps package-info / form state across
   /// shell rebuilds (IndexedStack alone is not enough if the child widget is
   /// a new instance every build).
@@ -87,9 +88,9 @@ class _HomeScreenState extends State<HomeScreen> {
     // Keep the platform MaterialPageRoute so iOS swipe-back and Android
     // predictive-back stay intact. Tab jank is handled by IndexedStack, not
     // by replacing the system transition.
-    await Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(builder: (_) => page),
-    );
+    await Navigator.of(
+      context,
+    ).push<void>(MaterialPageRoute<void>(builder: (_) => page));
   }
 
   Widget _sendRoute() {
@@ -147,7 +148,8 @@ class _HomeScreenState extends State<HomeScreen> {
   ///
   /// History updates only rebuild the transfer/files panes — never settings.
   Widget _buildTabHost(BuildContext context) {
-    final settingsTab = _settingsTab ??
+    final settingsTab =
+        _settingsTab ??
         SettingsScreen(
           settings: _settings,
           updates: widget.updates,

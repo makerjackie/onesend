@@ -37,18 +37,12 @@ void main() {
           .selected,
       isTrue,
     );
-    expect(
-      find.byKey(const ValueKey<String>('send-mode-fast')),
-      findsNothing,
-    );
+    expect(find.byKey(const ValueKey<String>('send-mode-fast')), findsNothing);
     expect(
       find.byKey(const ValueKey<String>('send-mode-reliable')),
       findsNothing,
     );
-    expect(
-      find.byKey(const ValueKey<String>('send-mode-turbo')),
-      findsNothing,
-    );
+    expect(find.byKey(const ValueKey<String>('send-mode-turbo')), findsNothing);
     expect(
       find.byKey(const ValueKey<String>('send-mode-cimbar')),
       findsOneWidget,

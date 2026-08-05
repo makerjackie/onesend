@@ -198,9 +198,7 @@ ThemeData _buildOneSendTheme(ColorScheme scheme) {
         minimumSize: const Size(0, 44),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.all(
-            Radius.circular(oneSendRadiusControl),
-          ),
+          borderRadius: BorderRadius.all(Radius.circular(oneSendRadiusControl)),
         ),
         textStyle: const TextStyle(fontWeight: FontWeight.w700),
       ),
@@ -212,9 +210,7 @@ ThemeData _buildOneSendTheme(ColorScheme scheme) {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         side: BorderSide(color: scheme.outline, width: 1.2),
         shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.all(
-            Radius.circular(oneSendRadiusControl),
-          ),
+          borderRadius: BorderRadius.all(Radius.circular(oneSendRadiusControl)),
         ),
       ),
     ),
@@ -224,9 +220,7 @@ ThemeData _buildOneSendTheme(ColorScheme scheme) {
         minimumSize: const Size(0, 40),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.all(
-            Radius.circular(oneSendRadiusControl),
-          ),
+          borderRadius: BorderRadius.all(Radius.circular(oneSendRadiusControl)),
         ),
       ),
     ),

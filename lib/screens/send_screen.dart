@@ -566,9 +566,9 @@ class _SendScreenState extends State<SendScreen>
                     : l10n.broadcasting,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
               ),
               if (!compact) ...[
                 const SizedBox(height: 4),
@@ -656,12 +656,11 @@ class _SendScreenState extends State<SendScreen>
                               ? Icons.play_arrow_rounded
                               : Icons.pause_rounded,
                         ),
-                        label: Text(
-                          sender.isPaused ? l10n.resume : l10n.pause,
-                        ),
+                        label: Text(sender.isPaused ? l10n.resume : l10n.pause),
                       ),
                     ),
-                  if (sender != null && _error == null) const SizedBox(width: 8),
+                  if (sender != null && _error == null)
+                    const SizedBox(width: 8),
                   Expanded(
                     child: FilledButton.icon(
                       onPressed: _endTransfer,
@@ -694,10 +693,7 @@ class _SendScreenState extends State<SendScreen>
                   ),
                 ),
                 const SizedBox(width: 16),
-                Expanded(
-                  flex: 6,
-                  child: qrStage(compact: false),
-                ),
+                Expanded(flex: 6, child: qrStage(compact: false)),
               ],
             ),
           );
