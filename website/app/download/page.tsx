@@ -59,6 +59,14 @@ export default function DownloadPage() {
           <a className="is-current" href="/download">
             下载
           </a>
+          <a
+            className="nav-github"
+            href="https://github.com/makerjackie/onesend"
+            target="_blank"
+            rel="noreferrer"
+          >
+            GitHub
+          </a>
           <Link className="nav-home" href="/">
             首页
           </Link>

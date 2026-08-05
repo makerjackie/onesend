@@ -278,17 +278,25 @@ summary:focus-visible {
   min-height: calc(100svh - 176px);
   display: flex;
   align-items: center;
-  padding-block: 88px;
+  padding-block: 72px;
+}
+
+.home-hero-grid {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(280px, 0.95fr);
+  gap: clamp(28px, 5vw, 64px);
+  align-items: center;
 }
 
 .home-hero-content {
-  max-width: 700px;
+  max-width: 640px;
 }
 
 .home-hero h1 {
   max-width: 680px;
   margin: 24px 0 0;
-  font-size: clamp(54px, 8vw, 104px);
+  font-size: clamp(48px, 7vw, 92px);
   line-height: 0.96;
   letter-spacing: -0.085em;
   font-weight: 850;
@@ -304,13 +312,100 @@ summary:focus-visible {
 
 .hero-actions {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
+  align-items: stretch;
   gap: 10px;
   margin-top: 32px;
+  max-width: 420px;
 }
 
-.hero-actions .button {
-  min-width: 142px;
+.hero-actions-label {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 750;
+  letter-spacing: 0.04em;
+  text-transform: none;
+}
+
+.hero-actions-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.hero-actions-web .button {
+  min-width: 0;
+  width: 100%;
+  min-height: 48px;
+  justify-content: center;
+}
+
+.hero-download-cta {
+  width: 100%;
+  min-height: 46px;
+  justify-content: center;
+}
+
+.hero-actions-hint {
+  margin: 4px 0 0;
+  max-width: 420px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.home-hero-visual {
+  justify-self: end;
+  width: min(100%, 440px);
+}
+
+/* Soft plate close to --paper so the mark feels part of the page, not a sticker. */
+.hero-demo-card {
+  width: 100%;
+  margin: 0;
+  padding: 18px 18px 16px;
+  border: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
+  border-radius: 32px;
+  background: color-mix(in srgb, var(--lime) 12%, var(--paper));
+  box-shadow:
+    0 1px 0 color-mix(in srgb, white 55%, transparent) inset,
+    0 22px 48px color-mix(in srgb, var(--ink) 7%, transparent);
+}
+
+.hero-demo-mark {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 22px;
+  /* Brand asset is cream; blend edges into the soft plate. */
+  background: #f4f1df;
+}
+
+.hero-demo-caption {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 14px;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 750;
+  letter-spacing: 0.01em;
+}
+
+.hero-demo-caption-arrow {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.hero-demo-note {
+  margin: 8px 0 0;
+  text-align: center;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .home-download-link,
@@ -1619,32 +1714,68 @@ body:has(.transfer-page) {
     display: none;
   }
 
+  .site-home .site-header nav > a:not(.nav-download) {
+    display: none;
+  }
+
   .home-hero {
     flex: 1;
     min-height: 0;
-    padding-block: 38px;
+    padding-block: 32px 28px;
+  }
+
+  .home-hero-grid {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+
+  .home-hero-visual {
+    display: none;
+  }
+
+  .home-hero-content {
+    order: 1;
+    max-width: none;
   }
 
   .home-hero h1 {
-    margin-top: 20px;
-    font-size: clamp(48px, 14vw, 68px);
+    margin-top: 18px;
+    font-size: clamp(42px, 12vw, 64px);
   }
 
   .home-value {
-    margin-top: 22px;
+    margin-top: 18px;
     font-size: 16px;
   }
 
   .hero-actions {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    margin-top: 26px;
+    max-width: none;
+    margin-top: 22px;
   }
 
-  .hero-actions .button {
-    min-width: 0;
-    width: 100%;
-    padding-inline: 13px;
+  .hero-actions-web .button,
+  .hero-download-cta {
+    min-height: 50px;
+    padding-inline: 12px;
+    font-size: 15px;
+  }
+
+  .hero-actions-hint {
+    margin-top: 2px;
+  }
+
+  .hero-demo-card {
+    padding: 14px 14px 12px;
+    border-radius: 24px;
+  }
+
+  .hero-demo-mark {
+    border-radius: 16px;
+  }
+
+  .hero-demo-caption {
+    font-size: 12px;
+    gap: 6px;
   }
 
   .site-footer {

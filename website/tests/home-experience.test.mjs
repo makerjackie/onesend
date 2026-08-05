@@ -19,14 +19,22 @@ const downloadRoute = readFileSync(
 const worker = readFileSync(resolve(root, "worker", "index.ts"), "utf8");
 
 test("homepage is intentionally a sparse entry point", () => {
-  assert.match(page, /href="\/send"/);
-  assert.match(page, /网页传输/);
-  assert.match(page, /href="\/receive"/);
-  assert.match(page, /接收文件/);
-  assert.match(page, /href="\/download">/);
+  // Web transfer is two equal jobs (send + receive), not a single /send link.
+  assert.match(page, /className="button button-primary" href="\/send"/);
+  assert.match(page, /className="button button-primary" href="\/receive"/);
+  assert.match(page, /下载 OneSend/);
+  assert.match(page, /className="button button-secondary hero-download-cta" href="\/download"/);
   assert.match(page, /className="home-value"/);
+  assert.match(page, /hero-scan-mark\.png/);
+  assert.match(page, /home-hero-visual/);
   assert.doesNotMatch(page, /import \{ WebTransfer \}/);
   assert.doesNotMatch(page, /<WebTransfer/);
+});
+
+test("worker serves public static media from ASSETS", () => {
+  assert.match(worker, /png\|jpe\?g\|gif\|webp/);
+  assert.match(worker, /shouldServeFromAssets/);
+  assert.match(worker, /shouldServeFromAssets\(url\.pathname\) && env\?\.ASSETS/);
 });
 
 test("legacy hash links route to the standalone surfaces", () => {

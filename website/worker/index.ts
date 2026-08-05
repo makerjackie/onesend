@@ -26,7 +26,7 @@ interface ExecutionContext {
 // const imageConfig: ImageConfig = { dangerouslyAllowSVG: true };
 
 const worker = {
-  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+  async fetch(request: Request, env: Env | undefined, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
 
     // With assets.run_worker_first, Cloudflare never auto-serves static files.
@@ -38,11 +38,11 @@ const worker = {
     // Dev (vinext/Vite) also links CSS by source path, e.g. /app/globals.css
     // and /app/**/*.module.css, plus Vite virtual modules under /@id/, /@fs/,
     // /@vite/. Those must hit the Vite asset pipeline too — not the RSC router.
-    if (shouldServeFromAssets(url.pathname)) {
+    if (shouldServeFromAssets(url.pathname) && env?.ASSETS) {
       return env.ASSETS.fetch(request);
     }
 
-    if (url.pathname === "/_vinext/image") {
+    if (url.pathname === "/_vinext/image" && env?.ASSETS && env.IMAGES) {
       const allowedWidths = [...DEFAULT_DEVICE_SIZES, ...DEFAULT_IMAGE_SIZES];
       return handleImageOptimization(request, {
         fetchAsset: (path) => env.ASSETS.fetch(new Request(new URL(path, request.url))),
@@ -73,6 +73,18 @@ function shouldServeFromAssets(pathname: string): boolean {
 
   // Other project sources Vite may request with a leading slash.
   if (/\.(?:tsx?|jsx?|mjs|cjs|css|map)(?:$|\?)/.test(pathname)) {
+    return true;
+  }
+
+  // Files from website/public (icon, og, hero art, sample video, etc.).
+  // With assets.run_worker_first these never auto-serve; missing this branch
+  // 404s new public assets (e.g. /hero-scan-mark.png) while older ones may
+  // still appear cached.
+  if (
+    /\.(?:png|jpe?g|gif|webp|avif|svg|ico|mp4|webm|woff2?|ttf|otf|txt|xml|json)(?:$|\?)/i.test(
+      pathname,
+    )
+  ) {
     return true;
   }
 

@@ -7,26 +7,26 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
     <description>Stable desktop releases for OneSend · 扫传</description>
     <language>zh-cn</language>
     <item>
-      <title>OneSend 1.5.2</title>
-      <link>https://github.com/makerjackie/onesend/releases/tag/v1.5.2</link>
-      <sparkle:version>21</sparkle:version>
-      <sparkle:shortVersionString>1.5.2</sparkle:shortVersionString>
+      <title>OneSend 1.5.4</title>
+      <link>https://github.com/makerjackie/onesend/releases/tag/v1.5.4</link>
+      <sparkle:version>23</sparkle:version>
+      <sparkle:shortVersionString>1.5.4</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>10.15</sparkle:minimumSystemVersion>
-      <description><![CDATA[<ul><li>Improved mobile QR scanner reliability across Android and iOS payload formats.</li><li>Focused Transfer, Files, and Settings navigation with saved-file actions.</li><li>Unified OneSend branding and website transfer routes across platforms.</li></ul>]]></description>
-      <pubDate>Tue, 04 Aug 2026 14:12:00 +0000</pubDate>
-      <enclosure url="https://github.com/makerjackie/onesend/releases/download/v1.5.2/onesend-macos-universal.zip" sparkle:edSignature="JPnJ5zozmoL1kzAPM4TZ9prBPrjanRaEl+ER/aV6J0Dvfk1A2zX+dwMi09kMsKATcwF3PVVBwkexY9sibl5oCA==" sparkle:os="macos" length="23215585" type="application/octet-stream"></enclosure>
+      <description><![CDATA[<ul><li>彩色视觉码发送更稳定，接收进度不再抖动，并移除 iOS 本地网络访问。</li><li>Color transfer is steadier, receive progress is monotonic, and iOS no longer uses local-network access.</li></ul>]]></description>
+      <pubDate>Wed, 05 Aug 2026 03:43:39 +0000</pubDate>
+      <enclosure url="https://github.com/makerjackie/onesend/releases/download/v1.5.4/onesend-macos-universal.zip" sparkle:edSignature="WXB3p0fS9GTkckwhSogG6cBzS4uobOLTxQKOLL5cw4j7rD7SMH6Bd5qCoScxendmElUWOGxmnrvZ2uZreEGeDQ==" sparkle:os="macos" length="25302829" type="application/octet-stream"></enclosure>
     </item>
     <item>
-      <title>OneSend 1.5.2</title>
-      <link>https://github.com/makerjackie/onesend/releases/tag/v1.5.2</link>
-      <sparkle:version>21</sparkle:version>
-      <sparkle:shortVersionString>1.5.2</sparkle:shortVersionString>
-      <description><![CDATA[<ul><li>Improved mobile QR scanner reliability across Android and iOS payload formats.</li><li>Focused Transfer, Files, and Settings navigation with saved-file actions.</li><li>Unified OneSend branding and website transfer routes across platforms.</li></ul>]]></description>
-      <pubDate>Tue, 04 Aug 2026 14:12:00 +0000</pubDate>
-      <enclosure url="https://github.com/makerjackie/onesend/releases/download/v1.5.2/onesend-windows-setup.exe" sparkle:edSignature="OgArwOL3OT026r/0CwWKzdxNCkMP5UMFFlBhyWFRGwKK7iCuzegBw2YijIcvojX3UYTqR4zgAjiaV0hQ9JdrCQ==" sparkle:installerArguments="/SILENT /SP- /NOICONS /NORESTART /ONESENDUPDATE=1" sparkle:os="windows-x64" length="13763071" type="application/octet-stream"></enclosure>
+      <title>OneSend 1.5.4</title>
+      <link>https://github.com/makerjackie/onesend/releases/tag/v1.5.4</link>
+      <sparkle:version>23</sparkle:version>
+      <sparkle:shortVersionString>1.5.4</sparkle:shortVersionString>
+      <description><![CDATA[<ul><li>彩色视觉码发送更稳定，接收进度不再抖动，并移除 iOS 本地网络访问。</li><li>Color transfer is steadier, receive progress is monotonic, and iOS no longer uses local-network access.</li></ul>]]></description>
+      <pubDate>Wed, 05 Aug 2026 03:43:39 +0000</pubDate>
+      <enclosure url="https://github.com/makerjackie/onesend/releases/download/v1.5.4/onesend-windows-setup.exe" sparkle:edSignature="83TZytGCldn9lmaIwMr9LwO6186z5CJ7WIzCSaPjUuo/BAYxXJO70/5Z/v9VnlMGphPd7kT0znkkHDbXnT0tBw==" sparkle:installerArguments="/SILENT /SP- /NOICONS /NORESTART /ONESENDUPDATE=1" sparkle:os="windows-x64" length="14834710" type="application/octet-stream"></enclosure>
     </item>
   </channel>
 </rss><!-- sparkle-signatures:
-edSignature: weB/LhOEahhLyPkJePJPC5jXVu3YdliMHPZ7L2QIoPIlqDvdDUpdd8EZqgW0UJT5pNWL9QBUNbtDaIJKuEt/Cw==
-length: 2593
+edSignature: N6SDXnytuRumH4LtNZUbhicznhYssD9PvZ7H/8faN4Z/GDRjvae1LOaeKAReXD/UqXaIC/sPiX+vC+UQH9CWCw==
+length: 2529
 -->

@@ -34,9 +34,14 @@ test("server-renders the OneSend product page", async () => {
   assert.match(html, /OneSend/);
   assert.match(html, /文件，/);
   assert.match(html, /用光传过去/);
-  assert.match(html, /网页传输/);
-  assert.match(html, /接收文件/);
   assert.match(html, /下载 OneSend/);
+  assert.match(html, /hero-scan-mark\.png/);
+  assert.match(html, /href="\/download"/);
+  assert.match(html, /href="\/send"/);
+  assert.match(html, /href="\/receive"/);
+  // Peer web jobs: send + receive both appear as primary buttons.
+  assert.match(html, /class="button button-primary" href="\/send"/);
+  assert.match(html, /class="button button-primary" href="\/receive"/);
   assert.doesNotMatch(html, /id="web-transfer"/);
   assert.doesNotMatch(html, /开始发送/);
   assert.doesNotMatch(html, /自动 · 快速/);
