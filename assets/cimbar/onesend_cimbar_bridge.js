@@ -22,11 +22,16 @@
     sendInFlight: false,
     sendGeneration: 0,
     receiveStarted: false,
+    receivePaused: false,
     receiveVideoStarted: false,
     receiveWasmReady: false,
     receiveSession: 0,
     receiveStartedAt: 0,
     receiveWorkers: [],
+    receiveWorkersExpected: 0,
+    receiveWorkersReady: 0,
+    receiveWorkersReadyResolve: null,
+    receiveWorkersReadyReject: null,
     receiveGeneration: 0,
     nativeWorker: null,
     workerProxy: null,
@@ -293,13 +298,18 @@
     const originalRestartPausedCamera = global.Recv.restart_paused_camera;
     if (typeof originalRestartPausedCamera === 'function') {
       global.Recv.restart_paused_camera = function () {
-        if (!state.receiveStarted) return;
+        if (!state.receiveStarted || state.receivePaused) return;
         return originalRestartPausedCamera.apply(this, arguments);
       };
     }
 
     const originalDecode = global.Recv.on_decode;
     global.Recv.on_decode = function (workerId, data) {
+      if (data && data.type === 'startWasm' && data.error === 'no wasm') {
+        // A frame reached this worker during its asynchronous WASM startup.
+        // It is a transient readiness signal, not a corrupt transfer.
+        return;
+      }
       if (data && data.error) {
         fail('decode', data.res || 'worker decoder error');
       } else if (data && data.failed_extract) {
@@ -413,20 +423,49 @@
     state.nativeWorker = global.Worker;
     state.workerProxy = new Proxy(state.nativeWorker, {
       construct(target, args) {
+        const receiveGeneration = state.receiveGeneration;
         const nextArgs = args.slice();
         if (nextArgs.length > 0) {
           nextArgs[0] = resolveUpstreamWorkerUrl(nextArgs[0]);
         }
         const worker = Reflect.construct(target, nextArgs);
         state.receiveWorkers.push(worker);
+        var workerReady = false;
+        worker.addEventListener('message', function (event) {
+          if (workerReady ||
+              !event || !event.data || !event.data.ready ||
+              receiveGeneration !== state.receiveGeneration) {
+            return;
+          }
+          workerReady = true;
+          state.receiveWorkersReady += 1;
+          if (state.receiveWorkersReady >= state.receiveWorkersExpected &&
+              typeof state.receiveWorkersReadyResolve === 'function') {
+            const resolve = state.receiveWorkersReadyResolve;
+            state.receiveWorkersReadyResolve = null;
+            state.receiveWorkersReadyReject = null;
+            resolve();
+          }
+        });
         worker.addEventListener('error', function (event) {
-          fail(
-            'decode',
-            new Error(
-              '解码 worker 加载失败: ' +
-                (event && event.message ? event.message : nextArgs[0]),
-            ),
+          // A worker can report its final error asynchronously after a mode
+          // switch or teardown. Never let that stale event fail a new session.
+          if (!state.receiveStarted ||
+              receiveGeneration !== state.receiveGeneration) {
+            return;
+          }
+          const error = new Error(
+            '解码 worker 加载失败: ' +
+              (event && event.message ? event.message : nextArgs[0]),
           );
+          if (typeof state.receiveWorkersReadyReject === 'function') {
+            const reject = state.receiveWorkersReadyReject;
+            state.receiveWorkersReadyResolve = null;
+            state.receiveWorkersReadyReject = null;
+            reject(error);
+          } else {
+            fail('decode', error);
+          }
         });
         return worker;
       },
@@ -443,11 +482,34 @@
       }
     }
     state.receiveWorkers = [];
+    state.receiveWorkersExpected = 0;
+    state.receiveWorkersReady = 0;
+    state.receiveWorkersReadyResolve = null;
+    state.receiveWorkersReadyReject = null;
     if (state.workerProxy && global.Worker === state.workerProxy) {
       global.Worker = state.nativeWorker;
     }
     state.workerProxy = null;
     state.nativeWorker = null;
+  }
+
+  function prepareReceiveWorkers(count, receiveGeneration) {
+    state.receiveWorkersExpected = count;
+    state.receiveWorkersReady = 0;
+    return new Promise(function (resolve, reject) {
+      state.receiveWorkersReadyResolve = resolve;
+      state.receiveWorkersReadyReject = reject;
+      global.setTimeout(function () {
+        if (receiveGeneration !== state.receiveGeneration ||
+            !state.receiveStarted ||
+            state.receiveWorkersReady >= count) {
+          return;
+        }
+        state.receiveWorkersReadyResolve = null;
+        state.receiveWorkersReadyReject = null;
+        reject(new Error('解码 worker 启动超时。'));
+      }, 5000);
+    });
   }
 
   function ensureVideoFrameCallback(video) {
@@ -589,17 +651,38 @@
       installReceiveHooks();
       installMobileCameraCapture();
       global.Module = global.Module || {};
-      global.Module.onRuntimeInitialized = function () {
-        state.receiveWasmReady = true;
-        // Match sender mode B (68). Auto (0) also works, but locking avoids
-        // wasteful mode cycling on empty frames.
-        if (typeof global.Recv.setMode === 'function') {
-          global.Recv.setMode(68);
+      const finishBoot = function () {
+        if (state.receiveWasmReady) {
+          // Idempotently replay readiness. Flutter may attach its JavaScript
+          // channel just after a cached WebView finishes Emscripten startup.
+          bridge('receive-ready', { decoder: 'upstream-worker', mode: 'B' });
+          return;
         }
-        bridge('receive-ready', { decoder: 'upstream-worker', mode: 'B' });
-        // Only open the camera after Flutter/native startReceive has armed us.
-        initializeReceiveVideo();
+        try {
+          // Match sender mode B (68). Auto (0) also works, but locking avoids
+          // wasteful mode cycling on empty frames.
+          if (typeof global.Recv.setMode === 'function') {
+            global.Recv.setMode(68);
+          }
+          state.receiveWasmReady = true;
+          bridge('receive-ready', { decoder: 'upstream-worker', mode: 'B' });
+          // Only open the camera after Flutter/native startReceive has armed us.
+          initializeReceiveVideo();
+        } catch (error) {
+          state.receiveWasmReady = false;
+          fail('receive-init', error);
+        }
       };
+      global.Module.onRuntimeInitialized = finishBoot;
+      // A cached/reused WebView can finish Emscripten before the wrapper is
+      // re-armed. Detect that state instead of waiting forever for a callback
+      // that has already happened.
+      if (
+        global.Module.calledRun === true &&
+        typeof global.Module._cimbard_get_bufsize === 'function'
+      ) {
+        global.setTimeout(finishBoot, 0);
+      }
     } catch (error) {
       fail('receive-init', error);
     }
@@ -614,26 +697,46 @@
     // runs WASM workers — avoids black file:// getUserMedia sessions.
     state.nativeFrames = options.nativeFrames === true;
     state.receiveStarted = true;
+    state.receivePaused = false;
     state.receiveStartedAt = performance.now();
     state.receiveVideoStarted = false;
     state.nextNativeWorker = 0;
     state.nativeFeedAnnounced = false;
     try {
       installReceiveWorkerTracking();
-      global.Recv.init_ww(4);
+      const receiveGeneration = state.receiveGeneration;
+      const workerCount = 4;
+      const workersReady = prepareReceiveWorkers(
+        workerCount,
+        receiveGeneration,
+      );
+      global.Recv.init_ww(workerCount);
       if (typeof global.Recv.setMode === 'function') {
         global.Recv.setMode(68);
       }
-      bridge('receive-started', {
-        mode: 'B',
-        nativeFrames: state.nativeFrames,
+      workersReady.then(function () {
+        if (!state.receiveStarted ||
+            receiveGeneration !== state.receiveGeneration) {
+          return;
+        }
+        bridge('receive-started', {
+          mode: 'B',
+          nativeFrames: state.nativeFrames,
+        });
+        if (state.nativeFrames) {
+          state.receiveVideoStarted = true;
+          bridge('receive-camera-live', { native: true });
+        } else {
+          initializeReceiveVideo();
+        }
+      }).catch(function (error) {
+        if (!state.receiveStarted ||
+            receiveGeneration !== state.receiveGeneration) {
+          return;
+        }
+        state.receiveStarted = false;
+        fail('decode', error);
       });
-      if (state.nativeFrames) {
-        state.receiveVideoStarted = true;
-        bridge('receive-camera-live', { native: true });
-      } else {
-        initializeReceiveVideo();
-      }
     } catch (error) {
       state.receiveStarted = false;
       state.nativeFrames = false;
@@ -661,7 +764,9 @@
    * width/height must match the pixel buffer (width*height*4 bytes).
    */
   function feedNativeFrame(width, height, rgbaBase64) {
-    if (!state.receiveStarted || !state.nativeFrames) return false;
+    if (!state.receiveStarted || state.receivePaused || !state.nativeFrames) {
+      return false;
+    }
     if (!state.receiveWorkers || state.receiveWorkers.length === 0) return false;
     const w = Number(width) | 0;
     const h = Number(height) | 0;
@@ -704,6 +809,44 @@
     }
   }
 
+  function setReceivePaused(paused) {
+    if (!state.receiveStarted) return false;
+    state.receivePaused = Boolean(paused);
+    if (state.nativeFrames) {
+      if (!state.receivePaused) {
+        bridge('receive-camera-live', { native: true, resumed: true });
+      }
+      return true;
+    }
+
+    try {
+      const video = document.getElementById('video');
+      if (!video) throw new Error('接收页面 video 元素未找到。');
+      if (state.receivePaused) {
+        video.pause();
+      } else {
+        const playResult = video.play();
+        if (playResult && typeof playResult.then === 'function') {
+          playResult.then(function () {
+            bridge('receive-camera-live', {
+              width: video.videoWidth || 0,
+              height: video.videoHeight || 0,
+              resumed: true,
+            });
+          }).catch(function (error) {
+            fail('camera', error);
+          });
+        } else {
+          bridge('receive-camera-live', { resumed: true });
+        }
+      }
+      return true;
+    } catch (error) {
+      fail('camera', error);
+      return false;
+    }
+  }
+
   function stopReceive() {
     state.receiveGeneration += 1;
     try {
@@ -717,8 +860,8 @@
       console.warn('[onesend-cimbar] stop camera error', error);
     }
     state.receiveStarted = false;
+    state.receivePaused = false;
     state.receiveVideoStarted = false;
-    state.receiveWasmReady = false;
     state.receiveStartedAt = 0;
     state.nativeFrames = false;
     state.nextNativeWorker = 0;
@@ -778,6 +921,7 @@
     togglePause: togglePause,
     bootReceive: bootReceive,
     startReceive: startReceive,
+    setReceivePaused: setReceivePaused,
     feedNativeFrame: feedNativeFrame,
     stopReceive: stopReceive,
     stop: stop,

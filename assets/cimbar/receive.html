@@ -28,7 +28,15 @@
   </div>
   <div id="crosshair1" class="crosshairs"></div>
   <div id="crosshair2" class="crosshairs"></div>
-  <div id="nav-container"><button id="nav-button"></button><div id="nav-content"></div></div>
+  <!-- Upstream Recv.setMode/debug helpers require these nodes even though the
+       OneSend shell keeps the controls hidden. Removing them aborts WASM ready
+       before receive-ready can be posted to Flutter. -->
+  <div id="nav-container">
+    <button id="nav-button"></button>
+    <button id="debug-button"></button>
+    <span id="mode-val"></span>
+    <div id="nav-content"></div>
+  </div>
   <div id="debug_menu">
     <div id="errorbox"></div>
     <div id="t0"></div><div id="t1"></div><div id="t2"></div><div id="t3"></div>

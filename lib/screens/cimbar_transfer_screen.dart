@@ -13,6 +13,7 @@ import 'package:webview_flutter_wkwebview/webview_flutter_wkwebview.dart';
 import '../app.dart';
 import '../core/envelope.dart';
 import '../l10n/generated/app_localizations.dart';
+import '../services/cimbar_asset_server.dart';
 import '../services/cimbar_bridge.dart';
 import '../services/cimbar_camera_frames.dart';
 import '../services/file_service.dart';
@@ -98,6 +99,7 @@ class _CimbarTransferScreenState extends State<CimbarTransferScreen>
   CameraController? _nativeCamera;
   Stopwatch? _receiveStopwatch;
   Timer? _statusTimer;
+  Timer? _engineReadyTimer;
   DateTime? _lastNativeFeedAt;
   bool _nativeFeedBusy = false;
 
@@ -122,8 +124,12 @@ class _CimbarTransferScreenState extends State<CimbarTransferScreen>
 
   bool get _supportedPlatform => Platform.isAndroid || Platform.isIOS;
   bool get _isSending => widget.direction == CimbarDirection.send;
-  /// Mobile receive uses the Flutter camera plugin + WASM workers in WebView.
-  bool get _useNativeCameraFeed => !_isSending && _supportedPlatform;
+
+  /// Android keeps the Flutter-camera fallback because its release build has
+  /// no INTERNET permission and therefore cannot use a loopback WebView origin.
+  /// iOS uses WKWebView getUserMedia on the loopback-only asset origin, avoiding
+  /// expensive RGBA/base64 copies and preserving libcimbar's full frame rate.
+  bool get _useNativeCameraFeed => !_isSending && Platform.isAndroid;
   AppLocalizations get _l10n => AppLocalizations.of(context)!;
 
   @override
@@ -154,6 +160,7 @@ class _CimbarTransferScreenState extends State<CimbarTransferScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     unawaited(_disableWakelock());
+    _engineReadyTimer?.cancel();
     // Do not call a state-updating async helper from dispose. The JavaScript
     // cleanup is deliberately fire-and-forget and does not touch Flutter
     // state, so camera tracks and workers are still stopped during teardown.
@@ -189,8 +196,9 @@ class _CimbarTransferScreenState extends State<CimbarTransferScreen>
 
   Future<void> _initializeWebView() async {
     try {
-      // Offline-only: load bundled assets (no local HTTP server / no INTERNET
-      // permission). WebView camera remains experimental on some iOS builds.
+      // Offline-only: iOS loads the bundled assets from a loopback-only origin
+      // so WKWebView can use getUserMedia. Android uses the asset origin and
+      // the native camera fallback, keeping the release manifest network-free.
       PlatformWebViewControllerCreationParams params =
           const PlatformWebViewControllerCreationParams();
       if (WebViewPlatform.instance is WebKitWebViewPlatform) {
@@ -224,17 +232,21 @@ class _CimbarTransferScreenState extends State<CimbarTransferScreen>
               if (_error == null) {
                 _status = _isSending
                     ? _CimbarStatus.pageReadySend
-                    : widget.autoStartReceive
-                    ? _CimbarStatus.requestingCamera
-                    : _CimbarStatus.pageReadyReceive;
+                    : _engineReady
+                    ? widget.autoStartReceive
+                          ? _CimbarStatus.requestingCamera
+                          : _CimbarStatus.decoderReadyStart
+                    : _CimbarStatus.loading;
               }
             });
             if (!_isSending) {
+              _armEngineReadyWatchdog(controller);
               unawaited(_tryAutoStartReceive());
             }
           },
           onWebResourceError: (error) {
             if (!mounted) return;
+            _engineReadyTimer?.cancel();
             debugPrint(
               '[OneSend CIMBAR] web resource error: ${error.errorCode} ${error.description}',
             );
@@ -251,7 +263,9 @@ class _CimbarTransferScreenState extends State<CimbarTransferScreen>
             controller.platform as AndroidWebViewController;
         await androidController.setMediaPlaybackRequiresUserGesture(false);
         if (_isSending) {
-          await androidController.setOnShowFileSelector(_showAndroidFileSelector);
+          await androidController.setOnShowFileSelector(
+            _showAndroidFileSelector,
+          );
         }
       }
 
@@ -260,9 +274,16 @@ class _CimbarTransferScreenState extends State<CimbarTransferScreen>
         return;
       }
       setState(() => _controller = controller);
-      await controller.loadFlutterAsset(
-        _isSending ? 'assets/cimbar/send.html' : 'assets/cimbar/receive.html',
-      );
+      final pageName = _isSending ? 'send.html' : 'receive.html';
+      if (Platform.isIOS) {
+        // Emscripten cannot fetch its WASM binary from WKWebView's file://
+        // Flutter asset origin. Serve bundled files only on loopback; the
+        // socket never listens on a LAN interface and the app stays offline.
+        final assets = await CimbarAssetServer.instance.ensureStarted();
+        await controller.loadRequest(assets.pageUri(pageName));
+      } else {
+        await controller.loadFlutterAsset('assets/cimbar/$pageName');
+      }
     } catch (error, stack) {
       debugPrint('[OneSend CIMBAR] webview init failed: $error\n$stack');
       if (!mounted) return;
@@ -354,6 +375,7 @@ class _CimbarTransferScreenState extends State<CimbarTransferScreen>
         unawaited(_recordSendHistory());
       case 'receive-ready':
         if (_isSending) return;
+        _engineReadyTimer?.cancel();
         _engineReady = true;
         _setState(() {
           if (_receiveStarted) {
@@ -450,6 +472,7 @@ class _CimbarTransferScreenState extends State<CimbarTransferScreen>
           _setState(() => _status = _CimbarStatus.recoveredSaving);
         }
       case 'error':
+        _engineReadyTimer?.cancel();
         final phase = event.stringValue('phase');
         final detail = event.stringValue('message') ?? 'unknown error';
         debugPrint('[OneSend CIMBAR] ${phase ?? 'engine'}: $detail');
@@ -506,6 +529,50 @@ class _CimbarTransferScreenState extends State<CimbarTransferScreen>
     _receiveStopwatch?.stop();
     _statusTimer?.cancel();
     _statusTimer = null;
+  }
+
+  void _armEngineReadyWatchdog(WebViewController controller) {
+    _engineReadyTimer?.cancel();
+    if (_engineReady || _isSending) return;
+    _engineReadyTimer = Timer(const Duration(seconds: 12), () async {
+      if (!mounted || _engineReady || controller != _controller) return;
+      var diagnostics = 'unavailable';
+      try {
+        final result = await controller.runJavaScriptReturningResult('''
+          (() => {
+            const ready = typeof Module !== 'undefined' &&
+              Module.calledRun === true &&
+              typeof Module._cimbard_get_bufsize === 'function';
+            if (ready && typeof OneSendCimbar !== 'undefined') {
+              // Re-arm a bridge callback that was lost during WebView reload.
+              OneSendCimbar.bootReceive();
+            }
+            return JSON.stringify({
+              href: String(location.href),
+              channel: typeof OneSendCimbarBridge !== 'undefined',
+              oneSend: typeof OneSendCimbar !== 'undefined',
+              module: typeof Module !== 'undefined',
+              calledRun: typeof Module !== 'undefined' && Module.calledRun === true,
+              heap: typeof Module !== 'undefined' && !!Module.HEAPU8,
+              decoder: typeof Module !== 'undefined' &&
+                typeof Module._cimbard_get_bufsize === 'function'
+            });
+          })()
+        ''');
+        diagnostics = result.toString();
+      } catch (error) {
+        diagnostics = 'probe failed: $error';
+      }
+      // Give the idempotent boot recovery one event-loop turn to deliver the
+      // ready event before surfacing a terminal startup error.
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+      debugPrint('[OneSend CIMBAR] engine startup timeout: $diagnostics');
+      if (!mounted || _engineReady || controller != _controller) return;
+      _setState(() {
+        _error = _l10n.cimbarEngineError;
+        _status = _CimbarStatus.loadFailed;
+      });
+    });
   }
 
   Future<void> _cleanupWebView(
@@ -638,9 +705,13 @@ class _CimbarTransferScreenState extends State<CimbarTransferScreen>
       debugPrint('[OneSend CIMBAR] startReceive skipped: page not ready');
       return;
     }
+    if (_receivePaused) {
+      await _resumeReceive();
+      return;
+    }
     // Only stop an already-running receive. Calling stopReceive on a cold
     // engine clears wasm worker state and leaves a black camera session.
-    if (_receiveStarted || _receivePaused) {
+    if (_receiveStarted) {
       await _stopReceiveResources();
     }
     _setState(() {
@@ -776,12 +847,58 @@ class _CimbarTransferScreenState extends State<CimbarTransferScreen>
 
   Future<void> _pauseReceive() async {
     if (_isSending || !_receiveStarted || _saving) return;
-    await _stopReceiveResources();
     _setState(() {
       _receiveStarted = false;
       _receivePaused = true;
       _status = _CimbarStatus.decoderReady;
     });
+    _cancelReceiveResources();
+    try {
+      final nativeCamera = _nativeCamera;
+      if (_useNativeCameraFeed &&
+          nativeCamera != null &&
+          nativeCamera.value.isStreamingImages) {
+        await nativeCamera.stopImageStream();
+      }
+      await _runWebViewScript('OneSendCimbar.setReceivePaused(true);');
+    } on Object catch (error, stack) {
+      debugPrint('[OneSend CIMBAR] pauseReceive failed: $error\n$stack');
+      _handleBridgeFailure(_l10n.cimbarReceiveError);
+    }
+  }
+
+  Future<void> _resumeReceive() async {
+    if (_controller == null || _isSending || !_receivePaused) return;
+    _setState(() {
+      _receiveStarted = true;
+      _receivePaused = false;
+      _status = _CimbarStatus.requestingCamera;
+      _error = null;
+    });
+    try {
+      await _runWebViewScript('OneSendCimbar.setReceivePaused(false);');
+      if (_useNativeCameraFeed) {
+        final nativeCamera = _nativeCamera;
+        if (nativeCamera == null || !nativeCamera.value.isInitialized) {
+          await _startNativeCamera(startStream: false);
+        }
+        await _startNativeImageStream();
+      }
+      _receiveStopwatch?.start();
+      _statusTimer?.cancel();
+      _statusTimer = Timer.periodic(const Duration(milliseconds: 500), (_) {
+        if (mounted && _receiveStarted) setState(() {});
+      });
+    } on Object catch (error, stack) {
+      debugPrint('[OneSend CIMBAR] resumeReceive failed: $error\n$stack');
+      await _stopReceiveResources(clearProgress: true);
+      if (!mounted) return;
+      _setState(() {
+        _receivePaused = false;
+        _error = _l10n.cimbarCameraError;
+        _status = _CimbarStatus.transferFailed;
+      });
+    }
   }
 
   void _chooseSendFile() {
@@ -808,6 +925,7 @@ class _CimbarTransferScreenState extends State<CimbarTransferScreen>
   }
 
   Future<void> _retry() async {
+    _engineReadyTimer?.cancel();
     await _releaseResources(clearProgress: true);
     if (_saving) return;
     final file = _receivedFile;
@@ -996,10 +1114,7 @@ class _CimbarTransferScreenState extends State<CimbarTransferScreen>
             if (_fileName != null) ...[
               const SizedBox(height: 2),
               Text(
-                l10n.cimbarFileInfo(
-                  _fileName!,
-                  _formatBytes(l10n, _fileSize),
-                ),
+                l10n.cimbarFileInfo(_fileName!, _formatBytes(l10n, _fileSize)),
                 style: theme.textTheme.bodySmall,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -1048,65 +1163,63 @@ class _CimbarTransferScreenState extends State<CimbarTransferScreen>
               spacing: 8,
               runSpacing: 8,
               children: [
-                  if (_isSending) ...[
+                if (_isSending) ...[
+                  OutlinedButton.icon(
+                    onPressed: _pageReady ? _chooseSendFile : null,
+                    icon: const Icon(Icons.attach_file_rounded),
+                    label: Text(l10n.chooseFile),
+                  ),
+                  if (_error == null &&
+                      (_status == _CimbarStatus.playing ||
+                          _status == _CimbarStatus.broadcasting ||
+                          _status == _CimbarStatus.paused))
                     OutlinedButton.icon(
-                      onPressed: _pageReady ? _chooseSendFile : null,
-                      icon: const Icon(Icons.attach_file_rounded),
-                      label: Text(l10n.chooseFile),
-                    ),
-                    if (_error == null &&
-                        (_status == _CimbarStatus.playing ||
-                            _status == _CimbarStatus.broadcasting ||
-                            _status == _CimbarStatus.paused))
-                      OutlinedButton.icon(
-                        onPressed: _pageReady
-                            ? () => _toggleSendPause(!_sendPaused)
-                            : null,
-                        icon: Icon(
-                          _sendPaused
-                              ? Icons.play_arrow_rounded
-                              : Icons.pause_rounded,
-                        ),
-                        label: Text(_sendPaused ? l10n.resume : l10n.pause),
+                      onPressed: _pageReady
+                          ? () => _toggleSendPause(!_sendPaused)
+                          : null,
+                      icon: Icon(
+                        _sendPaused
+                            ? Icons.play_arrow_rounded
+                            : Icons.pause_rounded,
                       ),
-                  ] else ...[
-                    // One primary control only (same idea as QR receive):
-                    // 暂停 ↔ 继续 / 失败时一个重试，不要并列两个按钮。
-                    if (_storedFile == null && !_saving)
-                      if (_error != null)
-                        FilledButton.icon(
-                          onPressed: _saving ? null : _retry,
-                          icon: const Icon(Icons.refresh_rounded),
-                          label: Text(
-                            _receivedFile != null
-                                ? l10n.retrySave
-                                : l10n.restart,
-                          ),
-                        )
-                      else if (_receiveStarted)
-                        FilledButton.icon(
-                          onPressed: _pageReady ? _pauseReceive : null,
-                          icon: const Icon(Icons.pause_rounded),
-                          label: Text(l10n.pauseScan),
-                        )
-                      else if (_receivePaused || !widget.autoStartReceive)
-                        FilledButton.icon(
-                          onPressed: _pageReady ? _startReceive : null,
-                          icon: const Icon(Icons.play_arrow_rounded),
-                          label: Text(
-                            _receivePaused
-                                ? l10n.resumeScan
-                                : l10n.cimbarStartReceive,
-                          ),
-                        ),
-                  ],
-                  if (_isSending && _error != null)
-                    OutlinedButton(
-                      onPressed: _saving ? null : _retry,
-                      child: Text(l10n.restart),
+                      label: Text(_sendPaused ? l10n.resume : l10n.pause),
                     ),
+                ] else ...[
+                  // One primary control only (same idea as QR receive):
+                  // 暂停 ↔ 继续 / 失败时一个重试，不要并列两个按钮。
+                  if (_storedFile == null && !_saving)
+                    if (_error != null)
+                      FilledButton.icon(
+                        onPressed: _saving ? null : _retry,
+                        icon: const Icon(Icons.refresh_rounded),
+                        label: Text(
+                          _receivedFile != null ? l10n.retrySave : l10n.restart,
+                        ),
+                      )
+                    else if (_receiveStarted)
+                      FilledButton.icon(
+                        onPressed: _pageReady ? _pauseReceive : null,
+                        icon: const Icon(Icons.pause_rounded),
+                        label: Text(l10n.pauseScan),
+                      )
+                    else if (_receivePaused || !widget.autoStartReceive)
+                      FilledButton.icon(
+                        onPressed: _pageReady ? _startReceive : null,
+                        icon: const Icon(Icons.play_arrow_rounded),
+                        label: Text(
+                          _receivePaused
+                              ? l10n.resumeScan
+                              : l10n.cimbarStartReceive,
+                        ),
+                      ),
                 ],
-              ),
+                if (_isSending && _error != null)
+                  OutlinedButton(
+                    onPressed: _saving ? null : _retry,
+                    child: Text(l10n.restart),
+                  ),
+              ],
+            ),
           ],
         ),
       ),
