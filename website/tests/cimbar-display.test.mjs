@@ -6,11 +6,11 @@ import test from "node:test";
 
 const CIMBAR_DISPLAY_POLICY = {
   desktopBreakpointPx: 840,
-  desktopWidthRatio: 0.34,
-  desktopHeightRatio: 0.44,
+  desktopWidthRatio: 0.42,
+  desktopHeightRatio: 0.62,
   mobileWidthRatio: 0.88,
   mobileHeightRatio: 0.4,
-  maximumDisplayPx: 420,
+  maximumDisplayPx: 560,
   minimumDisplayPx: 280,
   fallbackDisplayPx: 360,
 };
@@ -42,23 +42,22 @@ function resolveCimbarCanvasSize(viewport) {
   );
 }
 
-test("cimbar canvas stays within the right-hand workbench budget", () => {
+test("cimbar display uses the available workbench without overflowing", () => {
   const desktop = resolveCimbarCanvasSize({ width: 1280, height: 720 });
-  assert.ok(desktop <= 420, `desktop size ${desktop} exceeds 420`);
+  assert.ok(desktop <= 560, `desktop size ${desktop} exceeds 560`);
   assert.ok(desktop >= 280, `desktop size ${desktop} below 280`);
-  // Must be smaller than the old 560–900 full-bleed policy.
-  assert.ok(desktop < 560);
+  assert.equal(desktop, 446);
 
   const laptop = resolveCimbarCanvasSize({ width: 1440, height: 900 });
-  assert.ok(laptop <= 420);
+  assert.equal(laptop, 558);
 
   const phone = resolveCimbarCanvasSize({ width: 390, height: 844 });
-  assert.ok(phone <= 420);
+  assert.ok(phone <= 560);
   assert.ok(phone >= 280);
 });
 
-test("cimbar display never targets a 1024 full-bleed square", () => {
+test("cimbar CSS display stays capped while the bitmap remains 1024", () => {
   const huge = resolveCimbarCanvasSize({ width: 2560, height: 1440 });
-  assert.equal(huge, 420);
+  assert.equal(huge, 560);
   assert.notEqual(huge, 1024);
 });

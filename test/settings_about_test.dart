@@ -19,8 +19,20 @@ void main() {
     addTearDown(settings.dispose);
 
     await tester.pumpWidget(
-      _testApp(SettingsScreen(settings: settings, isDesktop: false)),
+      _testApp(
+        SettingsScreen(
+          settings: settings,
+          isDesktop: false,
+          packageInfoLoader: () async => PackageInfo(
+            appName: 'OneSend',
+            packageName: 'com.makerjackie.onesend',
+            version: '1.5.4',
+            buildNumber: '23',
+          ),
+        ),
+      ),
     );
+    await tester.pumpAndSettle();
 
     expect(find.text('应用设置'), findsOneWidget);
     expect(find.textContaining('发送页'), findsOneWidget);
@@ -28,7 +40,13 @@ void main() {
     expect(find.byKey(const ValueKey<String>('settings-cimbar')), findsNothing);
     expect(find.text('语言'), findsOneWidget);
     expect(find.text('主题'), findsOneWidget);
+    expect(find.text('问题反馈'), findsOneWidget);
     expect(find.text('关于 OneSend'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey<String>('settings-version-footer')),
+      findsOneWidget,
+    );
+    expect(find.text('1.5.4（2026-08-05 10:43）'), findsOneWidget);
   });
 
   testWidgets(
@@ -111,7 +129,9 @@ void main() {
     expect(find.text('扫传'), findsOneWidget);
     expect(find.text('实验性离线视觉传输'), findsOneWidget);
     expect(find.text('1.4.0（2026-08-04 21:30）'), findsOneWidget);
-    expect(find.textContaining('(14)'), findsNothing);
+    expect(find.text('开源致谢'), findsOneWidget);
+    expect(find.textContaining('decimen-optical-transfer'), findsOneWidget);
+    expect(find.textContaining('libcimbar'), findsOneWidget);
 
     final githubButton = find.byKey(const ValueKey<String>('about-github'));
     await tester.ensureVisible(githubButton);
@@ -119,6 +139,49 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(openedUrls, isNotEmpty);
+    expect(openedUrls.last.toString(), oneSendGithubUrl);
+
+    final feedbackButton = find.byKey(const ValueKey<String>('about-feedback'));
+    await tester.ensureVisible(feedbackButton);
+    await tester.tap(feedbackButton);
+    await tester.pumpAndSettle();
+
+    expect(openedUrls.last.toString(), oneSendGithubNewIssueUrl);
+  });
+
+  testWidgets('settings feedback opens GitHub new issue', (
+    WidgetTester tester,
+  ) async {
+    final settings = AppSettings();
+    addTearDown(settings.dispose);
+    final openedUrls = <Uri>[];
+
+    await tester.pumpWidget(
+      _testApp(
+        SettingsScreen(
+          settings: settings,
+          isDesktop: false,
+          packageInfoLoader: () async => PackageInfo(
+            appName: 'OneSend',
+            packageName: 'com.makerjackie.onesend',
+            version: '1.5.4',
+            buildNumber: '23',
+          ),
+          urlLauncher: (url) async {
+            openedUrls.add(url);
+            return true;
+          },
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final feedback = find.byKey(const ValueKey<String>('settings-feedback'));
+    await tester.ensureVisible(feedback);
+    await tester.tap(feedback);
+    await tester.pumpAndSettle();
+
+    expect(openedUrls.single.toString(), oneSendGithubNewIssueUrl);
   });
 }
 

@@ -21,12 +21,12 @@ class OneSendReleaseInfo {
 
 const String oneSendReleaseVersion = String.fromEnvironment(
   'ONESEND_VERSION',
-  defaultValue: '1.5.3',
+  defaultValue: '1.5.4',
 );
 
 const String oneSendReleasePublishedAt = String.fromEnvironment(
   'ONESEND_RELEASE_PUBLISHED_AT',
-  defaultValue: '2026-08-04 23:40',
+  defaultValue: '2026-08-05 10:43',
 );
 
 const OneSendReleaseInfo oneSendReleaseInfo = OneSendReleaseInfo(

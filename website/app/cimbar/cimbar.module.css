@@ -271,8 +271,7 @@
 
 .codeCanvas {
   display: block;
-  /* Prefer crisp pixels. CSS size equals bitmap size and is capped to the
-     right-hand workbench (see CIMBAR_DISPLAY_POLICY), not a 1024 full-bleed. */
+  /* Keep the 1024px encoder bitmap crisp while CSS fits it to the workbench. */
   width: auto !important;
   height: auto !important;
   max-width: 100% !important;

@@ -93,10 +93,15 @@ test("cimbar copy and camera behavior stay local and opt-in", () => {
   assert.match(client, /实测/);
   assert.match(client, /explainReceiveGap/);
   assert.match(client, /ideal: 1920/);
-  // Display fits the right workbench like QR — not a full-bleed 1024 canvas.
+  // Visible size fits the workbench; the backing bitmap remains crisp.
   assert.match(client, /CIMBAR_DISPLAY_POLICY/);
-  assert.match(client, /maximumDisplayPx: 420/);
+  assert.match(client, /maximumDisplayPx: 560/);
+  assert.match(client, /const CIMBAR_RENDER_SIZE = 1024/);
   assert.match(client, /sizeCimbarCanvas/);
+  assert.match(senderWrapper, /callback === self\.Send\.nextFrame/);
+  assert.match(senderWrapper, /opticalFrameTimer !== null/);
+  assert.match(senderWrapper, /generation !== loadGeneration/);
+  assert.match(senderWrapper, /frameCount \+= 1[\s\S]*postFrameIfNeeded\(\)/);
   assert.ok(client.indexOf("async function startReceiver") < client.indexOf("getUserMedia"));
   assert.doesNotMatch(`${page}\n${client}\n${senderWrapper}\n${receiverWrapper}`, /serviceWorker\.register/);
   assert.doesNotMatch(`${senderWrapper}\n${receiverWrapper}`, /https?:\/\//);

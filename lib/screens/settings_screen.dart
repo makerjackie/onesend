@@ -2,9 +2,12 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../app.dart';
 import '../core/optical_transfer.dart';
+import '../core/release_info.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../l10n/locale_support.dart';
 import '../services/app_settings.dart';
@@ -21,6 +24,10 @@ class SettingsScreen extends StatefulWidget {
     this.updates,
     this.onLanguageTap,
     this.onAboutTap,
+    this.onFeedbackTap,
+    this.packageInfoLoader,
+    this.urlLauncher,
+    this.releaseInfo = oneSendReleaseInfo,
     this.isDesktop,
     this.embedded = false,
     super.key,
@@ -30,6 +37,10 @@ class SettingsScreen extends StatefulWidget {
   final UpdateManager? updates;
   final VoidCallback? onLanguageTap;
   final VoidCallback? onAboutTap;
+  final VoidCallback? onFeedbackTap;
+  final Future<PackageInfo> Function()? packageInfoLoader;
+  final Future<bool> Function(Uri url)? urlLauncher;
+  final OneSendReleaseInfo releaseInfo;
 
   /// Overrides platform detection in previews and tests.
   final bool? isDesktop;
@@ -43,11 +54,36 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   bool _savingMode = false;
+  String? _versionLabel;
 
   bool get _desktop => widget.isDesktop ?? _isDesktopPlatform();
 
   bool get _showUpdateSettings =>
       _desktop && widget.updates?.supportsUpdates == true;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_loadVersionLabel());
+  }
+
+  Future<void> _loadVersionLabel() async {
+    final loader = widget.packageInfoLoader ?? PackageInfo.fromPlatform;
+    try {
+      final info = await loader();
+      if (!mounted) return;
+      final label = formatOneSendReleaseLabel(
+        version: info.version,
+        publishedAt: widget.releaseInfo.publishedAt,
+      );
+      setState(() => _versionLabel = label);
+    } catch (_) {
+      if (!mounted) return;
+      setState(
+        () => _versionLabel = AppLocalizations.of(context)!.versionUnavailable,
+      );
+    }
+  }
 
   Future<void> _openLanguageEntry() async {
     final callback = widget.onLanguageTap;
@@ -184,6 +220,34 @@ class _SettingsScreenState extends State<SettingsScreen> {
     ).push<void>(MaterialPageRoute<void>(builder: (_) => const AboutScreen()));
   }
 
+  Future<void> _openFeedback() async {
+    final callback = widget.onFeedbackTap;
+    if (callback != null) {
+      callback();
+      return;
+    }
+    final l10n = AppLocalizations.of(context)!;
+    try {
+      final launcher = widget.urlLauncher;
+      final opened = launcher == null
+          ? await launchUrl(
+              oneSendGithubNewIssueUri,
+              mode: LaunchMode.externalApplication,
+            )
+          : await launcher(oneSendGithubNewIssueUri);
+      if (!opened && mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(l10n.cannotOpenGithubIssues)));
+      }
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l10n.cannotOpenGithubIssues)));
+    }
+  }
+
   Future<void> _openTransferModeEntry() async {
     await showOneSendSheet<void>(
       context: context,
@@ -272,9 +336,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     return Scaffold(
-      appBar: widget.embedded
-          ? null
-          : AppBar(title: Text(l10n.settings)),
+      appBar: widget.embedded ? null : AppBar(title: Text(l10n.settings)),
       body: SafeArea(
         child: AnimatedBuilder(
           animation: widget.settings,
@@ -287,12 +349,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget _buildContent(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     return SingleChildScrollView(
-      padding: EdgeInsets.fromLTRB(
-        20,
-        widget.embedded ? 20 : 10,
-        20,
-        36,
-      ),
+      padding: EdgeInsets.fromLTRB(20, widget.embedded ? 20 : 10, 20, 36),
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 720),
@@ -364,6 +421,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ],
                     const _PanelDivider(),
                     _SettingRow(
+                      key: const ValueKey<String>('settings-feedback'),
+                      icon: Icons.bug_report_outlined,
+                      title: l10n.sendFeedback,
+                      subtitle: l10n.sendFeedbackSubtitle,
+                      onTap: _openFeedback,
+                    ),
+                    const _PanelDivider(),
+                    _SettingRow(
                       key: const ValueKey<String>('settings-about'),
                       icon: Icons.info_outline_rounded,
                       title: l10n.about,
@@ -371,6 +436,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       onTap: _openAbout,
                     ),
                   ],
+                ),
+              ),
+              const SizedBox(height: 28),
+              Center(
+                child: Text(
+                  key: const ValueKey<String>('settings-version-footer'),
+                  l10n.settingsVersionFooter(
+                    _versionLabel ?? l10n.readingVersion,
+                  ),
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    fontSize: 12,
+                    letterSpacing: 0.2,
+                  ),
                 ),
               ),
             ],

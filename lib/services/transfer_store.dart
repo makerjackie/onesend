@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 enum TransferDirection { sent, received }
@@ -56,13 +57,17 @@ class TransferRecord {
   }
 }
 
-class TransferStore {
+/// Local transfer history. Notifies listeners when records change so shell tabs
+/// can refresh without a full route rebuild.
+class TransferStore extends ChangeNotifier {
   static const _preferenceKey = 'onesend.transfer-history';
 
   late SharedPreferences _preferences;
   List<TransferRecord> _records = <TransferRecord>[];
+  bool _ready = false;
 
   List<TransferRecord> get records => List.unmodifiable(_records);
+  bool get isReady => _ready;
 
   Future<void> init() async {
     _preferences = await SharedPreferences.getInstance();
@@ -78,6 +83,8 @@ class TransferStore {
       }
     }
     _records.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    _ready = true;
+    notifyListeners();
   }
 
   Future<void> add(TransferRecord record) async {
@@ -86,11 +93,13 @@ class TransferStore {
       ..._records,
     ].take(30).toList(growable: false);
     await _persist();
+    notifyListeners();
   }
 
   Future<void> clear() async {
     _records = <TransferRecord>[];
     await _preferences.remove(_preferenceKey);
+    notifyListeners();
   }
 
   Future<void> _persist() async {

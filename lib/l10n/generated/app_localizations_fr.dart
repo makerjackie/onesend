@@ -317,6 +317,13 @@ class AppLocalizationsFr extends AppLocalizations {
       'Les transferts n’utilisent ni réseau ni serveur. Sur mobile, seul l’accès à la caméra est nécessaire.';
 
   @override
+  String get openPrivacyPolicy => 'Ouvrir la politique de confidentialité';
+
+  @override
+  String get cannotOpenPrivacy =>
+      'Impossible d’ouvrir la politique de confidentialité. Réessayez.';
+
+  @override
   String get openSourceAndAuthor => 'Code source ouvert et auteur';
 
   @override
@@ -351,9 +358,46 @@ class AppLocalizationsFr extends AppLocalizations {
   String get aboutFooter => 'OneSend · transfert de fichiers optique';
 
   @override
-  String versionLabel(Object version) {
+  String versionLabel(String version) {
     return 'Version $version';
   }
+
+  @override
+  String settingsVersionFooter(String version) {
+    return '$version';
+  }
+
+  @override
+  String get acknowledgments => 'Remerciements';
+
+  @override
+  String get acknowledgmentsIntro =>
+      'OneSend remercie ces projets open source pour les idées et assets :';
+
+  @override
+  String get creditDecimen =>
+      'decimen-optical-transfer — base LT / protocole (MIT)';
+
+  @override
+  String get creditQrDataTransfer =>
+      'qr-data-transfer — architecture publique revue ; aucun code inclus';
+
+  @override
+  String get creditLibcimbar =>
+      'libcimbar v0.6.7c — code visuel couleur expérimental (MPL-2.0)';
+
+  @override
+  String get sendFeedback => 'Envoyer un avis';
+
+  @override
+  String get sendFeedbackSubtitle => 'Signaler un problème sur GitHub';
+
+  @override
+  String get openGithubIssues => 'Ouvrir GitHub Issues';
+
+  @override
+  String get cannotOpenGithubIssues =>
+      'Impossible d’ouvrir GitHub Issues. Réessayez.';
 
   @override
   String get chooseAFile => 'Choisir un fichier';

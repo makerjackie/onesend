@@ -118,6 +118,9 @@ var RecvWorker = function () {
   };
 }();
 
+// OneSend offline preload: WKWebView file origins cannot fetch WASM. This
+// generated local script sets Module.wasmBinary without any HTTP/socket use.
+importScripts('cimbar_wasm_binary.2026-07-13T0523.js');
 importScripts('cimbar_js.2026-07-13T0523.js');
 
 self.onmessage = async (event) => {

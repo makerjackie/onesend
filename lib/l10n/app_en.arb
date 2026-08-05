@@ -81,6 +81,8 @@
   "whyWeBuiltItBody": "Two devices can exchange a file without a network, account, or pairing. OneSend turns the screen and camera already on your devices into a simple offline channel.",
   "privacy": "Privacy",
   "privacyBody": "Transfers do not use a network or server. Mobile needs camera access only.",
+  "openPrivacyPolicy": "Open privacy policy",
+  "cannotOpenPrivacy": "Could not open the privacy policy. Try again.",
   "openSourceAndAuthor": "Open source & author",
   "author": "Author",
   "license": "License",
@@ -93,6 +95,30 @@
   "cannotOpenGithub": "Could not open the GitHub page. Try again.",
   "aboutFooter": "OneSend · optical file transfer",
   "versionLabel": "Version {version}",
+  "@versionLabel": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsVersionFooter": "{version}",
+  "@settingsVersionFooter": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "acknowledgments": "Acknowledgments",
+  "acknowledgmentsIntro": "OneSend is grateful to these open-source projects for ideas, reference designs, and assets:",
+  "creditDecimen": "decimen-optical-transfer — LT-code / protocol foundation (MIT)",
+  "creditQrDataTransfer": "qr-data-transfer — public architecture reviewed; no code included",
+  "creditLibcimbar": "libcimbar v0.6.7c — experimental color visual code (MPL-2.0)",
+  "sendFeedback": "Send feedback",
+  "sendFeedbackSubtitle": "Report issues on GitHub",
+  "openGithubIssues": "Open GitHub Issues",
+  "cannotOpenGithubIssues": "Could not open GitHub Issues. Try again.",
   "chooseAFile": "Choose a file",
   "sendFileDescription": "The file becomes a changing sequence of visual codes.\nUp to {maxSize}; start with a small file for the first test.",
   "newTransferStatus": "New sends use {mode} mode · theoretical rate about {speed}",

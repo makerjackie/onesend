@@ -598,6 +598,18 @@ abstract class AppLocalizations {
   /// **'Transfers do not use a network or server. Mobile needs camera access only.'**
   String get privacyBody;
 
+  /// No description provided for @openPrivacyPolicy.
+  ///
+  /// In en, this message translates to:
+  /// **'Open privacy policy'**
+  String get openPrivacyPolicy;
+
+  /// No description provided for @cannotOpenPrivacy.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not open the privacy policy. Try again.'**
+  String get cannotOpenPrivacy;
+
   /// No description provided for @openSourceAndAuthor.
   ///
   /// In en, this message translates to:
@@ -668,7 +680,67 @@ abstract class AppLocalizations {
   ///
   /// In en, this message translates to:
   /// **'Version {version}'**
-  String versionLabel(Object version);
+  String versionLabel(String version);
+
+  /// No description provided for @settingsVersionFooter.
+  ///
+  /// In en, this message translates to:
+  /// **'{version}'**
+  String settingsVersionFooter(String version);
+
+  /// No description provided for @acknowledgments.
+  ///
+  /// In en, this message translates to:
+  /// **'Acknowledgments'**
+  String get acknowledgments;
+
+  /// No description provided for @acknowledgmentsIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'OneSend is grateful to these open-source projects for ideas, reference designs, and assets:'**
+  String get acknowledgmentsIntro;
+
+  /// No description provided for @creditDecimen.
+  ///
+  /// In en, this message translates to:
+  /// **'decimen-optical-transfer — LT-code / protocol foundation (MIT)'**
+  String get creditDecimen;
+
+  /// No description provided for @creditQrDataTransfer.
+  ///
+  /// In en, this message translates to:
+  /// **'qr-data-transfer — public architecture reviewed; no code included'**
+  String get creditQrDataTransfer;
+
+  /// No description provided for @creditLibcimbar.
+  ///
+  /// In en, this message translates to:
+  /// **'libcimbar v0.6.7c — experimental color visual code (MPL-2.0)'**
+  String get creditLibcimbar;
+
+  /// No description provided for @sendFeedback.
+  ///
+  /// In en, this message translates to:
+  /// **'Send feedback'**
+  String get sendFeedback;
+
+  /// No description provided for @sendFeedbackSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Report issues on GitHub'**
+  String get sendFeedbackSubtitle;
+
+  /// No description provided for @openGithubIssues.
+  ///
+  /// In en, this message translates to:
+  /// **'Open GitHub Issues'**
+  String get openGithubIssues;
+
+  /// No description provided for @cannotOpenGithubIssues.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not open GitHub Issues. Try again.'**
+  String get cannotOpenGithubIssues;
 
   /// No description provided for @chooseAFile.
   ///

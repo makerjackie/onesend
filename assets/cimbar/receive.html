@@ -16,8 +16,8 @@
     #crosshair2 { bottom: 18%; left: 18%; border-right: 0; border-top: 0; }
     .active_xhairs { border-color: #d9f866 !important; }
     .scanning_xhairs { border-color: #fff36b !important; }
-    #progress_bars { position: fixed; left: 4%; right: 4%; bottom: 4%; }
-    .progress { height: 8px; margin-top: 5px; background: #d9f866; border-radius: 4px; }
+    /* Flutter owns the single stable progress bar below the camera. */
+    #progress_bars { display: none; }
     #debug_menu { display: none; }
     #nav-container, #nav-button, #nav-content { display: none; }
   </style>
@@ -47,9 +47,13 @@
     <script src="upstream/recv.2026-07-13T0523.js"></script>
     <script src="upstream/zstd.2026-07-13T0523.js"></script>
     <script src="onesend_cimbar_envelope.js"></script>
+    <script src="upstream/cimbar_recv_worker_inline.2026-07-13T0523.js"></script>
     <script src="onesend_cimbar_bridge.js"></script>
   <script>
     var Module = window.Module = {};
+  </script>
+  <script src="upstream/cimbar_wasm_binary.2026-07-13T0523.js"></script>
+  <script>
     OneSendCimbar.bootReceive();
   </script>
   <script src="upstream/cimbar_js.2026-07-13T0523.js"></script>

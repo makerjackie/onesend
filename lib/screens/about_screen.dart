@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -8,7 +10,28 @@ import '../l10n/generated/app_localizations.dart';
 import '../widgets/brand_mark.dart';
 
 const String oneSendGithubUrl = 'https://github.com/makerjackie/onesend';
+const String oneSendGithubNewIssueUrl =
+    'https://github.com/makerjackie/onesend/issues/new';
+const String oneSendPrivacyUrl = 'https://onesend.01mvp.com/privacy';
+
 final Uri oneSendGithubUri = Uri.parse(oneSendGithubUrl);
+final Uri oneSendGithubNewIssueUri = Uri.parse(oneSendGithubNewIssueUrl);
+final Uri oneSendPrivacyUri = Uri.parse(oneSendPrivacyUrl);
+
+/// Open-source projects historically referenced by OneSend (see README /
+/// THIRD_PARTY_NOTICES).
+const List<({String title, String url})> oneSendOpenSourceCredits =
+    <({String title, String url})>[
+      (
+        title: 'decimen-optical-transfer',
+        url: 'https://github.com/bashalarmistalt/decimen-optical-transfer',
+      ),
+      (
+        title: 'qr-data-transfer',
+        url: 'https://github.com/deedy/qr-data-transfer',
+      ),
+      (title: 'libcimbar', url: 'https://github.com/sz3/libcimbar'),
+    ];
 
 typedef AboutPackageInfoLoader = Future<PackageInfo> Function();
 typedef AboutUrlLauncher = Future<bool> Function(Uri url);
@@ -33,7 +56,7 @@ class AboutScreen extends StatefulWidget {
 class _AboutScreenState extends State<AboutScreen> {
   PackageInfo? _packageInfo;
   String? _message;
-  bool _openingGithub = false;
+  bool _openingUrl = false;
 
   @override
   void initState() {
@@ -52,27 +75,52 @@ class _AboutScreenState extends State<AboutScreen> {
     }
   }
 
-  Future<void> _openGithub() async {
-    if (_openingGithub) return;
+  Future<void> _openUri(Uri uri, {required String failureMessage}) async {
+    if (_openingUrl) return;
     setState(() {
-      _openingGithub = true;
+      _openingUrl = true;
       _message = null;
     });
     try {
       final launcher = widget.urlLauncher;
       final opened = launcher == null
-          ? await launchUrl(
-              oneSendGithubUri,
-              mode: LaunchMode.externalApplication,
-            )
-          : await launcher(oneSendGithubUri);
-      if (!opened) throw StateError('github');
+          ? await launchUrl(uri, mode: LaunchMode.externalApplication)
+          : await launcher(uri);
+      if (!opened) throw StateError('url');
     } catch (_) {
       if (!mounted) return;
-      setState(() => _message = AppLocalizations.of(context)!.cannotOpenGithub);
+      setState(() => _message = failureMessage);
     }
     if (!mounted) return;
-    setState(() => _openingGithub = false);
+    setState(() => _openingUrl = false);
+  }
+
+  Future<void> _openGithub() async {
+    await _openUri(
+      oneSendGithubUri,
+      failureMessage: AppLocalizations.of(context)!.cannotOpenGithub,
+    );
+  }
+
+  Future<void> _openFeedback() async {
+    await _openUri(
+      oneSendGithubNewIssueUri,
+      failureMessage: AppLocalizations.of(context)!.cannotOpenGithubIssues,
+    );
+  }
+
+  Future<void> _openPrivacy() async {
+    await _openUri(
+      oneSendPrivacyUri,
+      failureMessage: AppLocalizations.of(context)!.cannotOpenPrivacy,
+    );
+  }
+
+  Future<void> _openCredit(String url) async {
+    await _openUri(
+      Uri.parse(url),
+      failureMessage: AppLocalizations.of(context)!.cannotOpenGithub,
+    );
   }
 
   String _versionLabel() {
@@ -86,6 +134,11 @@ class _AboutScreenState extends State<AboutScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final creditBodies = <String>[
+      l10n.creditDecimen,
+      l10n.creditQrDataTransfer,
+      l10n.creditLibcimbar,
+    ];
     return Scaffold(
       appBar: AppBar(title: Text(l10n.about)),
       body: SafeArea(
@@ -116,7 +169,25 @@ class _AboutScreenState extends State<AboutScreen> {
                     body: l10n.whyWeBuiltItBody,
                   ),
                   const SizedBox(height: 12),
-                  _AboutPanel(title: l10n.privacy, body: l10n.privacyBody),
+                  _AboutPanel(
+                    title: l10n.privacy,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          l10n.privacyBody,
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                        const SizedBox(height: 12),
+                        OutlinedButton.icon(
+                          key: const ValueKey<String>('about-privacy'),
+                          onPressed: _openingUrl ? null : _openPrivacy,
+                          icon: const Icon(Icons.policy_outlined, size: 18),
+                          label: Text(l10n.openPrivacyPolicy),
+                        ),
+                      ],
+                    ),
+                  ),
                   const SizedBox(height: 12),
                   _AboutPanel(
                     title: l10n.openSourceAndAuthor,
@@ -134,6 +205,33 @@ class _AboutScreenState extends State<AboutScreen> {
                   ),
                   const SizedBox(height: 12),
                   _AboutPanel(
+                    title: l10n.acknowledgments,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          l10n.acknowledgmentsIntro,
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                        const SizedBox(height: 12),
+                        for (var i = 0; i < creditBodies.length; i++) ...[
+                          if (i > 0) const SizedBox(height: 10),
+                          _CreditRow(
+                            body: creditBodies[i],
+                            onOpen: _openingUrl
+                                ? null
+                                : () => unawaited(
+                                    _openCredit(
+                                      oneSendOpenSourceCredits[i].url,
+                                    ),
+                                  ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  _AboutPanel(
                     title: l10n.github,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -143,20 +241,43 @@ class _AboutScreenState extends State<AboutScreen> {
                           style: Theme.of(context).textTheme.bodyMedium,
                         ),
                         const SizedBox(height: 14),
-                        OutlinedButton.icon(
-                          key: const ValueKey<String>('about-github'),
-                          onPressed: _openingGithub ? null : _openGithub,
-                          icon: _openingGithub
-                              ? const SizedBox.square(
-                                  dimension: 16,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : const Icon(Icons.open_in_new_rounded, size: 18),
-                          label: Text(
-                            _openingGithub ? l10n.opening : l10n.openGithub,
-                          ),
+                        Wrap(
+                          spacing: 10,
+                          runSpacing: 10,
+                          children: [
+                            OutlinedButton.icon(
+                              key: const ValueKey<String>('about-github'),
+                              onPressed: _openingUrl ? null : _openGithub,
+                              icon: _openingUrl
+                                  ? const SizedBox.square(
+                                      dimension: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : const Icon(
+                                      Icons.open_in_new_rounded,
+                                      size: 18,
+                                    ),
+                              label: Text(
+                                _openingUrl ? l10n.opening : l10n.openGithub,
+                              ),
+                            ),
+                            FilledButton.tonalIcon(
+                              key: const ValueKey<String>('about-feedback'),
+                              onPressed: _openingUrl ? null : _openFeedback,
+                              icon: const Icon(
+                                Icons.bug_report_outlined,
+                                size: 18,
+                              ),
+                              label: Text(l10n.sendFeedback),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          l10n.sendFeedbackSubtitle,
+                          style: Theme.of(context).textTheme.bodySmall,
                         ),
                         if (_message != null) ...[
                           const SizedBox(height: 10),
@@ -181,6 +302,46 @@ class _AboutScreenState extends State<AboutScreen> {
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CreditRow extends StatelessWidget {
+  const _CreditRow({required this.body, required this.onOpen});
+
+  final String body;
+  final VoidCallback? onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onOpen,
+      borderRadius: BorderRadius.circular(10),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              Icons.favorite_outline_rounded,
+              size: 18,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(body, style: Theme.of(context).textTheme.bodyMedium),
+            ),
+            if (onOpen != null) ...[
+              const SizedBox(width: 8),
+              Icon(
+                Icons.open_in_new_rounded,
+                size: 16,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ],
+          ],
         ),
       ),
     );
@@ -263,9 +424,7 @@ class _AboutPanel extends StatelessWidget {
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surfaceContainerHigh,
         borderRadius: BorderRadius.circular(oneSendRadiusCard),
-        border: Border.all(
-          color: Theme.of(context).colorScheme.outlineVariant,
-        ),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

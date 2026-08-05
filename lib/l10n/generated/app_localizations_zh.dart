@@ -296,6 +296,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get privacyBody => '传输不经网络或服务器；移动端只需要相机权限。';
 
   @override
+  String get openPrivacyPolicy => '打开隐私政策';
+
+  @override
+  String get cannotOpenPrivacy => '无法打开隐私政策，请稍后重试。';
+
+  @override
   String get openSourceAndAuthor => '开源与作者';
 
   @override
@@ -329,9 +335,41 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aboutFooter => 'OneSend · 光传文件';
 
   @override
-  String versionLabel(Object version) {
+  String versionLabel(String version) {
     return '版本 $version';
   }
+
+  @override
+  String settingsVersionFooter(String version) {
+    return '$version';
+  }
+
+  @override
+  String get acknowledgments => '开源致谢';
+
+  @override
+  String get acknowledgmentsIntro => 'OneSend 参考并致谢以下开源项目（想法、架构参考或资产）：';
+
+  @override
+  String get creditDecimen => 'decimen-optical-transfer — LT 码 / 协议基础（MIT）';
+
+  @override
+  String get creditQrDataTransfer => 'qr-data-transfer — 公开架构参考（未纳入其代码）';
+
+  @override
+  String get creditLibcimbar => 'libcimbar v0.6.7c — 实验性彩色视觉码（MPL-2.0）';
+
+  @override
+  String get sendFeedback => '问题反馈';
+
+  @override
+  String get sendFeedbackSubtitle => '在 GitHub 提交 Issue';
+
+  @override
+  String get openGithubIssues => '打开 GitHub Issues';
+
+  @override
+  String get cannotOpenGithubIssues => '无法打开 GitHub Issues，请稍后重试。';
 
   @override
   String get chooseAFile => '选一个文件';
@@ -1128,6 +1166,12 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get privacyBody => '传输不经网络或服务器；移动端只需要相机权限。';
 
   @override
+  String get openPrivacyPolicy => '打开隐私政策';
+
+  @override
+  String get cannotOpenPrivacy => '无法打开隐私政策，请稍后重试。';
+
+  @override
   String get openSourceAndAuthor => '开源与作者';
 
   @override
@@ -1161,9 +1205,41 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get aboutFooter => 'OneSend · 光传文件';
 
   @override
-  String versionLabel(Object version) {
+  String versionLabel(String version) {
     return '版本 $version';
   }
+
+  @override
+  String settingsVersionFooter(String version) {
+    return '$version';
+  }
+
+  @override
+  String get acknowledgments => '开源致谢';
+
+  @override
+  String get acknowledgmentsIntro => 'OneSend 参考并致谢以下开源项目（想法、架构参考或资产）：';
+
+  @override
+  String get creditDecimen => 'decimen-optical-transfer — LT 码 / 协议基础（MIT）';
+
+  @override
+  String get creditQrDataTransfer => 'qr-data-transfer — 公开架构参考（未纳入其代码）';
+
+  @override
+  String get creditLibcimbar => 'libcimbar v0.6.7c — 实验性彩色视觉码（MPL-2.0）';
+
+  @override
+  String get sendFeedback => '问题反馈';
+
+  @override
+  String get sendFeedbackSubtitle => '在 GitHub 提交 Issue';
+
+  @override
+  String get openGithubIssues => '打开 GitHub Issues';
+
+  @override
+  String get cannotOpenGithubIssues => '无法打开 GitHub Issues，请稍后重试。';
 
   @override
   String get chooseAFile => '选一个文件';
@@ -1965,6 +2041,12 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get privacyBody => '傳輸不使用網路或伺服器。行動裝置只需要相機存取權限。';
 
   @override
+  String get openPrivacyPolicy => '開啟隱私政策';
+
+  @override
+  String get cannotOpenPrivacy => '無法開啟隱私政策，請稍後再試。';
+
+  @override
   String get openSourceAndAuthor => '開放原始碼與作者';
 
   @override
@@ -1998,9 +2080,41 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get aboutFooter => 'OneSend · 光學檔案傳輸';
 
   @override
-  String versionLabel(Object version) {
+  String versionLabel(String version) {
     return '版本 $version';
   }
+
+  @override
+  String settingsVersionFooter(String version) {
+    return '$version';
+  }
+
+  @override
+  String get acknowledgments => '開源致謝';
+
+  @override
+  String get acknowledgmentsIntro => 'OneSend 參考並致謝以下開源專案（想法、架構參考或資產）：';
+
+  @override
+  String get creditDecimen => 'decimen-optical-transfer — LT 碼 / 協定基礎（MIT）';
+
+  @override
+  String get creditQrDataTransfer => 'qr-data-transfer — 公開架構參考（未納入其程式碼）';
+
+  @override
+  String get creditLibcimbar => 'libcimbar v0.6.7c — 實驗性彩色視覺碼（MPL-2.0）';
+
+  @override
+  String get sendFeedback => '問題回饋';
+
+  @override
+  String get sendFeedbackSubtitle => '在 GitHub 提交 Issue';
+
+  @override
+  String get openGithubIssues => '開啟 GitHub Issues';
+
+  @override
+  String get cannotOpenGithubIssues => '無法開啟 GitHub Issues，請稍後再試。';
 
   @override
   String get chooseAFile => '選擇檔案';

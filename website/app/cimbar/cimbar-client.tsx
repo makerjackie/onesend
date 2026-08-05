@@ -13,11 +13,12 @@ const RECEIVE_WORKER_URL = "/cimbar/node_modules/cimbar-receive-worker.js";
  */
 const MAX_INPUT_BYTES = 33 * 1024 * 1024;
 const CIMBAR_MODE = 68;
-const CIMBAR_MODE_LABEL = "B";
 /** Upstream peak display rate. */
 const CIMBAR_DISPLAY_FPS = 15;
 /** Upstream reference under ideal monitor+phone conditions (not a guarantee). */
 const CIMBAR_THEORETICAL_KBPS = 106;
+/** Native libcimbar bitmap size; CSS scales it to the available stage. */
+const CIMBAR_RENDER_SIZE = 1024;
 /**
  * Sample the camera faster than the 15 fps display so dwell frames are
  * more likely to be captured on iPhone-class sensors.
@@ -29,17 +30,18 @@ const RECEIVE_CAPTURE_INTERVAL_MS = 33;
  * workbench stage. Never force 1024×1024 CSS size; that overflows the panel
  * and forces scroll/crop so phones cannot see the whole code.
  *
- * Bitmap size equals CSS size (no bilinear downscale of color cells).
+ * The visible size fits the workbench; the bitmap remains 1024px so the
+ * browser does not destroy small color-cell boundaries before capture.
  */
 export const CIMBAR_DISPLAY_POLICY = {
   desktopBreakpointPx: 840,
   /** Right-column workbench budget on desktop (aligned with QR stage). */
-  desktopWidthRatio: 0.34,
-  desktopHeightRatio: 0.44,
+  desktopWidthRatio: 0.42,
+  desktopHeightRatio: 0.62,
   mobileWidthRatio: 0.88,
   mobileHeightRatio: 0.4,
   /** Hard cap so the code never dominates the page like a full-screen GL demo. */
-  maximumDisplayPx: 420,
+  maximumDisplayPx: 560,
   minimumDisplayPx: 280,
   fallbackDisplayPx: 360,
 } as const;
@@ -97,9 +99,12 @@ function sizeCimbarCanvas(canvas: HTMLCanvasElement) {
       )
     : resolveCimbarCanvasSize();
 
-  if (canvas.width !== size || canvas.height !== size) {
-    canvas.width = size;
-    canvas.height = size;
+  if (
+    canvas.width !== CIMBAR_RENDER_SIZE ||
+    canvas.height !== CIMBAR_RENDER_SIZE
+  ) {
+    canvas.width = CIMBAR_RENDER_SIZE;
+    canvas.height = CIMBAR_RENDER_SIZE;
   }
   canvas.style.setProperty("width", `${size}px`, "important");
   canvas.style.setProperty("height", `${size}px`, "important");
@@ -271,17 +276,6 @@ function openReceivedInBrowser(file: ReceivedFile) {
   window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
-async function sha256(bytes: Uint8Array) {
-  if (!globalThis.crypto?.subtle) return null;
-  const digest = await globalThis.crypto.subtle.digest(
-    "SHA-256",
-    bytes.slice().buffer as ArrayBuffer,
-  );
-  return Array.from(new Uint8Array(digest), (value) =>
-    value.toString(16).padStart(2, "0"),
-  ).join("");
-}
-
 function describeError(error: unknown) {
   if (error instanceof Error && error.message) return error.message;
   return "浏览器无法完成这次本地实验。";
@@ -302,13 +296,13 @@ export function CimbarTransfer({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [senderState, setSenderState] = useState<SenderState>("idle");
   const [senderFrames, setSenderFrames] = useState(0);
+  const [senderSpeedLabel, setSenderSpeedLabel] = useState("—");
   const [senderError, setSenderError] = useState<string | null>(null);
   const [receiverState, setReceiverState] = useState<ReceiverState>("idle");
   const [decodedFrames, setDecodedFrames] = useState(0);
   const [receiverProgress, setReceiverProgress] = useState(0);
   const [receiverError, setReceiverError] = useState<string | null>(null);
   const [receivedFile, setReceivedFile] = useState<ReceivedFile | null>(null);
-  const [verification, setVerification] = useState<string | null>(null);
   const [canvasSize, setCanvasSize] = useState(() =>
     resolveCimbarCanvasSize(),
   );
@@ -477,12 +471,15 @@ export function CimbarTransfer({
       revokePreviewUrl();
       void releaseWakeLock();
     };
+    // Resource teardown intentionally captures the mount-time helper.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function markSenderReady(file: File) {
     pendingFileRef.current = file;
     setSelectedFile(file);
     setSenderFrames(0);
+    setSenderSpeedLabel("—");
     setSenderError(null);
     setSenderState("ready");
   }
@@ -499,6 +496,7 @@ export function CimbarTransfer({
     startWhenReadyRef.current = false;
     setSenderState("sending");
     setSenderFrames(0);
+    setSenderSpeedLabel("—");
     setSenderError(null);
     void requestWakeLock();
     worker.postMessage({ type: "load", file });
@@ -539,6 +537,14 @@ export function CimbarTransfer({
         // Count is already throttled in the worker; still avoid layout thrash.
         const next = Number(data.count) || 0;
         setSenderFrames((prev) => (prev === next ? prev : next));
+        const elapsedMs = Number(data.elapsedMs) || 0;
+        if (next > 1 && elapsedMs > 0) {
+          const measuredFps = next / (elapsedMs / 1000);
+          const streamKbps =
+            CIMBAR_THEORETICAL_KBPS *
+            Math.min(1, measuredFps / CIMBAR_DISPLAY_FPS);
+          setSenderSpeedLabel(`约 ${formatSpeedKBps(streamKbps)}`);
+        }
         return;
       }
       if (data.type === "error") {
@@ -658,6 +664,7 @@ export function CimbarTransfer({
     if (pendingFileRef.current || selectedFile) {
       setSenderState("ready");
       setSenderFrames(0);
+      setSenderSpeedLabel("—");
       return;
     }
     pendingFileRef.current = null;
@@ -770,7 +777,6 @@ export function CimbarTransfer({
     setReceiverState("starting");
     setReceiverError(null);
     setReceivedFile(null);
-    setVerification(null);
     setDecodedFrames(0);
     setReceiverProgress(0);
     setScanStats({ noData: 0, decoded: 0 });
@@ -841,15 +847,6 @@ export function CimbarTransfer({
           } satisfies ReceivedFile;
           stopReceiverResources();
           presentReceivedFile(file);
-          void sha256(bytes)
-            .then((digest) => {
-              setVerification(
-                digest
-                  ? `fountain + zstd + envelope CRC32 校验通过 · SHA-256 ${digest}`
-                  : "fountain + zstd + envelope CRC32 校验通过",
-              );
-            })
-            .catch(() => setVerification("fountain + zstd + envelope CRC32 校验通过"));
           return;
         }
         if (data.type === "error") {
@@ -915,7 +912,6 @@ export function CimbarTransfer({
     stopReceiverResources();
     revokePreviewUrl();
     setReceivedFile(null);
-    setVerification(null);
     setReceiverProgress(0);
     setDecodedFrames(0);
     setScanStats({ noData: 0, decoded: 0 });
@@ -1076,10 +1072,7 @@ export function CimbarTransfer({
                   <strong>~{CIMBAR_THEORETICAL_KBPS} KB/s</strong>
                 </span>
                 <span>
-                  显示
-                  <strong>
-                    {CIMBAR_DISPLAY_FPS} fps · Mode {CIMBAR_MODE_LABEL}
-                  </strong>
+                  当前码流<strong>{senderSpeedLabel}</strong>
                 </span>
                 <span>
                   已出帧<strong>{senderFrames}</strong>
@@ -1100,8 +1093,8 @@ export function CimbarTransfer({
               <canvas
                 ref={senderCanvasRef}
                 className="web-code-canvas web-cimbar-canvas"
-                width={canvasSize}
-                height={canvasSize}
+                width={CIMBAR_RENDER_SIZE}
+                height={CIMBAR_RENDER_SIZE}
                 style={{
                   width: `${canvasSize}px`,
                   height: `${canvasSize}px`,

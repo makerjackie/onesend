@@ -35,6 +35,10 @@ class _HomeScreenState extends State<HomeScreen> {
   int _selectedTab = 0;
   String? _presentedUpdateVersion;
   AppSettings? _fallbackSettings;
+  /// Built once so the settings tab keeps package-info / form state across
+  /// shell rebuilds (IndexedStack alone is not enough if the child widget is
+  /// a new instance every build).
+  Widget? _settingsTab;
 
   AppSettings get _settings =>
       widget.settings ?? (_fallbackSettings ??= AppSettings());
@@ -42,6 +46,11 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    _settingsTab = SettingsScreen(
+      settings: _settings,
+      updates: widget.updates,
+      embedded: true,
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _performStartupUpdateCheck();
     });
@@ -75,10 +84,12 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _open(Widget page) async {
-    await Navigator.of(
-      context,
-    ).push<void>(MaterialPageRoute<void>(builder: (_) => page));
-    if (mounted) setState(() {});
+    // Keep the platform MaterialPageRoute so iOS swipe-back and Android
+    // predictive-back stay intact. Tab jank is handled by IndexedStack, not
+    // by replacing the system transition.
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(builder: (_) => page),
+    );
   }
 
   Widget _sendRoute() {
@@ -111,7 +122,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
     if (confirmed == true) {
       await widget.store.clear();
-      if (mounted) setState(() {});
     }
   }
 
@@ -124,11 +134,52 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Row(
           children: [
             if (wide) _buildNavigationRail(context, l10n),
-            Expanded(child: _buildCurrentTab(context)),
+            Expanded(child: _buildTabHost(context)),
           ],
         ),
       ),
       bottomNavigationBar: wide ? null : _buildNavigationBar(l10n),
+    );
+  }
+
+  /// Keep all shell tabs alive. Switching used to rebuild whole trees (settings
+  /// reloaded package info, history rebuilt), which felt like jank on device.
+  ///
+  /// History updates only rebuild the transfer/files panes — never settings.
+  Widget _buildTabHost(BuildContext context) {
+    final settingsTab = _settingsTab ??
+        SettingsScreen(
+          settings: _settings,
+          updates: widget.updates,
+          embedded: true,
+        );
+    return IndexedStack(
+      index: _selectedTab,
+      sizing: StackFit.expand,
+      children: [
+        KeyedSubtree(
+          key: const ValueKey<String>('tab-transfer'),
+          child: RepaintBoundary(
+            child: ListenableBuilder(
+              listenable: widget.store,
+              builder: (context, _) => _buildTransferTab(context),
+            ),
+          ),
+        ),
+        KeyedSubtree(
+          key: const ValueKey<String>('tab-files'),
+          child: RepaintBoundary(
+            child: ListenableBuilder(
+              listenable: widget.store,
+              builder: (context, _) => _buildFilesTab(context),
+            ),
+          ),
+        ),
+        KeyedSubtree(
+          key: const ValueKey<String>('tab-settings'),
+          child: RepaintBoundary(child: settingsTab),
+        ),
+      ],
     );
   }
 
@@ -174,7 +225,12 @@ class _HomeScreenState extends State<HomeScreen> {
         groupAlignment: -0.9,
         minExtendedWidth: 168,
         leading: Padding(
-          padding: EdgeInsets.fromLTRB(extended ? 12 : 0, 8, extended ? 12 : 0, 20),
+          padding: EdgeInsets.fromLTRB(
+            extended ? 12 : 0,
+            8,
+            extended ? 12 : 0,
+            20,
+          ),
           child: extended
               ? const BrandMark(compact: false)
               : const BrandIcon(size: 34, borderRadius: 8),
@@ -209,18 +265,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildCurrentTab(BuildContext context) {
-    return switch (_selectedTab) {
-      0 => _buildTransferTab(context),
-      1 => _buildFilesTab(context),
-      _ => SettingsScreen(
-        settings: _settings,
-        updates: widget.updates,
-        embedded: true,
-      ),
-    };
-  }
-
   Widget _buildTransferTab(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final records = widget.store.records;
@@ -229,9 +273,7 @@ class _HomeScreenState extends State<HomeScreen> {
         final workbench = constraints.maxWidth >= oneSendWorkbenchBreakpoint;
         final horizontal = constraints.maxWidth >= 700;
         final actions = Flex(
-          direction: horizontal && !workbench
-              ? Axis.horizontal
-              : Axis.vertical,
+          direction: horizontal && !workbench ? Axis.horizontal : Axis.vertical,
           crossAxisAlignment: horizontal && !workbench
               ? CrossAxisAlignment.start
               : CrossAxisAlignment.stretch,
@@ -300,9 +342,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           child: Center(
             child: ConstrainedBox(
-              constraints: BoxConstraints(
-                maxWidth: workbench ? 1080 : 720,
-              ),
+              constraints: BoxConstraints(maxWidth: workbench ? 1080 : 720),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [

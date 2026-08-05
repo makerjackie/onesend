@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.5.4 (build 23) - 2026-08-05
+
+### 中文
+
+- 修复网页彩色视觉码发送端重复启动多组帧循环的问题；输出现在稳定在单一约 15 fps 时钟，避免相机捕获大量切换中的过渡帧。
+- 将网页彩色码原生位图提升并固定为 1024 × 1024，同时按视口清晰缩放显示，改善手机摄像头可见的色块边缘与有效识别率。
+- 修复 iOS 彩色接收依赖 `127.0.0.1` 本地 HTTP 服务的问题；WASM 与解码 worker 现在全部从应用内离线资源启动，不创建网络套接字，也不声明本地网络访问。
+- 接收页只保留一条 Flutter 进度条，并按已达到的最高解码进度单调推进；不再因多个 worker 的异步报告前后变化而抖动或倒退。
+- 彩色接收完成前即可按真实已解码光学字节显示有效速度，文件大小上限提示修正为 33 MiB。
+- 补齐离线资源摘要、iOS 无网络路径、进度单调性、网页帧调度与高分辨率画布测试；通过 Flutter 全量测试、网页构建/测试及 iOS 18.5、26.5 模拟器回归。
+
+### English
+
+- Fixed duplicate color-code sender frame loops on the web. Output now follows one stable ~15 fps clock instead of exposing transition-heavy frames to the camera.
+- Raised and fixed the native web color-code bitmap at 1024 × 1024 while scaling it cleanly to the viewport, improving color-cell edges and practical camera recognition yield.
+- Removed the iOS color receiver's `127.0.0.1` HTTP asset server. WASM and decoder workers now start entirely from offline bundled assets, with no network socket or local-network declaration.
+- Reduced reception to one Flutter-owned progress bar that advances monotonically to the furthest decoded point, preventing asynchronous worker reports from shaking or moving it backward.
+- Added live effective optical-byte speed before file completion and corrected the color-mode size limit label to 33 MiB.
+- Added checks for offline asset digests, the network-free iOS path, monotonic progress, web frame scheduling, and the high-resolution canvas; the full Flutter suite, website build/tests, and iOS 18.5/26.5 simulator regressions pass.
+
 ## 1.5.2 (build 21) - 2026-08-04
 
 ### 中文

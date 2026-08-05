@@ -302,6 +302,12 @@ class AppLocalizationsJa extends AppLocalizations {
   String get privacyBody => '転送にネットワークやサーバーは使いません。モバイルではカメラへのアクセスだけが必要です。';
 
   @override
+  String get openPrivacyPolicy => 'プライバシーポリシーを開く';
+
+  @override
+  String get cannotOpenPrivacy => 'プライバシーポリシーを開けませんでした。もう一度お試しください。';
+
+  @override
   String get openSourceAndAuthor => 'オープンソースと作者';
 
   @override
@@ -335,9 +341,42 @@ class AppLocalizationsJa extends AppLocalizations {
   String get aboutFooter => 'OneSend · 光ファイル転送';
 
   @override
-  String versionLabel(Object version) {
+  String versionLabel(String version) {
     return 'バージョン $version';
   }
+
+  @override
+  String settingsVersionFooter(String version) {
+    return '$version';
+  }
+
+  @override
+  String get acknowledgments => '謝辞';
+
+  @override
+  String get acknowledgmentsIntro => 'OneSend は次のオープンソースプロジェクトに感謝します：';
+
+  @override
+  String get creditDecimen =>
+      'decimen-optical-transfer — LT コード / プロトコル基盤（MIT）';
+
+  @override
+  String get creditQrDataTransfer => 'qr-data-transfer — 公開アーキテクチャの参照（コードは未使用）';
+
+  @override
+  String get creditLibcimbar => 'libcimbar v0.6.7c — 実験的カラー視覚コード（MPL-2.0）';
+
+  @override
+  String get sendFeedback => 'フィードバック';
+
+  @override
+  String get sendFeedbackSubtitle => 'GitHub で Issue を作成';
+
+  @override
+  String get openGithubIssues => 'GitHub Issues を開く';
+
+  @override
+  String get cannotOpenGithubIssues => 'GitHub Issues を開けませんでした。もう一度お試しください。';
 
   @override
   String get chooseAFile => 'ファイルを選択';

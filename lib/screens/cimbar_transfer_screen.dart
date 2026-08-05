@@ -13,7 +13,6 @@ import 'package:webview_flutter_wkwebview/webview_flutter_wkwebview.dart';
 import '../app.dart';
 import '../core/envelope.dart';
 import '../l10n/generated/app_localizations.dart';
-import '../services/cimbar_asset_server.dart';
 import '../services/cimbar_bridge.dart';
 import '../services/cimbar_camera_frames.dart';
 import '../services/file_service.dart';
@@ -40,6 +39,22 @@ bool shouldGrantCimbarWebViewMediaPermission({
   // for capture while scanning color codes.
   if (types.isEmpty) return true;
   return types.contains(WebViewPermissionResourceType.camera);
+}
+
+/// Converts libcimbar's per-stream fountain report into one stable UI value.
+///
+/// Reports can temporarily shrink, reorder, or contain a stale lower value as
+/// decoder workers finish out of order. A user-facing transfer cannot undo
+/// bytes it has already recovered, so the displayed value must be monotonic.
+@visibleForTesting
+double? stableCimbarDecodeProgress(double? current, List<double>? report) {
+  var next = current;
+  for (final value in report ?? const <double>[]) {
+    if (!value.isFinite) continue;
+    final clamped = value.clamp(0.0, 1.0).toDouble();
+    if (next == null || clamped > next) next = clamped;
+  }
+  return next;
 }
 
 enum _CimbarStatus {
@@ -118,6 +133,7 @@ class _CimbarTransferScreenState extends State<CimbarTransferScreen>
   bool _sendHistoryWritten = false;
   double? _decodeProgress;
   int _receivedBytes = 0;
+  int _decodedOpticalBytes = 0;
   int? _expectedBytes;
   TransferFile? _receivedFile;
   StoredTransfer? _storedFile;
@@ -125,10 +141,9 @@ class _CimbarTransferScreenState extends State<CimbarTransferScreen>
   bool get _supportedPlatform => Platform.isAndroid || Platform.isIOS;
   bool get _isSending => widget.direction == CimbarDirection.send;
 
-  /// Android keeps the Flutter-camera fallback because its release build has
-  /// no INTERNET permission and therefore cannot use a loopback WebView origin.
-  /// iOS uses WKWebView getUserMedia on the loopback-only asset origin, avoiding
-  /// expensive RGBA/base64 copies and preserving libcimbar's full frame rate.
+  /// Android keeps the Flutter-camera fallback because file-origin WebView
+  /// camera capture differs across vendors. iOS uses WKWebView getUserMedia;
+  /// both platforms load bundled files directly and never open a socket.
   bool get _useNativeCameraFeed => !_isSending && Platform.isAndroid;
   AppLocalizations get _l10n => AppLocalizations.of(context)!;
 
@@ -196,9 +211,9 @@ class _CimbarTransferScreenState extends State<CimbarTransferScreen>
 
   Future<void> _initializeWebView() async {
     try {
-      // Offline-only: iOS loads the bundled assets from a loopback-only origin
-      // so WKWebView can use getUserMedia. Android uses the asset origin and
-      // the native camera fallback, keeping the release manifest network-free.
+      // Offline-only: every page, worker and WASM byte is a bundled Flutter
+      // asset. The WASM preload generated beside the upstream binary avoids
+      // fetch/XHR on WKWebView's file origin without opening a loopback socket.
       PlatformWebViewControllerCreationParams params =
           const PlatformWebViewControllerCreationParams();
       if (WebViewPlatform.instance is WebKitWebViewPlatform) {
@@ -275,15 +290,7 @@ class _CimbarTransferScreenState extends State<CimbarTransferScreen>
       }
       setState(() => _controller = controller);
       final pageName = _isSending ? 'send.html' : 'receive.html';
-      if (Platform.isIOS) {
-        // Emscripten cannot fetch its WASM binary from WKWebView's file://
-        // Flutter asset origin. Serve bundled files only on loopback; the
-        // socket never listens on a LAN interface and the app stays offline.
-        final assets = await CimbarAssetServer.instance.ensureStarted();
-        await controller.loadRequest(assets.pageUri(pageName));
-      } else {
-        await controller.loadFlutterAsset('assets/cimbar/$pageName');
-      }
+      await controller.loadFlutterAsset('assets/cimbar/$pageName');
     } catch (error, stack) {
       debugPrint('[OneSend CIMBAR] webview init failed: $error\n$stack');
       if (!mounted) return;
@@ -406,16 +413,23 @@ class _CimbarTransferScreenState extends State<CimbarTransferScreen>
           _receiveStarted = true;
           _error = null;
           _decodeProgress = null;
+          _decodedOpticalBytes = 0;
           _status = _CimbarStatus.cameraStarted;
         });
       case 'decode-progress':
         if (_isSending) return;
         final values = event.progressValues();
-        final progress = values == null || values.isEmpty
-            ? null
-            : values.reduce((a, b) => a + b) / values.length;
+        final progress = stableCimbarDecodeProgress(_decodeProgress, values);
+        final decodedBytes = event.integerValue('decodedBytes');
+        final changed =
+            progress != _decodeProgress ||
+            (decodedBytes != null && decodedBytes > _decodedOpticalBytes);
+        if (!changed) return;
         _setState(() {
-          _decodeProgress = progress?.clamp(0, 1).toDouble();
+          _decodeProgress = progress;
+          if (decodedBytes != null && decodedBytes > _decodedOpticalBytes) {
+            _decodedOpticalBytes = decodedBytes;
+          }
           _status = _CimbarStatus.decoding;
         });
       case 'receive-file-start':
@@ -504,6 +518,7 @@ class _CimbarTransferScreenState extends State<CimbarTransferScreen>
       _receivePaused = false;
       _saving = false;
       _receivedBytes = 0;
+      _decodedOpticalBytes = 0;
       _expectedBytes = null;
       _fileName = null;
       _fileSize = 0;
@@ -521,6 +536,7 @@ class _CimbarTransferScreenState extends State<CimbarTransferScreen>
       _receivePaused = false;
       _saving = false;
       _receivedBytes = 0;
+      _decodedOpticalBytes = 0;
       _expectedBytes = null;
     });
   }
@@ -606,6 +622,7 @@ class _CimbarTransferScreenState extends State<CimbarTransferScreen>
       _receiveStarted = false;
       if (clearProgress) {
         _receivedBytes = 0;
+        _decodedOpticalBytes = 0;
         _expectedBytes = null;
         _decodeProgress = null;
       }
@@ -949,6 +966,7 @@ class _CimbarTransferScreenState extends State<CimbarTransferScreen>
       _fileSize = 0;
       _sendBytesRead = 0;
       _receivedBytes = 0;
+      _decodedOpticalBytes = 0;
       _expectedBytes = null;
       _receivedFile = null;
       _storedFile = null;
@@ -967,7 +985,7 @@ class _CimbarTransferScreenState extends State<CimbarTransferScreen>
     if (mounted) setState(callback);
   }
 
-  String _maxSizeLabel(AppLocalizations l10n) => l10n.cimbarMebibytes('16');
+  String _maxSizeLabel(AppLocalizations l10n) => l10n.cimbarMebibytes('33');
 
   String _statusText(AppLocalizations l10n) {
     return switch (_status) {
@@ -1087,12 +1105,16 @@ class _CimbarTransferScreenState extends State<CimbarTransferScreen>
   Widget _buildStatusPanel(AppLocalizations l10n) {
     final theme = Theme.of(context);
     final elapsed = _receiveStopwatch?.elapsed ?? Duration.zero;
+    final speedBytes = _expectedBytes == null
+        ? _decodedOpticalBytes
+        : _receivedBytes;
     final measuredSpeed = elapsed.inMilliseconds <= 0
         ? 0.0
-        : _receivedBytes / 1000 / (elapsed.inMilliseconds / 1000);
+        : speedBytes / 1000 / (elapsed.inMilliseconds / 1000);
     final progress = _expectedBytes == null || _expectedBytes == 0
         ? null
         : (_receivedBytes / _expectedBytes!).clamp(0, 1).toDouble();
+    final displayedProgress = progress ?? _decodeProgress;
 
     // Compact fixed footer — never scroll; stage above takes remaining height.
     return Material(
@@ -1129,13 +1151,12 @@ class _CimbarTransferScreenState extends State<CimbarTransferScreen>
             ],
             if (!_isSending) ...[
               const SizedBox(height: 6),
-              if (progress != null) LinearProgressIndicator(value: progress),
-              if (_decodeProgress != null && progress == null)
-                LinearProgressIndicator(value: _decodeProgress),
+              if (displayedProgress != null)
+                LinearProgressIndicator(value: displayedProgress),
               const SizedBox(height: 4),
               Text(
                 '${l10n.currentRate(formatTransferSpeed(measuredSpeed * 1000))}'
-                '${_expectedBytes == null ? '' : ' · ${((progress ?? 0) * 100).round()}%'}',
+                '${displayedProgress == null ? '' : ' · ${(displayedProgress * 100).round()}%'}',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.titleSmall?.copyWith(

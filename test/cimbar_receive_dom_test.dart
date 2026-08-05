@@ -30,10 +30,33 @@ void main() {
   test('receiver arms the bridge before loading Emscripten', () async {
     final html = await rootBundle.loadString('assets/cimbar/receive.html');
     final boot = html.indexOf('OneSendCimbar.bootReceive()');
+    final preload = html.indexOf(
+      'upstream/cimbar_wasm_binary.2026-07-13T0523.js',
+    );
     final wasm = html.indexOf('upstream/cimbar_js.2026-07-13T0523.js');
+    final worker = html.indexOf(
+      'upstream/cimbar_recv_worker_inline.2026-07-13T0523.js',
+    );
 
     expect(boot, greaterThanOrEqualTo(0));
+    expect(preload, greaterThanOrEqualTo(0));
+    expect(worker, greaterThanOrEqualTo(0));
+    expect(preload, lessThan(boot));
     expect(wasm, greaterThan(boot));
+  });
+
+  test('receiver has one Flutter-owned monotonic progress surface', () async {
+    final html = await rootBundle.loadString('assets/cimbar/receive.html');
+    final screen = await File(
+      'lib/screens/cimbar_transfer_screen.dart',
+    ).readAsString();
+
+    expect(html, contains('#progress_bars { display: none; }'));
+    expect(screen, contains('stableCimbarDecodeProgress'));
+    expect(
+      screen,
+      contains('final displayedProgress = progress ?? _decodeProgress'),
+    );
   });
 
   test('pause keeps the camera pipeline reusable for resume', () async {
@@ -80,5 +103,8 @@ void main() {
       lessThan(startReceive.indexOf('initializeReceiveVideo()')),
     );
     expect(bridge, contains("data.error === 'no wasm'"));
+    expect(bridge, contains('decodedOpticalBytes'));
+    expect(bridge, contains('OneSendCimbarInlineReceiveWorkerSource'));
+    expect(bridge, contains("type: 'onesend-wasm-init'"));
   });
 }

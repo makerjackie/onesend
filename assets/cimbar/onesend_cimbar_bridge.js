@@ -28,6 +28,7 @@
     receiveSession: 0,
     receiveStartedAt: 0,
     receiveWorkers: [],
+    receiveWorkerBlobUrls: [],
     receiveWorkersExpected: 0,
     receiveWorkersReady: 0,
     receiveWorkersReadyResolve: null,
@@ -41,6 +42,7 @@
     nativeFrames: false,
     nextNativeWorker: 0,
     nativeFeedAnnounced: false,
+    decodedOpticalBytes: 0,
   };
 
   function bridge(type, details) {
@@ -278,6 +280,10 @@
         bridge('decode-progress', {
           progress: report.map(function (value) { return Number(value); }),
           mode: 'B',
+          decodedBytes: state.decodedOpticalBytes,
+          elapsedMs: state.receiveStartedAt > 0
+            ? Math.max(0, performance.now() - state.receiveStartedAt)
+            : 0,
         });
       }
       return originalProgress.apply(this, arguments);
@@ -314,6 +320,8 @@
         fail('decode', data.res || 'worker decoder error');
       } else if (data && data.failed_extract) {
         bridge('decode-progress', { phase: 'scan', worker: workerId });
+      } else if (data && data.buff && Number(data.buff.byteLength) > 0) {
+        state.decodedOpticalBytes += Number(data.buff.byteLength);
       }
       return originalDecode.apply(this, arguments);
     };
@@ -425,8 +433,22 @@
       construct(target, args) {
         const receiveGeneration = state.receiveGeneration;
         const nextArgs = args.slice();
+        var inlineWorker = false;
         if (nextArgs.length > 0) {
-          nextArgs[0] = resolveUpstreamWorkerUrl(nextArgs[0]);
+          const requestedUrl = nextArgs[0];
+          const inlineSource = global.OneSendCimbarInlineReceiveWorkerSource;
+          if (typeof requestedUrl === 'string' &&
+              requestedUrl.indexOf('recv-worker.') >= 0 &&
+              typeof inlineSource === 'string' && inlineSource.length > 0) {
+            const blobUrl = global.URL.createObjectURL(
+              new Blob([inlineSource], { type: 'text/javascript' }),
+            );
+            state.receiveWorkerBlobUrls.push(blobUrl);
+            nextArgs[0] = blobUrl;
+            inlineWorker = true;
+          } else {
+            nextArgs[0] = resolveUpstreamWorkerUrl(requestedUrl);
+          }
         }
         const worker = Reflect.construct(target, nextArgs);
         state.receiveWorkers.push(worker);
@@ -467,6 +489,18 @@
             fail('decode', error);
           }
         });
+        if (inlineWorker) {
+          const wasm = global.Module && global.Module.wasmBinary;
+          if (!(wasm instanceof Uint8Array) || wasm.length === 0) {
+            worker.terminate();
+            throw new Error('离线解码 worker 缺少 WASM 字节。');
+          }
+          const copy = wasm.slice();
+          worker.postMessage(
+            { type: 'onesend-wasm-init', wasmBinary: copy.buffer },
+            [copy.buffer],
+          );
+        }
         return worker;
       },
     });
@@ -482,6 +516,12 @@
       }
     }
     state.receiveWorkers = [];
+    for (const blobUrl of state.receiveWorkerBlobUrls) {
+      try {
+        global.URL.revokeObjectURL(blobUrl);
+      } catch (error) {}
+    }
+    state.receiveWorkerBlobUrls = [];
     state.receiveWorkersExpected = 0;
     state.receiveWorkersReady = 0;
     state.receiveWorkersReadyResolve = null;
@@ -702,6 +742,7 @@
     state.receiveVideoStarted = false;
     state.nextNativeWorker = 0;
     state.nativeFeedAnnounced = false;
+    state.decodedOpticalBytes = 0;
     try {
       installReceiveWorkerTracking();
       const receiveGeneration = state.receiveGeneration;
@@ -866,6 +907,7 @@
     state.nativeFrames = false;
     state.nextNativeWorker = 0;
     state.nativeFeedAnnounced = false;
+    state.decodedOpticalBytes = 0;
     stopReceiveWorkers();
   }
 

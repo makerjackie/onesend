@@ -28,12 +28,6 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>NSCameraUsageDescription</key>
 	<string>OneSend uses the camera only to scan changing visual codes and receive files.</string>
-	<key>NSAppTransportSecurity</key>
-	<dict>
-		<!-- Allows only the app's 127.0.0.1 offline CIMBAR asset origin. -->
-		<key>NSAllowsLocalNetworking</key>
-		<true/>
-	</dict>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>LSSupportsOpeningDocumentsInPlace</key>
