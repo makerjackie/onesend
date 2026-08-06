@@ -286,11 +286,17 @@ type CimbarTransferProps = {
   direction?: View;
   /** Hide local send/receive tabs; parent already owns navigation. */
   embedded?: boolean;
+  /** Start camera preparation when opened from a sender's receiver-link QR. */
+  autoStartReceiver?: boolean;
+  /** Open the parent's no-app receiver handoff. */
+  onOpenReceiverSetup?: () => void;
 };
 
 export function CimbarTransfer({
   direction,
   embedded = false,
+  autoStartReceiver = false,
+  onOpenReceiverSetup,
 }: CimbarTransferProps = {}) {
   const [view, setView] = useState<View>(direction ?? "send");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -313,6 +319,7 @@ export function CimbarTransfer({
   const [receiverGapHint, setReceiverGapHint] = useState<string | null>(null);
   const receiveStartedAtRef = useRef<number | null>(null);
   const scanStatsRef = useRef({ noData: 0, decoded: 0 });
+  const autoStartReceiverHandledRef = useRef(false);
 
   useEffect(() => {
     if (!direction || direction === view) return;
@@ -764,7 +771,7 @@ export function CimbarTransfer({
     scheduleVideoFrame();
   }
 
-  async function startReceiver() {
+  async function startReceiver(options?: { automatic?: boolean }) {
     if (receiverState === "starting" || receiverState === "receiving") return;
     if (!navigator.mediaDevices?.getUserMedia) {
       setReceiverState("error");
@@ -901,10 +908,32 @@ export function CimbarTransfer({
       scheduleVideoFrame();
     } catch (error) {
       stopReceiverResources();
+      if (options?.automatic) {
+        setReceiverState("idle");
+        setReceiverError("浏览器需要确认摄像头权限，请点“开启摄像头”并允许访问。");
+        return;
+      }
       setReceiverState("error");
       setReceiverError(describeError(error));
     }
   }
+
+  useEffect(() => {
+    if (
+      !autoStartReceiver ||
+      view !== "receive" ||
+      autoStartReceiverHandledRef.current
+    ) {
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      autoStartReceiverHandledRef.current = true;
+      void startReceiver({ automatic: true });
+    }, 0);
+    return () => window.clearTimeout(timer);
+    // This one-shot request is owned by the parent receiver-launch URL.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoStartReceiver, view]);
 
   function stopReceiver() {
     stopReceiverResources();
@@ -1050,6 +1079,15 @@ export function CimbarTransfer({
                     {senderState === "loading" ? "准备中…" : "开始发送"}
                   </button>
                 )}
+                {!senderIsActive && onOpenReceiverSetup && (
+                  <button
+                    className="button button-secondary"
+                    type="button"
+                    onClick={onOpenReceiverSetup}
+                  >
+                    对方没有 App？
+                  </button>
+                )}
                 {senderState === "sending" && (
                   <button className="button button-secondary" type="button" onClick={pauseSender}>
                     暂停
@@ -1128,7 +1166,13 @@ export function CimbarTransfer({
             </div>
             <div className="web-transfer-actions web-transfer-actions-primary web-cimbar-actions">
               {!receiverActive && receiverState !== "complete" && (
-                <button className="button button-primary" type="button" onClick={startReceiver}>
+                <button
+                  className="button button-primary"
+                  type="button"
+                  onClick={() => {
+                    void startReceiver();
+                  }}
+                >
                   开启摄像头
                 </button>
               )}
