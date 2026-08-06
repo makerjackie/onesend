@@ -77,6 +77,18 @@ test("web transfer keeps fast defaults, two primary modes, and completed-file ac
   assert.doesNotMatch(transfer, /href="\/cimbar"/);
 });
 
+test("sender can bootstrap a no-app web receiver in the matching mode", () => {
+  assert.match(transfer, /buildReceiverLaunchUrl/);
+  assert.match(transfer, /parseReceiverLaunch/);
+  assert.match(transfer, /对方没有 App？/);
+  assert.match(transfer, /先让对方打开接收页/);
+  assert.match(transfer, /web-receiver-setup-dialog/);
+  assert.match(transfer, /startCamera\(\{ automatic: true \}\)/);
+  assert.match(transfer, /autoStartReceiver=\{autoStartCimbarReceiver\}/);
+  assert.match(styles, /\.web-receiver-setup-backdrop/);
+  assert.match(styles, /\.web-receiver-setup-dialog/);
+});
+
 test("web transfer allows live mode switches without pausing first", () => {
   // Must not hard-block mode changes while sending/paused.
   assert.doesNotMatch(

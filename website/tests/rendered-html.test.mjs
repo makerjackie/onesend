@@ -68,6 +68,7 @@ test("server-renders independent send and receive surfaces without role tabs", a
   assert.match(sendHtml, /发送文件/);
   assert.match(sendHtml, /data-transfer-role="send"/);
   assert.match(sendHtml, /开始发送/);
+  assert.match(sendHtml, /对方没有 App/);
   assert.doesNotMatch(sendHtml, /role="tablist"/);
   assert.match(receiveHtml, /接收文件/);
   assert.match(receiveHtml, /data-transfer-role="receive"/);

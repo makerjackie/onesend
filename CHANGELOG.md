@@ -4,12 +4,14 @@
 
 ### 中文
 
+- 网页发送端新增“对方没有 App”引导：先用普通二维码打开手机网页接收页，自动选择与发送端一致的视觉模式并尝试启动摄像头；受浏览器限制时退回一次明确的授权按钮。入口链接不包含文件或会话数据，文件仍只通过屏幕和摄像头传输。
 - 彩色接收在解码器繁忙时丢弃过期相机帧，不再让帧队列持续积压；同时限制进度事件刷新频率并保持网页进度单调前进，减少卡顿和进度条抖动。
 - 黑白二维码接收忽略没有带来新数据的重复扫描事件，减少无效界面重绘；桌面高密度二维码启用更完整的识别搜索以改善弱光、倾斜与远距离场景。
 - 新增接收背压、单调进度与重复帧处理测试；Flutter 全量 138 项测试和网页构建/41 项测试全部通过。
 
 ### English
 
+- Added a no-app web handoff: the sender first shows a regular QR that opens the mobile web receiver, selects the sender's visual mode, and attempts to start the camera. Browsers that require a user gesture fall back to one clear permission button. The link contains no file or session data; the file still travels only through the screen and camera.
 - Color reception now drops stale camera frames while every decoder worker is busy, throttles progress events, and keeps web progress monotonic to reduce queue buildup, UI stalls, and progress jitter.
 - Black-and-white QR reception skips duplicate scan events that add no data, reducing unnecessary UI rebuilds; desktop high-density QR decoding now uses a more thorough search for difficult lighting, angle, and distance conditions.
 - Added coverage for receive backpressure, monotonic progress, and duplicate-frame handling; all 138 Flutter tests and the website build/41 tests pass.

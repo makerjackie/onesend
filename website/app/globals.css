@@ -1144,6 +1144,95 @@ body:has(.transfer-page) {
   text-align: center;
 }
 
+.web-receiver-setup-backdrop {
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgb(20 23 18 / 62%);
+  backdrop-filter: blur(7px);
+}
+
+.web-receiver-setup-dialog {
+  width: min(100%, 680px);
+  max-height: calc(100svh - 40px);
+  overflow: auto;
+  display: grid;
+  grid-template-columns: minmax(220px, 0.8fr) minmax(0, 1.2fr);
+  grid-template-areas:
+    "header header"
+    "code copy"
+    "actions actions";
+  gap: 18px 24px;
+  padding: 22px;
+  border: 1px solid var(--line-strong);
+  border-radius: 22px;
+  background: var(--paper);
+  box-shadow: 0 28px 80px rgb(0 0 0 / 28%);
+}
+
+.web-receiver-setup-dialog > header {
+  grid-area: header;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.web-receiver-setup-dialog h3 {
+  margin: 4px 0 0;
+  font-size: clamp(22px, 4vw, 32px);
+  letter-spacing: -0.045em;
+}
+
+.web-receiver-setup-code {
+  grid-area: code;
+  display: grid;
+  place-items: center;
+  align-self: center;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: #fff;
+}
+
+.web-receiver-setup-code canvas {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  image-rendering: pixelated;
+}
+
+.web-receiver-setup-copy {
+  grid-area: copy;
+  align-content: center;
+  display: grid;
+  gap: 5px;
+}
+
+.web-receiver-setup-copy strong {
+  font-size: 14px;
+}
+
+.web-receiver-setup-copy p {
+  margin: 0 0 11px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.web-receiver-setup-actions {
+  grid-area: actions;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
 .web-camera-stage {
   flex: 1 1 auto;
   min-height: 390px;
@@ -1837,6 +1926,51 @@ body:has(.transfer-page) {
 
   .web-transfer-actions-primary .button,
   .web-receipt-actions .button {
+    width: 100%;
+  }
+
+  .web-receiver-setup-backdrop {
+    align-items: end;
+    padding: 10px;
+  }
+
+  .web-receiver-setup-dialog {
+    max-height: calc(100svh - 20px);
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "header"
+      "code"
+      "copy"
+      "actions";
+    gap: 12px;
+    padding: 16px;
+    border-radius: 20px;
+  }
+
+  .web-receiver-setup-dialog > header {
+    gap: 10px;
+  }
+
+  .web-receiver-setup-dialog h3 {
+    font-size: 23px;
+  }
+
+  .web-receiver-setup-code {
+    width: min(100%, 250px);
+    justify-self: center;
+    padding: 9px;
+  }
+
+  .web-receiver-setup-copy p {
+    margin-bottom: 7px;
+  }
+
+  .web-receiver-setup-actions {
+    flex-direction: column;
+    padding-top: 12px;
+  }
+
+  .web-receiver-setup-actions .button {
     width: 100%;
   }
 

@@ -7,6 +7,10 @@ import { useEffect, useRef, useState } from "react";
 import { Brand } from "./brand";
 import { CimbarTransfer } from "./cimbar/cimbar-client";
 import {
+  buildReceiverLaunchUrl,
+  parseReceiverLaunch,
+} from "./receiver-launch.mjs";
+import {
   TRANSFER_MODES,
   OpticalReceiver,
   OpticalSender,
@@ -319,6 +323,37 @@ function drawQr(
   }
 }
 
+/** Draw the low-density URL QR used only to open the web receiver. */
+function drawReceiverLaunchQr(canvas: HTMLCanvasElement, url: string) {
+  const symbol = QRCode.create(url, { errorCorrectionLevel: "M" });
+  const marginModules = 4;
+  const modulePx = 5;
+  const pixelSize = (symbol.modules.size + marginModules * 2) * modulePx;
+  canvas.width = pixelSize;
+  canvas.height = pixelSize;
+  canvas.style.setProperty("width", `${pixelSize}px`);
+  canvas.style.setProperty("height", `${pixelSize}px`);
+  canvas.style.setProperty("image-rendering", "pixelated");
+
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("The browser cannot draw the receiver link.");
+  context.imageSmoothingEnabled = false;
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, pixelSize, pixelSize);
+  context.fillStyle = "#000000";
+  for (let row = 0; row < symbol.modules.size; row += 1) {
+    for (let column = 0; column < symbol.modules.size; column += 1) {
+      if (!symbol.modules.get(row, column)) continue;
+      context.fillRect(
+        (column + marginModules) * modulePx,
+        (row + marginModules) * modulePx,
+        modulePx,
+        modulePx,
+      );
+    }
+  }
+}
+
 /**
  * Match protocol frame intervals. An earlier 140–170 ms dwell capped Turbo at
  * ~6 fps (~13 KB/s) and made the mode look broken. Real-world scan success can
@@ -450,6 +485,10 @@ export function WebTransfer({
   const [receiverError, setReceiverError] = useState<string | null>(null);
   const [scanHint, setScanHint] = useState<string | null>(null);
   const [modeNotice, setModeNotice] = useState<string | null>(null);
+  const [receiverSetupOpen, setReceiverSetupOpen] = useState(false);
+  const [receiverLaunchUrl, setReceiverLaunchUrl] = useState("");
+  const [autoStartCimbarReceiver, setAutoStartCimbarReceiver] =
+    useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const modeNoticeTimerRef = useRef<number | null>(null);
@@ -473,6 +512,8 @@ export function WebTransfer({
   const modeRef = useRef<TransferModeChoice>("fast");
   const modeMenuRef = useRef<HTMLDetailsElement>(null);
   const previewUrlRef = useRef<string | null>(null);
+  const receiverSetupCanvasRef = useRef<HTMLCanvasElement>(null);
+  const receiverLaunchHandledRef = useRef(false);
   const usesCimbar = mode === "cimbar";
   const roleIsLocked = lockedRole !== undefined;
   const captureCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -502,6 +543,15 @@ export function WebTransfer({
       previewUrlRef.current = null;
     }
     setPreviewUrl(null);
+  }
+
+  function openReceiverSetup() {
+    const url = buildReceiverLaunchUrl(
+      window.location.origin,
+      modeRef.current,
+    );
+    setReceiverLaunchUrl(url);
+    setReceiverSetupOpen(true);
   }
 
   function showReceivedFile(file: ReceivedFile) {
@@ -564,6 +614,29 @@ export function WebTransfer({
       if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    if (!receiverSetupOpen || !receiverLaunchUrl) return;
+    const frame = window.requestAnimationFrame(() => {
+      const canvas = receiverSetupCanvasRef.current;
+      if (!canvas) return;
+      try {
+        drawReceiverLaunchQr(canvas, receiverLaunchUrl);
+      } catch (error) {
+        setSenderError(describeError(error));
+      }
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [receiverLaunchUrl, receiverSetupOpen]);
+
+  useEffect(() => {
+    if (!receiverSetupOpen) return;
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") setReceiverSetupOpen(false);
+    }
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [receiverSetupOpen]);
 
   useEffect(() => {
     function openFromHash() {
@@ -1022,7 +1095,7 @@ export function WebTransfer({
     }
   }
 
-  async function startCamera() {
+  async function startCamera(options?: { automatic?: boolean }) {
     if (!navigator.mediaDevices?.getUserMedia) {
       setReceiverState("error");
       setReceiverError(
@@ -1196,10 +1269,36 @@ export function WebTransfer({
       schedule(30);
     } catch (error) {
       stopCameraTracks();
+      if (options?.automatic) {
+        setReceiverState("idle");
+        setReceiverError(null);
+        setScanHint("浏览器需要确认摄像头权限，请点“开启摄像头”并允许访问。");
+        return;
+      }
       setReceiverState("error");
       setReceiverError(describeError(error));
     }
   }
+
+  useEffect(() => {
+    if (lockedRole !== "receive" || receiverLaunchHandledRef.current) return;
+    const launch = parseReceiverLaunch(window.location.search);
+    if (!launch?.autoStart) return;
+    const timer = window.setTimeout(() => {
+      receiverLaunchHandledRef.current = true;
+      const launchMode = launch.mode as TransferModeChoice;
+      modeRef.current = launchMode;
+      setMode(launchMode);
+      if (launchMode === "cimbar") {
+        setAutoStartCimbarReceiver(true);
+      } else {
+        void startCamera({ automatic: true });
+      }
+    }, 0);
+    return () => window.clearTimeout(timer);
+    // This is a one-shot handoff from the URL into the existing receiver.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lockedRole]);
 
   function stopCamera() {
     stopCameraTracks();
@@ -1301,6 +1400,7 @@ export function WebTransfer({
                       key="cimbar-send"
                       direction="send"
                       embedded
+                      onOpenReceiverSetup={openReceiverSetup}
                     />
                   </div>
                 ) : (
@@ -1357,6 +1457,15 @@ export function WebTransfer({
                               onClick={startSender}
                             >
                               {senderState === "preparing" ? copy.preparing : copy.displayCode}
+                            </button>
+                          )}
+                          {!senderIsActive && (
+                            <button
+                              className="button button-secondary"
+                              type="button"
+                              onClick={openReceiverSetup}
+                            >
+                              对方没有 App？
                             </button>
                           )}
                           {senderState === "sending" && (
@@ -1445,6 +1554,7 @@ export function WebTransfer({
                       key="cimbar-receive"
                       direction="receive"
                       embedded
+                      autoStartReceiver={autoStartCimbarReceiver}
                     />
                   </div>
                 ) : (
@@ -1456,7 +1566,13 @@ export function WebTransfer({
                       </div>
                       <div className="web-transfer-actions web-transfer-actions-primary">
                         {!cameraIsActive && receiverState !== "complete" && (
-                          <button className="button button-primary" type="button" onClick={startCamera}>
+                          <button
+                            className="button button-primary"
+                            type="button"
+                            onClick={() => {
+                              void startCamera();
+                            }}
+                          >
                             {receiverPaused ? copy.resume : copy.startCamera}
                           </button>
                         )}
@@ -1586,6 +1702,70 @@ export function WebTransfer({
               </article>
             )}
         </div>
+
+        {receiverSetupOpen && (
+          <div
+            className="web-receiver-setup-backdrop"
+            role="presentation"
+            onMouseDown={() => setReceiverSetupOpen(false)}
+          >
+            <section
+              className="web-receiver-setup-dialog"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="web-receiver-setup-title"
+              onMouseDown={(event) => event.stopPropagation()}
+            >
+              <header>
+                <div>
+                  <span className="mono-label">NO APP NEEDED</span>
+                  <h3 id="web-receiver-setup-title">先让对方打开接收页</h3>
+                </div>
+                <button
+                  className="button button-secondary button-compact"
+                  type="button"
+                  onClick={() => setReceiverSetupOpen(false)}
+                >
+                  关闭
+                </button>
+              </header>
+              <div className="web-receiver-setup-code">
+                <canvas
+                  ref={receiverSetupCanvasRef}
+                  width={260}
+                  height={260}
+                  role="img"
+                  aria-label="打开 OneSend 网页接收页"
+                />
+              </div>
+              <div className="web-receiver-setup-copy">
+                <strong>1. 接收方用手机相机扫这个码</strong>
+                <p>网页会直接进入接收页，并尝试申请摄像头权限。</p>
+                <strong>2. 对方看到取景框后，再开始发送</strong>
+                <p>文件仍只通过屏幕和摄像头传输，不经过服务器。</p>
+              </div>
+              <div className="web-receiver-setup-actions">
+                <button
+                  className="button button-primary"
+                  type="button"
+                  onClick={() => setReceiverSetupOpen(false)}
+                >
+                  对方已打开，返回发送
+                </button>
+                {receiverLaunchUrl && (
+                  <a
+                    className="button button-secondary"
+                    href={receiverLaunchUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    在本机打开接收页
+                  </a>
+                )}
+              </div>
+            </section>
+          </div>
+        )}
 
         <div className="web-transfer-notes web-transfer-notes-compact">
           <p>
